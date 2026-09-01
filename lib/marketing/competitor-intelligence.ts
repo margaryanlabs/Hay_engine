@@ -14,8 +14,21 @@ export type CompetitorEvidence = {
   error?: string;
 };
 
+function normalizeCompetitorInput(competitor: CompetitorInput) {
+  const rawName = competitor.name.trim();
+  const [labelPart, urlPart] = rawName.split("|").map(part => part.trim());
+  const directUrl = /^https?:\/\//i.test(rawName) ? rawName : undefined;
+  const embeddedUrl = urlPart && /^https?:\/\//i.test(urlPart) ? urlPart : undefined;
+  const url = competitor.url || embeddedUrl || directUrl;
+  let name = embeddedUrl ? labelPart : rawName;
+  if (directUrl) {
+    try { name = new URL(directUrl).hostname.replace(/^www\./, ""); } catch { name = rawName; }
+  }
+  return { ...competitor, name: name || rawName, url };
+}
+
 export async function collectCompetitorEvidence(competitors: CompetitorInput[], limit = 4): Promise<CompetitorEvidence[]> {
-  const selected = competitors.slice(0, Math.max(0, Math.min(limit, 5)));
+  const selected = competitors.slice(0, Math.max(0, Math.min(limit, 5))).map(normalizeCompetitorInput);
   return Promise.all(selected.map(async competitor => {
     const base: CompetitorEvidence = {
       name: competitor.name,
