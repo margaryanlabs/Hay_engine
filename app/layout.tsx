@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./creator.css";
 import "./marketing.css";
+import "./login.css";
 
 export const metadata: Metadata = {
   title: "HAY Engine — Armenian AI Marketing & Creator OS",
