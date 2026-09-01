@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "quality": "tsx scripts/quality-check.ts"
+    "quality": "rm -rf .quality-build && tsc -p scripts/tsconfig.quality.json && node .quality-build/scripts/quality-check.js"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.5",
@@ -25,7 +25,6 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "tsx": "^4.20.6",
     "typescript": "7.0.2"
   }
 }
