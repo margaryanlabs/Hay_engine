@@ -1,0 +1,26 @@
+[
+  {
+    "written": "BTC",
+    "spoken_hy_eastern": "Բիթքոյն",
+    "spoken_hy_western": "Բիթքոյն",
+    "category": "finance",
+    "source": "curated",
+    "status": "seed"
+  },
+  {
+    "written": "OpenAI",
+    "spoken_hy_eastern": "Օփեն Էյ Այ",
+    "spoken_hy_western": "Օփեն Էյ Այ",
+    "category": "brand",
+    "source": "curated",
+    "status": "seed"
+  },
+  {
+    "written": "funding rate",
+    "spoken_hy_eastern": "ֆանդինգ ռեյթ",
+    "spoken_hy_western": "ֆանդինգ ռեյթ",
+    "category": "finance",
+    "source": "curated",
+    "status": "seed"
+  }
+]
