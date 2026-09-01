@@ -6,6 +6,7 @@ import "./landing-v2-wow.css";
 import "./creator.css";
 import "./marketing.css";
 import "./marketing-v2.css";
+import "./competitor-intel.css";
 import "./studio-status.css";
 import "./studio-command.css";
 import "./studio-onboarding.css";
