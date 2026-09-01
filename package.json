@@ -1,6 +1,6 @@
 {
   "name": "hay-engine",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "engines": {
     "node": ">=22"
@@ -17,7 +17,8 @@
     "next": "16.3.3",
     "openai": "7.5.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "sharp": "0.34.4"
   },
   "devDependencies": {
     "@types/node": "latest",
