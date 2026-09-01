@@ -15,6 +15,12 @@ export default function StudioOnboarding(){
     void hydrate();
   },[]);
 
+  useEffect(()=>{
+    const reopen=()=>{window.localStorage.removeItem("hay-studio-onboarding-hidden");setHidden(false);setMode("loading");void hydrate();};
+    window.addEventListener("hay:onboarding-open",reopen);
+    return()=>window.removeEventListener("hay:onboarding-open",reopen);
+  },[]);
+
   async function hydrate(){
     try{
       const response=await fetch("/api/businesses",{cache:"no-store"});
