@@ -14,6 +14,7 @@
     "quality-check.ts",
     "../lib/hay/quality-suite.ts",
     "../lib/hay/quality-benchmark.ts",
+    "../lib/hay/quality-business-pack.ts",
     "../lib/hay/conversational.ts",
     "../lib/hay/normalize.ts",
     "../lib/hay/dictionary.ts",
