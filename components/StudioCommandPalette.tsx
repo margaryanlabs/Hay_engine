@@ -20,6 +20,8 @@ export default function StudioCommandPalette(){
     {label:"Social Channels",hint:"CONNECT",action:()=>scroll(".channelList")},
     {label:"Competitor Radar",hint:"RADAR",action:()=>scroll(".competitorsCard")},
     {label:"Content Pulse",hint:"CALENDAR",action:()=>scroll(".contentPulse")},
+    {label:"Approval Inbox",hint:"DECIDE",action:()=>scroll(".studioApprovalPanel")},
+    {label:"Performance Memory",hint:"LEARN",action:()=>scroll(".studioPerformancePanel")},
     {label:"Creator Engine",hint:"CREATE",action:()=>go("/creator")},
     {label:"HAY Voice Lab",hint:"VOICE",action:()=>go("/voice")},
     {label:"Armenian Quality",hint:"100/100",action:()=>go("/quality")},
