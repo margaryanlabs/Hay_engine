@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runArmenianQualityBenchmark } from "@/lib/hay/quality-benchmark";
+import { runArmenianQualityBenchmark } from "@/lib/hay/quality-suite";
 
 export const dynamic = "force-dynamic";
 
