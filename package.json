@@ -1,6 +1,6 @@
 {
   "name": "hay-engine",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "engines": {
     "node": ">=22"
@@ -9,7 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "quality": "rm -rf .quality-build && tsc -p scripts/tsconfig.quality.json && node .quality-build/scripts/quality-check.js"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.5",

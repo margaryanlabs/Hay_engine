@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "outDir": "../.quality-build",
+    "rootDir": "..",
+    "types": ["node"]
+  },
+  "include": [
+    "quality-check.ts",
+    "../lib/hay/quality-suite.ts",
+    "../lib/hay/quality-benchmark.ts",
+    "../lib/hay/conversational.ts",
+    "../lib/hay/normalize.ts",
+    "../lib/hay/dictionary.ts",
+    "../lib/hay/numbers.ts",
+    "../lib/hay/types.ts"
+  ]
+}

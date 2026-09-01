@@ -1,4 +1,4 @@
-import { CODE_SWITCH_DICTIONARY, PRONUNCIATION_DICTIONARY } from "./dictionary";
+import { CODE_SWITCH_DICTIONARY, HYBRID_ARMENIAN_FORMS, PRONUNCIATION_DICTIONARY } from "./dictionary";
 import { numberToArmenian } from "./numbers";
 import type { Dialect, Locale, NormalizationIssue, NormalizationResult } from "./types";
 
@@ -33,6 +33,13 @@ export function normalizeForSpeech(
     issues.push({ kind: "number", source, spoken });
     return spoken;
   });
+
+  for (const [regex, spoken] of HYBRID_ARMENIAN_FORMS) {
+    spokenText = spokenText.replace(regex, (source) => {
+      issues.push({ kind: "brand", source, spoken });
+      return spoken;
+    });
+  }
 
   for (const [source, spoken] of Object.entries(PRONUNCIATION_DICTIONARY)) {
     const regex = new RegExp(`\\b${escapeRegExp(source)}\\b`, "gi");

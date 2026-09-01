@@ -1,6 +1,7 @@
 node_modules
 .next
 out
+.quality-build
 .env
 .env.local
 .env.*.local
