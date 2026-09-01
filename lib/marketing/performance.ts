@@ -10,22 +10,28 @@ export type MarketingPerformanceContext = {
 
 const number = (value: unknown) => Number(value) || 0;
 
-export async function loadMarketingPerformance(businessId?: string): Promise<MarketingPerformanceContext | null> {
-  if (!businessId || !isSupabaseConfigured()) return null;
+export async function loadMarketingPerformance(businessId?: string, businessName?: string): Promise<MarketingPerformanceContext | null> {
+  if (!isSupabaseConfigured()) return null;
   const supabase = await createClient();
   const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
   const userId = claimsData?.claims?.sub;
   if (claimsError || !userId) return null;
-  const { data: business } = await supabase.from("businesses").select("id").eq("id", businessId).eq("owner_id", userId).maybeSingle();
-  if (!business) return null;
+
+  let query = supabase.from("businesses").select("id").eq("owner_id", userId).limit(1);
+  if (businessId) query = query.eq("id", businessId);
+  else if (businessName?.trim()) query = query.eq("name", businessName.trim());
+  else return null;
+  const { data: business } = await query.maybeSingle();
+  if (!business?.id) return null;
+  const resolvedBusinessId = String(business.id);
 
   const [{ data: snapshots }, { data: content }] = await Promise.all([
     supabase.from("content_metrics")
       .select("content_item_id,platform,views,reach,likes,comments,shares,saves,clicks,conversions,measured_at")
-      .eq("business_id", businessId).order("measured_at", { ascending: false }).limit(250),
+      .eq("business_id", resolvedBusinessId).order("measured_at", { ascending: false }).limit(250),
     supabase.from("content_items")
       .select("id,platform,format,hook,objective")
-      .eq("business_id", businessId).limit(250),
+      .eq("business_id", resolvedBusinessId).limit(250),
   ]);
 
   if (!snapshots?.length) return null;
