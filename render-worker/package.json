@@ -1,20 +1,29 @@
 {
   "name": "hay-engine-render-worker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
   "scripts": {
+    "start": "tsx src/server.ts",
     "studio": "remotion studio src/index.ts",
-    "render:sample": "remotion render src/index.ts HAY-Reel out/hay-sample.mp4 --props=sample-input.json"
+    "render:sample": "remotion render src/index.ts HAY-Reel out/hay-sample.mp4 --props=sample-input.json",
+    "check": "tsc --noEmit"
   },
   "dependencies": {
+    "@remotion/bundler": "4.0.506",
     "@remotion/media": "4.0.506",
+    "@remotion/renderer": "4.0.506",
+    "@supabase/supabase-js": "2.57.4",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "remotion": "4.0.506"
   },
   "devDependencies": {
     "@remotion/cli": "4.0.506",
-    "@types/react": "latest",
-    "typescript": "latest"
+    "@types/node": "22.18.1",
+    "@types/react": "19.1.12",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2"
   }
 }
