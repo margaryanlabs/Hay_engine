@@ -4,6 +4,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 export const runtime = "nodejs";
 
 type MetricRow = {
+  content_item_id?: string | null;
   platform?: string | null;
   measured_at?: string | null;
   impressions?: number | null;
@@ -16,6 +17,19 @@ type MetricRow = {
   clicks?: number | null;
   conversions?: number | null;
   watch_time_seconds?: number | null;
+};
+
+type MetricTotals = {
+  impressions:number;
+  reach:number;
+  views:number;
+  likes:number;
+  comments:number;
+  shares:number;
+  saves:number;
+  clicks:number;
+  conversions:number;
+  watchTimeSeconds:number;
 };
 
 const number = (value: unknown) => Number(value || 0);
@@ -92,11 +106,12 @@ export async function GET(request: Request) {
   // Keep only the latest metrics snapshot for each content item so totals are not double-counted.
   const latestByContent = new Map<string, MetricRow>();
   for (const row of metrics) {
-    const contentItemId = String((row as MetricRow & { content_item_id?: string }).content_item_id || "");
+    const contentItemId = String(row.content_item_id || "");
     if (contentItemId && !latestByContent.has(contentItemId)) latestByContent.set(contentItemId, row);
   }
   const latestMetrics = [...latestByContent.values()];
-  const totals = latestMetrics.reduce((acc, row) => ({
+  const emptyTotals: MetricTotals = { impressions: 0, reach: 0, views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0, conversions: 0, watchTimeSeconds: 0 };
+  const totals = latestMetrics.reduce<MetricTotals>((acc, row) => ({
     impressions: acc.impressions + number(row.impressions),
     reach: acc.reach + number(row.reach),
     views: acc.views + number(row.views),
@@ -107,7 +122,7 @@ export async function GET(request: Request) {
     clicks: acc.clicks + number(row.clicks),
     conversions: acc.conversions + number(row.conversions),
     watchTimeSeconds: acc.watchTimeSeconds + number(row.watch_time_seconds),
-  }), { impressions: 0, reach: 0, views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0, conversions: 0, watchTimeSeconds: 0 });
+  }), emptyTotals);
 
   const byPlatform = Object.entries(latestMetrics.reduce<Record<string, { views: number; reach: number; saves: number; clicks: number; conversions: number; posts: number }>>((acc, row) => {
     const platform = String(row.platform || "unknown");
