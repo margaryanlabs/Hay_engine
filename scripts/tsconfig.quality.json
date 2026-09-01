@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "Node16",
+    "moduleResolution": "Node16",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "strict": true,
@@ -12,6 +12,7 @@
   },
   "include": [
     "quality-check.ts",
+    "../lib/hay/quality-suite.ts",
     "../lib/hay/quality-benchmark.ts",
     "../lib/hay/conversational.ts",
     "../lib/hay/normalize.ts",
