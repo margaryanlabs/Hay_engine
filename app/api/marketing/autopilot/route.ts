@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAutopilotRun, type AutopilotMode } from "@/lib/marketing/autopilot";
 import { loadMarketingPerformance } from "@/lib/marketing/performance";
+import { persistMarketingPlan } from "@/lib/marketing/persistence";
 import type { BusinessProfile, CompetitorInput, SocialConnection } from "@/lib/marketing/types";
 
 export const runtime = "nodejs";
@@ -13,7 +14,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_business_profile" }, { status: 400 });
     }
     const mode = (["copilot", "approval", "autopublish"].includes(body.mode) ? body.mode : "approval") as AutopilotMode;
-    const performance = await loadMarketingPerformance(typeof body.businessId === "string" ? body.businessId : undefined, business.name);
+    const requestedBusinessId = typeof body.businessId === "string" ? body.businessId : undefined;
+    const performance = await loadMarketingPerformance(requestedBusinessId, business.name);
     const run = await createAutopilotRun({
       business,
       competitors: (body.competitors ?? []) as CompetitorInput[],
@@ -22,7 +24,16 @@ export async function POST(request: Request) {
       horizonDays: Math.min(30, Math.max(7, Number(body.horizonDays) || 7)),
       performance,
     });
-    return NextResponse.json({ ...run, performanceUsed: Boolean(performance), performance });
+    const persisted = await persistMarketingPlan(run.plan, requestedBusinessId);
+    const jobs = run.jobs.map(job => ({ ...job, contentItemId: persisted.idMap[job.contentItemId] || job.contentItemId }));
+    return NextResponse.json({
+      ...run,
+      plan: persisted.plan,
+      jobs,
+      performanceUsed: Boolean(performance),
+      performance,
+      persistence: { persisted: persisted.persisted, businessId: persisted.businessId, planId: persisted.planId, reason: persisted.reason },
+    });
   } catch (error) {
     console.error("Marketing autopilot failed", error);
     return NextResponse.json({ error: "autopilot_failed" }, { status: 500 });
