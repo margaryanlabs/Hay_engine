@@ -1,6 +1,6 @@
 # HAY Engine roadmap
 
-## Phase 0 — foundation (current)
+## Phase 0 — foundation
 
 - [x] Armenian-first multilingual web shell (HY / EN / RU)
 - [x] HAY normalization endpoint
@@ -11,18 +11,25 @@
 - [x] optional ElevenLabs Armenian TTS with timestamps
 - [x] Eastern / Western Armenian architecture switch
 
-## Phase 1 — creator MVP
+## Phase 1 — creator MVP (in progress)
 
+- [x] one-request CreatorProject pipeline
+- [x] automatic caption cue generation
+- [x] asset direction and text-free generated-media prompts
+- [x] OpenAI scene image generation adapter
+- [x] live 9:16 browser preview + scene timeline
+- [x] deterministic Armenian typography overlay architecture
+- [x] dedicated Remotion composition / MP4 render-worker scaffold
+- [x] provider health diagnostics
 - [ ] account/auth + project persistence
 - [ ] Armenian voice picker and voice quality test suite
-- [ ] Armenian subtitle segmentation from provider timestamps
-- [ ] upload image/video assets
+- [ ] use ElevenLabs provider timestamps for word-accurate subtitle segmentation
+- [ ] upload image/video assets to object storage
 - [ ] stock media search adapter
-- [ ] image generation adapter
 - [ ] Veo/Kling/Seedance-style video provider adapters
-- [ ] Remotion composition and MP4 render worker
+- [ ] render queue + storage callback + downloadable MP4
 - [ ] Reel presets: Ad / Product / Restaurant / Real estate / News / Finance
-- [ ] typography templates that render Armenian text deterministically
+- [ ] production Armenian typography template library
 
 ## Phase 2 — Armenian language infrastructure
 
