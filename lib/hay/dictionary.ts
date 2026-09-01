@@ -1,3 +1,12 @@
+export const HYBRID_ARMENIAN_FORMS: Array<[RegExp,string]> = [
+  [/\bBTC-ն/gi,"Բիթքոյնը"],
+  [/\bBTC-ի/gi,"Բիթքոյնի"],
+  [/\bETH-ը/gi,"Իթերիումը"],
+  [/\bETH-ի/gi,"Իթերիումի"],
+  [/\bVETO-ն/gi,"Վետոն"],
+  [/\bVETO-ի/gi,"Վետոյի"],
+];
+
 export const PRONUNCIATION_DICTIONARY: Record<string, string> = {
   "OPENAI": "Օփեն Էյ Այ",
   "CHATGPT": "Չաթ Ջի Փի Թի",
