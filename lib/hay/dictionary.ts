@@ -1,0 +1,33 @@
+export const PRONUNCIATION_DICTIONARY: Record<string, string> = {
+  "OPENAI": "Օփեն Էյ Այ",
+  "CHATGPT": "Չաթ Ջի Փի Թի",
+  "INSTAGRAM": "Ինստագրամ",
+  "TIKTOK": "ՏիկՏոկ",
+  "YOUTUBE": "ՅուԹյուբ",
+  "VETO": "Վետո",
+  "BTC": "Բիթքոյն",
+  "BITCOIN": "Բիթքոյն",
+  "ETH": "Իթերիում",
+  "ETHEREUM": "Իթերիում",
+  "USDT": "Յու Էս Դի Թի",
+  "USD": "դոլար",
+  "AMD": "դրամ",
+  "AI": "Էյ Այ",
+  "API": "Էյ Փի Այ",
+  "URL": "Յու Ար Էլ",
+  "SEO": "Էս Ի Օ",
+  "SaaS": "Սաս",
+};
+
+export const CODE_SWITCH_DICTIONARY: Array<[RegExp, string]> = [
+  [/funding\s+rate/gi, "ֆանդինգ ռեյթ"],
+  [/funding/gi, "ֆանդինգ"],
+  [/bullish/gi, "բուլիշ"],
+  [/bearish/gi, "բեարիշ"],
+  [/stop\s+loss/gi, "ստոփ լոս"],
+  [/take\s+profit/gi, "թեյք փրոֆիթ"],
+  [/breakout/gi, "բրեյքաութ"],
+  [/liquidity/gi, "լիքվիդիթի"],
+  [/positioning/gi, "փոզիշնինգ"],
+  [/macro/gi, "մակրո"],
+];
