@@ -1,0 +1,29 @@
+{
+  "project": {
+    "id": "hay_sample",
+    "language": "hy",
+    "duration": 15,
+    "format": "9:16",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "storyboard": {
+      "hook": "AI-ն վերջապես բնական հայերեն է խոսում։",
+      "cta": "Ստեղծիր հայերեն։ Հնչիր բնական։"
+    },
+    "captions": [
+      { "id": "c1", "start": 0, "end": 3, "text": "AI-ն վերջապես բնական հայերեն է խոսում։" },
+      { "id": "c2", "start": 3, "end": 7, "text": "Սցենար, ձայն և ենթագրեր՝ մեկ հոսքում։" },
+      { "id": "c3", "start": 7, "end": 11, "text": "Հայերենը այստեղ առաջնային լեզուն է։" },
+      { "id": "c4", "start": 11, "end": 15, "text": "Ստեղծիր հայերեն։ Հնչիր բնական։" }
+    ],
+    "scenes": [
+      { "id": "s1", "start": 0, "end": 3, "visual": "Dark premium Armenian typography opening", "screenText": "Բնական հայերեն AI", "voiceover": "AI-ն վերջապես բնական հայերեն է խոսում։", "asset": { "kind": "motion", "prompt": "", "searchQuery": "", "status": "ready", "typographyOverlay": true } },
+      { "id": "s2", "start": 3, "end": 7, "visual": "Language layers connect to voice and captions", "screenText": "LANGUAGE → VOICE", "voiceover": "Սցենար, ձայն և ենթագրեր՝ մեկ հոսքում։", "asset": { "kind": "motion", "prompt": "", "searchQuery": "", "status": "ready", "typographyOverlay": true } },
+      { "id": "s3", "start": 7, "end": 11, "visual": "Premium creator interface with Armenian content", "screenText": "ՀԱՅԵՐԵՆ / FIRST", "voiceover": "Հայերենը այստեղ առաջնային լեզուն է։", "asset": { "kind": "generated-image", "prompt": "", "searchQuery": "", "status": "planned", "typographyOverlay": true } },
+      { "id": "s4", "start": 11, "end": 15, "visual": "HAY Engine clean brand reveal", "screenText": "HAY ENGINE", "voiceover": "Ստեղծիր հայերեն։ Հնչիր բնական։", "asset": { "kind": "brand", "prompt": "", "searchQuery": "", "status": "ready", "typographyOverlay": true } }
+    ]
+  },
+  "sceneImages": {},
+  "audioSrc": null
+}

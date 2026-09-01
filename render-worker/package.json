@@ -1,0 +1,20 @@
+{
+  "name": "hay-engine-render-worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render:sample": "remotion render src/index.ts HAY-Reel out/hay-sample.mp4 --props=sample-input.json"
+  },
+  "dependencies": {
+    "@remotion/media": "4.0.506",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "remotion": "4.0.506"
+  },
+  "devDependencies": {
+    "@remotion/cli": "4.0.506",
+    "@types/react": "latest",
+    "typescript": "latest"
+  }
+}
