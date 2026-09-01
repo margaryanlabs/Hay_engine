@@ -1,4 +1,6 @@
 import MarketingOS from "@/components/MarketingOS";
+import StudioCommandPalette from "@/components/StudioCommandPalette";
+import StudioStatusRail from "@/components/StudioStatusRail";
 
 export const metadata = {
   title: "HAY Studio — Marketing OS",
@@ -6,5 +8,9 @@ export const metadata = {
 };
 
 export default function StudioPage(){
-  return <MarketingOS/>;
+  return <>
+    <StudioStatusRail/>
+    <MarketingOS/>
+    <StudioCommandPalette/>
+  </>;
 }
