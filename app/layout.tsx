@@ -7,6 +7,7 @@ import "./creator.css";
 import "./marketing.css";
 import "./marketing-v2.css";
 import "./studio-status.css";
+import "./studio-command.css";
 import "./voice-lab.css";
 import "./quality.css";
 import "./login.css";
