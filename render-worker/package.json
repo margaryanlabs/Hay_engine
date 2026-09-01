@@ -12,18 +12,18 @@
   },
   "dependencies": {
     "@remotion/bundler": "4.0.506",
+    "@remotion/cli": "4.0.506",
     "@remotion/media": "4.0.506",
     "@remotion/renderer": "4.0.506",
     "@supabase/supabase-js": "2.57.4",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "remotion": "4.0.506"
+    "remotion": "4.0.506",
+    "tsx": "4.20.5"
   },
   "devDependencies": {
-    "@remotion/cli": "4.0.506",
     "@types/node": "22.18.1",
     "@types/react": "19.1.12",
-    "tsx": "4.20.5",
     "typescript": "5.9.2"
   }
 }
