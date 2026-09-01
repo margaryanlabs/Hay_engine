@@ -3,7 +3,11 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createCreatorProject } from "@/lib/creator/project";
 import { buildAlignedCaptionCues } from "@/lib/creator/aligned-captions";
 import { generateSceneImage } from "@/lib/providers/openai-image";
-import { createArmenianSpeech } from "@/lib/providers/elevenlabs";
+import { createArmenianSpeech } from "@/lib/providers/armenian-speech";
+import { createArmenianSpeech as createElevenSpeech } from "@/lib/providers/elevenlabs";
+import { resolveVoice } from "@/lib/providers/voice-catalog";
+import { naturalizeArmenianText, type ArmenianSpeechStyle } from "@/lib/hay/conversational";
+import { normalizeForSpeech } from "@/lib/hay/normalize";
 import { dispatchRender } from "@/lib/render/client";
 import type { Locale } from "@/lib/hay/types";
 
@@ -46,7 +50,7 @@ export async function POST(request: Request) {
       `Offer/context: ${business.offer || business.description}. Location: ${business.location || "Armenia"}.`,
       `Creative brief: ${content.asset_brief}.`,
       `Caption direction: ${content.caption}. CTA: ${content.cta}.`,
-      language === "hy" ? "Use native, idiomatic Armenian. Keep visual generation free of baked-in Armenian text; HAY overlays exact typography separately." : "Keep visual generation text-free; HAY overlays typography separately.",
+      language === "hy" ? "Use native, idiomatic contemporary Eastern Armenian. Keep visual generation free of baked-in Armenian text; HAY overlays exact typography separately." : "Keep visual generation text-free; HAY overlays typography separately.",
     ].join("\n");
 
     let project = await createCreatorProject({ prompt, language, dialect: "eastern", style: "advertising", duration });
@@ -62,13 +66,26 @@ export async function POST(request: Request) {
     if (projectError) throw projectError;
 
     let audioSrc: string | undefined;
-    const voiceId = String(body.voiceId || process.env.ELEVENLABS_VOICE_ID_MALE || process.env.ELEVENLABS_VOICE_ID || "") || undefined;
-    if (voiceId) {
-      const speech = await createArmenianSpeech(project.voice.text, voiceId);
-      if (speech?.audioBase64) {
-        const aligned = buildAlignedCaptionCues(speech.alignment);
-        if (aligned?.length) project = { ...project, captions: aligned };
-        audioSrc = await uploadPrivateAsset({ supabase, userId, bytes: Uint8Array.from(Buffer.from(speech.audioBase64, "base64")), contentType: speech.contentType, extension: "mp3" });
+    if(language==="hy"){
+      const style=(body.speechStyle==="standard"||body.speechStyle==="yerevan"?body.speechStyle:"natural") as ArmenianSpeechStyle;
+      const naturalized=await naturalizeArmenianText(project.voice.text,style);
+      const normalized=normalizeForSpeech(naturalized.text,"hy","eastern");
+      const voice=resolveVoice(body.voiceId?String(body.voiceId):undefined);
+      const speech=voice ? await createArmenianSpeech({text:normalized.spokenText,provider:voice.provider,providerVoiceId:voice.providerVoiceId}) : null;
+      if(speech?.audioBase64){
+        const aligned=buildAlignedCaptionCues(speech.alignment);
+        if(aligned?.length) project={...project,captions:aligned,voice:{...project.voice,text:normalized.spokenText}};
+        audioSrc=await uploadPrivateAsset({supabase,userId,bytes:Uint8Array.from(Buffer.from(speech.audioBase64,"base64")),contentType:speech.contentType,extension:"mp3"});
+      }
+    } else {
+      const voiceId=String(body.providerVoiceId||process.env.ELEVENLABS_VOICE_ID||"")||undefined;
+      if(voiceId){
+        const speech=await createElevenSpeech(project.voice.text,voiceId);
+        if(speech?.audioBase64){
+          const aligned=buildAlignedCaptionCues(speech.alignment);
+          if(aligned?.length) project={...project,captions:aligned};
+          audioSrc=await uploadPrivateAsset({supabase,userId,bytes:Uint8Array.from(Buffer.from(speech.audioBase64,"base64")),contentType:speech.contentType,extension:"mp3"});
+        }
       }
     }
 
