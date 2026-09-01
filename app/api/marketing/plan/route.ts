@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { analyzeCompetitorEvidence, collectCompetitorEvidence, competitorContextForPlan } from "@/lib/marketing/competitor-intelligence";
+import { contentMemoryForPlan, loadContentMemory } from "@/lib/marketing/content-memory";
 import { buildMarketingPlan } from "@/lib/marketing/planner";
 import { loadMarketingPerformance } from "@/lib/marketing/performance";
 import { persistMarketingPlan } from "@/lib/marketing/persistence";
@@ -19,14 +20,15 @@ export async function POST(request: Request) {
     }
 
     const requestedBusinessId = typeof body.businessId === "string" ? body.businessId : undefined;
-    const [performance, competitorEvidence] = await Promise.all([
+    const [performance, competitorEvidence, contentMemory] = await Promise.all([
       loadMarketingPerformance(requestedBusinessId, business.name),
       collectCompetitorEvidence(competitors),
+      loadContentMemory(requestedBusinessId, business.name),
     ]);
     const competitorSignals = await analyzeCompetitorEvidence(business, competitorEvidence);
     const planningBusiness: BusinessProfile = {
       ...business,
-      description: `${business.description || ""}${competitorContextForPlan(competitorEvidence, competitorSignals)}`.trim(),
+      description: `${business.description || ""}${competitorContextForPlan(competitorEvidence, competitorSignals)}${contentMemoryForPlan(contentMemory)}`.trim(),
     };
     const generatedRaw = await buildMarketingPlan(planningBusiness, competitors, horizonDays, performance);
     const generated = { ...generatedRaw, business, competitors: competitorSignals.length ? competitorSignals : generatedRaw.competitors };
@@ -35,6 +37,8 @@ export async function POST(request: Request) {
       ...persisted.plan,
       performanceUsed: Boolean(performance),
       performance,
+      contentMemoryUsed: Boolean(contentMemory),
+      contentMemory: contentMemory ? { recentHooks: contentMemory.recentHooks.slice(0, 12), formatCounts: contentMemory.formatCounts, platformCounts: contentMemory.platformCounts } : null,
       competitorIntelligence: { evidence: competitorEvidence, signals: competitorSignals },
       persistence: { persisted: persisted.persisted, businessId: persisted.businessId, planId: persisted.planId, reason: persisted.reason },
     });
