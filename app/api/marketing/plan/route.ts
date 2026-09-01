@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_business_profile" }, { status: 400 });
     }
 
-    const performance = await loadMarketingPerformance(typeof body.businessId === "string" ? body.businessId : undefined);
+    const performance = await loadMarketingPerformance(typeof body.businessId === "string" ? body.businessId : undefined, business.name);
     const plan = await buildMarketingPlan(business, competitors, horizonDays, performance);
     return NextResponse.json({ ...plan, performanceUsed: Boolean(performance), performance });
   } catch (error) {
