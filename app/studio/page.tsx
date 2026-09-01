@@ -1,5 +1,6 @@
 import MarketingOS from "@/components/MarketingOS";
 import StudioCommandPalette from "@/components/StudioCommandPalette";
+import StudioOnboarding from "@/components/StudioOnboarding";
 import StudioStatusRail from "@/components/StudioStatusRail";
 
 export const metadata = {
@@ -11,6 +12,7 @@ export default function StudioPage(){
   return <>
     <StudioStatusRail/>
     <MarketingOS/>
+    <StudioOnboarding/>
     <StudioCommandPalette/>
   </>;
 }
