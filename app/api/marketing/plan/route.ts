@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildMarketingPlan } from "@/lib/marketing/planner";
+import { loadMarketingPerformance } from "@/lib/marketing/performance";
 import type { BusinessProfile, CompetitorInput } from "@/lib/marketing/types";
 
 export const runtime = "nodejs";
@@ -15,8 +16,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_business_profile" }, { status: 400 });
     }
 
-    const plan = await buildMarketingPlan(business, competitors, horizonDays);
-    return NextResponse.json(plan);
+    const performance = await loadMarketingPerformance(typeof body.businessId === "string" ? body.businessId : undefined);
+    const plan = await buildMarketingPlan(business, competitors, horizonDays, performance);
+    return NextResponse.json({ ...plan, performanceUsed: Boolean(performance), performance });
   } catch (error) {
     console.error("Marketing plan API failed", error);
     return NextResponse.json({ error: "marketing_plan_failed" }, { status: 500 });
