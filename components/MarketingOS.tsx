@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import HayLogo from "./HayLogo";
-import type { BusinessProfile, CompetitorInput, MarketingPlan, SocialConnection, SocialPlatform } from "@/lib/marketing/types";
+import type { BusinessProfile, CompetitorInput, ContentItem, MarketingPlan, SocialConnection, SocialPlatform } from "@/lib/marketing/types";
 import type { Locale } from "@/lib/hay/types";
 
 const copy = {
@@ -29,6 +29,7 @@ export default function MarketingOS() {
   const [intelligence,setIntelligence]=useState<MarketingPlan["brand"]|null>(null);
   const [connections,setConnections]=useState<SocialConnection[]>([]);
   const [connectionState,setConnectionState]=useState<Record<string,string>>({});
+  const [assetState,setAssetState]=useState<Record<string,string>>({});
   const [autopilot,setAutopilot]=useState(false);
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
@@ -70,11 +71,34 @@ export default function MarketingOS() {
   async function analyze(){setBusy(true);setMessage("");try{const response=await fetch("/api/business/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({business,competitors})});const data=await response.json();if(!response.ok)throw new Error(data.error||"analysis_failed");setIntelligence(data.intelligence.brand);}catch(error){setMessage(error instanceof Error?error.message:"Analysis failed");}finally{setBusy(false);}}
 
   async function generatePlan(){
-    setBusy(true);setMessage("");
+    setBusy(true);setMessage("");setAssetState({});
     try{
-      if(autopilot){const response=await fetch("/api/marketing/autopilot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({business,competitors,connections,mode:"approval",horizonDays:7})});const data=await response.json();if(!response.ok)throw new Error(data.error||"autopilot_failed");setPlan(data.plan);setIntelligence(data.plan.brand);setMessage(`Autopilot ready · ${data.jobs.length} jobs mapped`);}
-      else{const response=await fetch("/api/marketing/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({business,competitors,horizonDays:7})});const data=await response.json();if(!response.ok)throw new Error(data.error||"plan_failed");setPlan(data);setIntelligence(data.brand);}
+      if(autopilot){
+        const response=await fetch("/api/marketing/autopilot",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({business,businessId,competitors,connections,mode:"approval",horizonDays:7})});
+        const data=await response.json();if(!response.ok)throw new Error(data.error||"autopilot_failed");setPlan(data.plan);setIntelligence(data.plan.brand);if(data.persistence?.businessId)setBusinessId(data.persistence.businessId);setMessage(`Autopilot ready · ${data.jobs.length} jobs mapped${data.performanceUsed?" · learning from previous performance":""}`);
+      } else {
+        const response=await fetch("/api/marketing/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({business,businessId,competitors,horizonDays:7})});
+        const data=await response.json();if(!response.ok)throw new Error(data.error||"plan_failed");setPlan(data);setIntelligence(data.brand);if(data.persistence?.businessId)setBusinessId(data.persistence.businessId);if(data.performanceUsed)setMessage("New plan adapted to measured content performance.");
+      }
     }catch(error){setMessage(error instanceof Error?error.message:"Plan failed");}finally{setBusy(false);}
+  }
+
+  async function createAsset(item:ContentItem){
+    if(assetState[item.id]==="creating"||assetState[item.id]==="rendering")return;
+    setAssetState(state=>({...state,[item.id]:"creating"}));setMessage("");
+    try{
+      const isStatic=item.format==="post"||item.format==="carousel";
+      const endpoint=isStatic?"/api/marketing/content/static":"/api/marketing/content/create";
+      const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contentItemId:item.id})});
+      if(response.status===401){window.location.href="/login";return;}
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.detail||data.error||"asset_creation_failed");
+      if(data.configured===false){setAssetState(state=>({...state,[item.id]:"setup"}));setMessage(data.message||"Activate dedicated HAY persistence to create durable assets.");return;}
+      if(isStatic){setAssetState(state=>({...state,[item.id]:"ready"}));setMessage(`${item.platform} ${item.format} ready · ${data.count||1} asset${data.count>1?"s":""}`);return;}
+      const rendering=data.render?.configured&&data.render?.jobId;
+      setAssetState(state=>({...state,[item.id]:rendering?"rendering":"renderable"}));
+      setMessage(rendering?`Render job ${data.render.jobId} started. Final MP4 will attach to this content item automatically.`:"Creator project prepared. Configure Render Worker to produce the final MP4.");
+    }catch(error){setAssetState(state=>({...state,[item.id]:"error"}));setMessage(error instanceof Error?error.message:"Asset creation failed");}
   }
 
   async function connect(platform:SocialPlatform){
@@ -88,6 +112,8 @@ export default function MarketingOS() {
       setMessage(data.configured?`${platform} connector is ready for authorization.`:`${platform}: ${data.missing?.join(", ")||"developer app configuration required"}`);
     }catch(error){setConnectionState(state=>({...state,[platform]:"error"}));setMessage(error instanceof Error?error.message:"Connection failed");}
   }
+
+  const assetLabel=(item:ContentItem)=>{const state=assetState[item.id];if(state==="creating")return"Creating ···";if(state==="rendering")return"Rendering ···";if(state==="ready")return"Ready ✓";if(state==="renderable")return"Render setup";if(state==="setup")return"Setup needed";if(state==="error")return"Retry";return"Create asset →";};
 
   return <main className="marketingPage">
     <header className="marketingNav"><a href="/" className="logoLink"><HayLogo/></a><nav className="productNav"><a className="active" href="/">Marketing OS</a><a href="/creator">Creator</a><span>Voice</span><span>Language API</span></nav><div className="navTools"><a href="/login" style={{fontSize:10,color:"#8d857d",textDecoration:"none"}}>ACCOUNT</a><div className="localePill">{(["hy","en","ru"] as Locale[]).map(item=><button key={item} className={locale===item?"active":""} onClick={()=>{setLocale(item);patchBusiness("primaryLanguage",item);}}>{item==="hy"?"ՀԱՅ":item.toUpperCase()}</button>)}</div><button className="commandButton">⌘ K</button></div></header>
@@ -104,7 +130,7 @@ export default function MarketingOS() {
       <article className="intelCard competitorsCard"><div className="panelTop"><span>04 / {t.competitors.toUpperCase()}</span><em>{competitors.length} TRACKED</em></div><textarea value={competitorText} onChange={e=>setCompetitorText(e.target.value)}/><div className="radarRows">{(plan?.competitors||competitors.map(c=>({name:c.name,strength:"awaiting analysis",gap:"—",opportunity:"—"}))).slice(0,3).map((item,index)=><div key={item.name}><span>0{index+1}</span><strong>{item.name}</strong><small>{item.gap}</small></div>)}</div></article>
     </section>
 
-    <section className="contentPulse"><div className="pulseHeader"><div><span>05 / AUTONOMOUS CONTENT DESK</span><h2>{t.calendar}</h2></div><div className="pulseStats"><span><b>{plan?.items.length||0}</b> assets</span><span><b>{plan?"7":"—"}</b> days</span><span><b>{autopilot?"AUTO":"REVIEW"}</b> publish</span></div></div>{activeItems.length?<div className="calendarRail">{activeItems.map(item=><article key={item.id} className="contentTile"><div className="tileMeta"><span>D{item.day}</span><i>{item.platform}</i><em>{item.objective}</em></div><h3>{item.hook}</h3><p>{item.concept}</p><footer><span>{item.format}</span><button>Review →</button></footer></article>)}</div>:<div className="emptyPulse"><div className="emptyGlyph">Հ</div><h3>Strategy first. Content second.</h3><p>Fill the business DNA, add competitors and let HAY build the first executable week.</p><button className="hayPrimary" onClick={generatePlan}>{t.plan}</button></div>}</section>
+    <section className="contentPulse"><div className="pulseHeader"><div><span>05 / AUTONOMOUS CONTENT DESK</span><h2>{t.calendar}</h2></div><div className="pulseStats"><span><b>{plan?.items.length||0}</b> assets</span><span><b>{plan?"7":"—"}</b> days</span><span><b>{autopilot?"AUTO":"REVIEW"}</b> publish</span></div></div>{activeItems.length?<div className="calendarRail">{activeItems.map(item=><article key={item.id} className={`contentTile asset-${assetState[item.id]||"idea"}`}><div className="tileMeta"><span>D{item.day}</span><i>{item.platform}</i><em>{item.objective}</em></div><h3>{item.hook}</h3><p>{item.concept}</p><footer><span>{item.format}</span><button onClick={()=>createAsset(item)} disabled={assetState[item.id]==="creating"||assetState[item.id]==="rendering"}>{assetLabel(item)}</button></footer></article>)}</div>:<div className="emptyPulse"><div className="emptyGlyph">Հ</div><h3>Strategy first. Content second.</h3><p>Fill the business DNA, add competitors and let HAY build the first executable week.</p><button className="hayPrimary" onClick={generatePlan}>{t.plan}</button></div>}</section>
     <section className="systemLine"><span>HAY ENGINE / ARMENIAN AI INFRASTRUCTURE</span><span>ANALYZE → STRATEGIZE → CREATE → APPROVE → PUBLISH → LEARN</span><span>YEREVAN / 2026</span></section>
   </main>;
 }
