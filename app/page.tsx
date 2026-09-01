@@ -1,5 +1,5 @@
-import CreatorStudio from "@/components/CreatorStudio";
+import MarketingOS from "@/components/MarketingOS";
 
 export default function Home() {
-  return <CreatorStudio />;
+  return <MarketingOS />;
 }
