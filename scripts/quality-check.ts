@@ -1,4 +1,4 @@
-import { runArmenianQualityBenchmark } from "../lib/hay/quality-benchmark";
+import { runArmenianQualityBenchmark } from "../lib/hay/quality-suite";
 
 const report=runArmenianQualityBenchmark();
 console.log(`HAY Armenian Quality ${report.version}`);
