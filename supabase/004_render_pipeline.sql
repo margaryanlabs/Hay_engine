@@ -4,6 +4,9 @@ alter table public.creator_projects
   add column if not exists content_item_id uuid references public.content_items(id) on delete set null;
 create index if not exists creator_projects_content_item_idx on public.creator_projects(content_item_id);
 
+alter table public.content_items
+  add column if not exists asset_urls jsonb not null default '[]'::jsonb;
+
 create table if not exists public.render_jobs (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.creator_projects(id) on delete cascade,
@@ -30,11 +33,11 @@ create policy "creator owners render delete" on public.render_jobs for delete to
 using (exists (select 1 from public.creator_projects cp where cp.id = project_id and cp.owner_id = (select auth.uid())));
 
 -- Private working assets + public final renders. The service-role worker writes both;
--- only final renders are public because Instagram/TikTok need server-accessible media URLs.
+-- only final publishable media is public because social platforms need server-accessible URLs.
 insert into storage.buckets (id, name, public, file_size_limit)
 values ('hay-assets', 'hay-assets', false, 1073741824)
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('hay-renders', 'hay-renders', true, 1073741824, array['video/mp4'])
+values ('hay-renders', 'hay-renders', true, 1073741824, array['video/mp4','image/png','image/jpeg','image/webp'])
 on conflict (id) do update set public = true, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
