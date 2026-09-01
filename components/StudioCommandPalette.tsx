@@ -12,8 +12,10 @@ export default function StudioCommandPalette(){
   function close(){setOpen(false);setQuery("");setSelected(0);}
   function scroll(selector:string){const node=document.querySelector<HTMLElement>(selector);node?.scrollIntoView({behavior:"smooth",block:"start"});close();}
   function go(path:string){window.location.href=path;}
+  function openOnboarding(){window.dispatchEvent(new Event("hay:onboarding-open"));close();}
 
   const commands=useMemo<Command[]>(()=>[
+    {label:"Show onboarding",hint:"START",action:openOnboarding},
     {label:"Business Intelligence",hint:"BUSINESS",action:()=>scroll(".marketingGrid .intelCard:nth-child(1)")},
     {label:"Social Channels",hint:"CONNECT",action:()=>scroll(".channelList")},
     {label:"Competitor Radar",hint:"RADAR",action:()=>scroll(".competitorsCard")},
