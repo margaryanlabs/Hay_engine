@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { analyzeCompetitorEvidence, collectCompetitorEvidence, competitorContextForPlan } from "@/lib/marketing/competitor-intelligence";
 import { buildMarketingPlan } from "@/lib/marketing/planner";
 import { loadMarketingPerformance } from "@/lib/marketing/performance";
 import { persistMarketingPlan } from "@/lib/marketing/persistence";
@@ -18,10 +19,25 @@ export async function POST(request: Request) {
     }
 
     const requestedBusinessId = typeof body.businessId === "string" ? body.businessId : undefined;
-    const performance = await loadMarketingPerformance(requestedBusinessId, business.name);
-    const generated = await buildMarketingPlan(business, competitors, horizonDays, performance);
+    const [performance, competitorEvidence] = await Promise.all([
+      loadMarketingPerformance(requestedBusinessId, business.name),
+      collectCompetitorEvidence(competitors),
+    ]);
+    const competitorSignals = await analyzeCompetitorEvidence(business, competitorEvidence);
+    const planningBusiness: BusinessProfile = {
+      ...business,
+      description: `${business.description || ""}${competitorContextForPlan(competitorEvidence, competitorSignals)}`.trim(),
+    };
+    const generatedRaw = await buildMarketingPlan(planningBusiness, competitors, horizonDays, performance);
+    const generated = { ...generatedRaw, business, competitors: competitorSignals.length ? competitorSignals : generatedRaw.competitors };
     const persisted = await persistMarketingPlan(generated, requestedBusinessId);
-    return NextResponse.json({ ...persisted.plan, performanceUsed: Boolean(performance), performance, persistence: { persisted: persisted.persisted, businessId: persisted.businessId, planId: persisted.planId, reason: persisted.reason } });
+    return NextResponse.json({
+      ...persisted.plan,
+      performanceUsed: Boolean(performance),
+      performance,
+      competitorIntelligence: { evidence: competitorEvidence, signals: competitorSignals },
+      persistence: { persisted: persisted.persisted, businessId: persisted.businessId, planId: persisted.planId, reason: persisted.reason },
+    });
   } catch (error) {
     console.error("Marketing plan API failed", error);
     return NextResponse.json({ error: "marketing_plan_failed" }, { status: 500 });
