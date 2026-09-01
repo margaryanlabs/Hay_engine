@@ -1,5 +1,6 @@
+import OpenAI from "openai";
 import { inspectPublicSite } from "./site-inspect";
-import type { CompetitorInput } from "./types";
+import type { BusinessProfile, CompetitorInput, CompetitorSignal } from "./types";
 
 export type CompetitorEvidence = {
   name: string;
@@ -52,4 +53,64 @@ export function evidenceForPrompt(evidence: CompetitorEvidence[]) {
     description: item.description,
     textExcerpt: item.textExcerpt,
   }));
+}
+
+function fallbackSignal(business: BusinessProfile, item: CompetitorEvidence): CompetitorSignal {
+  const clue = item.description || item.title || item.textExcerpt?.slice(0, 180) || item.name;
+  if (business.primaryLanguage === "hy") return {
+    name: item.name,
+    strength: item.available ? `Հստակ ներկայություն․ ${clue}` : "Հանրային կայքի տվյալները հասանելի չեն։",
+    gap: "Ստուգել՝ արդյոք բրենդը բավարար չափով ցույց է տալիս իրական ապացույց, մարդկանց, տարբերակիչ առաջարկ և տեղական կոնտեքստ։",
+    opportunity: `${business.name}-ը կարող է վերցնել ավելի հստակ դիրքավորում, ավելի բնական հայերեն և proof-led կոնտենտ, քան ${item.name}-ը։`,
+  };
+  if (business.primaryLanguage === "ru") return {
+    name: item.name,
+    strength: item.available ? `Публичное позиционирование: ${clue}` : "Публичные данные сайта недоступны.",
+    gap: "Проверить, насколько конкурент показывает реальные доказательства, людей, уникальный оффер и локальный контекст.",
+    opportunity: `${business.name} может занять более чёткую позицию и строить более доказательный контент, чем ${item.name}.`,
+  };
+  return {
+    name: item.name,
+    strength: item.available ? `Public positioning signal: ${clue}` : "Public website evidence is unavailable.",
+    gap: "Test whether the competitor underuses proof, people, differentiated offers and local context.",
+    opportunity: `${business.name} can own a sharper, more proof-led point of view than ${item.name}.`,
+  };
+}
+
+function parseSignals(raw: string, fallback: CompetitorSignal[]) {
+  try {
+    const parsed = JSON.parse(raw.replace(/^```json\s*/i, "").replace(/```$/i, "").trim()) as { competitors?: unknown };
+    if (!Array.isArray(parsed.competitors)) return fallback;
+    return parsed.competitors.slice(0, fallback.length).map((value, index) => {
+      const row = value && typeof value === "object" ? value as Record<string, unknown> : {};
+      const base = fallback[index];
+      const pick = (key: string, backup: string) => typeof row[key] === "string" && String(row[key]).trim() ? String(row[key]).trim() : backup;
+      return { name: pick("name", base.name), strength: pick("strength", base.strength), gap: pick("gap", base.gap), opportunity: pick("opportunity", base.opportunity) };
+    });
+  } catch {
+    return fallback;
+  }
+}
+
+export async function analyzeCompetitorEvidence(business: BusinessProfile, evidence: CompetitorEvidence[]): Promise<CompetitorSignal[]> {
+  const fallback = evidence.map(item => fallbackSignal(business, item));
+  if (!evidence.length || !process.env.OPENAI_API_KEY) return fallback;
+  try {
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const language = business.primaryLanguage === "hy" ? "idiomatic Eastern Armenian" : business.primaryLanguage === "ru" ? "Russian" : "English";
+    const response = await client.responses.create({
+      model: process.env.OPENAI_MARKETING_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-luna",
+      reasoning: { effort: "low" },
+      input: `You are the competitor intelligence layer inside HAY Marketing OS.\n\nCompare the supplied PUBLIC website evidence against the user's business. Do not invent traffic, revenue, follower counts, market share or facts absent from evidence. Distinguish observable evidence from strategic inference. Focus on positioning, offer clarity, proof/trust, content angles, audience language and differentiation. Answer in ${language}.\n\nBUSINESS:\n${JSON.stringify(business)}\n\nPUBLIC COMPETITOR EVIDENCE:\n${JSON.stringify(evidenceForPrompt(evidence))}\n\nReturn ONLY JSON:\n{"competitors":[{"name":"","strength":"","gap":"","opportunity":""}]}\nOne entry per supplied competitor. Keep each field concise and actionable.`,
+    });
+    return parseSignals(response.output_text, fallback);
+  } catch (error) {
+    console.error("Competitor intelligence generation failed", error);
+    return fallback;
+  }
+}
+
+export function competitorContextForPlan(evidence: CompetitorEvidence[], signals: CompetitorSignal[]) {
+  if (!evidence.length) return "";
+  return `\n\nHAY COMPETITOR INTELLIGENCE (derived from public evidence; do not invent missing metrics):\n${JSON.stringify({ evidence: evidenceForPrompt(evidence), signals })}`;
 }
