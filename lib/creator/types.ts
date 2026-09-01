@@ -59,7 +59,7 @@ export type CreatorProject = {
   providers: {
     planner: "openai" | "hay-demo";
     image: "openai" | "unconfigured";
-    video: "adapter-ready";
+    video: "google-veo" | "unconfigured";
     voice: "elevenlabs" | "unconfigured";
   };
 };
