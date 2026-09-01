@@ -86,7 +86,7 @@ export type PublishingJob = {
   businessId?: string;
   contentItemId: string;
   platform: SocialPlatform;
-  status: "queued" | "processing" | "needs_auth" | "published" | "failed";
+  status: "queued" | "processing" | "needs_auth" | "needs_approval" | "published" | "failed";
   scheduledFor?: string;
   createdAt: string;
   externalPostId?: string;
