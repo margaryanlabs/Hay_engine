@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./landing.css";
 import "./landing-v2.css";
+import "./landing-v2-wow.css";
 import "./creator.css";
 import "./marketing.css";
 import "./voice-lab.css";
