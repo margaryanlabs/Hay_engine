@@ -4,6 +4,7 @@ import "./landing.css";
 import "./creator.css";
 import "./marketing.css";
 import "./voice-lab.css";
+import "./quality.css";
 import "./login.css";
 
 export const metadata: Metadata = {
