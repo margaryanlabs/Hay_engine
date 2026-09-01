@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_business_profile" }, { status: 400 });
     }
     const mode = (["copilot", "approval", "autopublish"].includes(body.mode) ? body.mode : "approval") as AutopilotMode;
-    const performance = await loadMarketingPerformance(typeof body.businessId === "string" ? body.businessId : undefined);
+    const performance = await loadMarketingPerformance(typeof body.businessId === "string" ? body.businessId : undefined, business.name);
     const run = await createAutopilotRun({
       business,
       competitors: (body.competitors ?? []) as CompetitorInput[],
