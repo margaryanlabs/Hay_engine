@@ -25,10 +25,21 @@ export const PRONUNCIATION_DICTIONARY: Record<string, string> = {
   "API": "Էյ Փի Այ",
   "URL": "Յու Ար Էլ",
   "SEO": "Էս Ի Օ",
-  "SaaS": "Սաս",
+  "SAAS": "Սաս",
+  "CRM": "Սի Ար Էմ",
+  "QR": "Քյու Ար",
+  "VIN": "Վին",
+  "EV": "Ի Վի",
+  "SUV": "Էս Յու Վի",
+  "SMS": "Էս Էմ Էս",
+  "OTP": "Օ Թի Փի",
+  "IBAN": "Այբան",
+  "IELTS": "Այելթս",
+  "PDF": "Փի Դի Էֆ",
 };
 
 export const CODE_SWITCH_DICTIONARY: Array<[RegExp, string]> = [
+  [/wi[\s-]?fi/gi, "վայ ֆայ"],
   [/funding\s+rate/gi, "ֆանդինգ ռեյթ"],
   [/funding/gi, "ֆանդինգ"],
   [/bullish/gi, "բուլիշ"],
