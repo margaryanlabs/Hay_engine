@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { analyzeCompetitorEvidence, collectCompetitorEvidence, competitorContextForPlan } from "@/lib/marketing/competitor-intelligence";
 import { inspectPublicSite } from "@/lib/marketing/site-inspect";
 import { buildMarketingPlan } from "@/lib/marketing/planner";
 import type { BusinessProfile, CompetitorInput } from "@/lib/marketing/types";
@@ -14,30 +15,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_business_profile" }, { status: 400 });
     }
 
-    let businessSnapshot = null;
-    if (business.website) {
-      try { businessSnapshot = await inspectPublicSite(business.website); } catch (error) { console.warn("Business site inspection skipped", error); }
-    }
+    const [businessSnapshot, competitorEvidence] = await Promise.all([
+      business.website ? inspectPublicSite(business.website).catch(error => { console.warn("Business site inspection skipped", error); return null; }) : Promise.resolve(null),
+      collectCompetitorEvidence(competitors),
+    ]);
+    const competitorSignals = await analyzeCompetitorEvidence(business, competitorEvidence);
 
-    const competitorSnapshots = [];
-    for (const competitor of competitors.slice(0, 5)) {
-      if (!competitor.url) continue;
-      try {
-        competitorSnapshots.push({ name: competitor.name, snapshot: await inspectPublicSite(competitor.url) });
-      } catch (error) {
-        competitorSnapshots.push({ name: competitor.name, error: "unavailable" });
-      }
-    }
-
-    const enrichedBusiness: BusinessProfile = {
+    const planningBusiness: BusinessProfile = {
       ...business,
-      description: [business.description, businessSnapshot?.description, businessSnapshot?.text?.slice(0, 1800)].filter(Boolean).join("\n"),
+      description: [
+        business.description,
+        businessSnapshot?.description,
+        businessSnapshot?.text?.slice(0, 1800),
+        competitorContextForPlan(competitorEvidence, competitorSignals),
+      ].filter(Boolean).join("\n"),
     };
-    const plan = await buildMarketingPlan(enrichedBusiness, competitors, 7);
+    const plan = await buildMarketingPlan(planningBusiness, competitors, 7);
 
     return NextResponse.json({
-      source: { business: businessSnapshot, competitors: competitorSnapshots },
-      intelligence: { brand: plan.brand, competitors: plan.competitors, strategySummary: plan.strategySummary },
+      source: { business: businessSnapshot, competitors: competitorEvidence },
+      intelligence: {
+        brand: plan.brand,
+        competitors: competitorSignals.length ? competitorSignals : plan.competitors,
+        strategySummary: plan.strategySummary,
+      },
+      evidenceBacked: competitorEvidence.some(item => item.available),
       generatedBy: plan.generatedBy,
     });
   } catch (error) {
