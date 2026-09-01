@@ -3,6 +3,7 @@ import {
   evaluateArmenianQualityCase,
   type ArmenianQualityCase,
 } from "./quality-benchmark";
+import { ARMENIAN_BUSINESS_QUALITY_PACK } from "./quality-business-pack";
 
 function applyQualityPolicy(test: ArmenianQualityCase): ArmenianQualityCase {
   if (test.id === "sp-001") {
@@ -22,7 +23,10 @@ function applyQualityPolicy(test: ArmenianQualityCase): ArmenianQualityCase {
   return test;
 }
 
-export const ARMENIAN_QUALITY_SUITE = ARMENIAN_QUALITY_BENCHMARK.map(applyQualityPolicy);
+export const ARMENIAN_QUALITY_SUITE = [
+  ...ARMENIAN_QUALITY_BENCHMARK,
+  ...ARMENIAN_BUSINESS_QUALITY_PACK,
+].map(applyQualityPolicy);
 
 export function runArmenianQualityBenchmark() {
   const results = ARMENIAN_QUALITY_SUITE.map(evaluateArmenianQualityCase);
@@ -36,7 +40,7 @@ export function runArmenianQualityBenchmark() {
     }),
   );
   return {
-    version: "hay-quality-v1.1",
+    version: "hay-quality-v2",
     cases: results.length,
     passedCases,
     failedCases: results.length - passedCases,

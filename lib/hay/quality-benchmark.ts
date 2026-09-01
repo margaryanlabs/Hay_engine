@@ -9,6 +9,11 @@ export type ArmenianQualityDomain =
   | "finance-tech"
   | "creator"
   | "support"
+  | "tourism"
+  | "automotive"
+  | "healthcare"
+  | "education"
+  | "banking"
   | "general";
 
 export type ArmenianQualityCase = {

@@ -14,7 +14,7 @@ export default function QualityPage(){
     </header>
 
     <section className="qualityHero">
-      <div><span className="qualityEyebrow">ARMENIAN QUALITY BENCHMARK / V1.1</span><h1><small>Չափել։</small>Ոչ թե ենթադրել։</h1><p>HAY-ը ամեն փոփոխությունից հետո նույն հայկական թեստերով ստուգում է խոսակցական լեզուն, բրենդների արտասանությունը, թվերը, արժույթները և code-switch-ը։</p></div>
+      <div><span className="qualityEyebrow">ARMENIAN QUALITY BENCHMARK / {report.version.toUpperCase()}</span><h1><small>Չափել։</small>Ոչ թե ենթադրել։</h1><p>HAY-ը ամեն փոփոխությունից հետո նույն հայկական թեստերով ստուգում է խոսակցական լեզուն, բրենդների արտասանությունը, թվերը, արժույթները և code-switch-ը՝ իրական բիզնես ոլորտների կոնտեքստով։</p></div>
       <div className={`qualityScore ${report.failedCases?"warning":"healthy"}`}><span>QUALITY SCORE</span><strong>{report.score}</strong><small>/ 100</small><i>{report.passedCases}/{report.cases} CASES</i></div>
     </section>
 
