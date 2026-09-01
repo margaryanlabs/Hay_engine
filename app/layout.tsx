@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./creator.css";
 
 export const metadata: Metadata = {
-  title: "HAY Engine — Armenian-first AI",
-  description: "Armenian-first language, voice and creator intelligence.",
+  title: "HAY Engine — Armenian-first AI Creator",
+  description: "Create scripts, Armenian voice, captions, scene plans and vertical AI content with an Armenian-first language engine.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

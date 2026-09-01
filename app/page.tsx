@@ -1,5 +1,5 @@
-import HayStudio from "@/components/HayStudio";
+import CreatorStudio from "@/components/CreatorStudio";
 
 export default function Home() {
-  return <HayStudio />;
+  return <CreatorStudio />;
 }
