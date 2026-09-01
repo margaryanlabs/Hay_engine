@@ -1,5 +1,5 @@
-import MarketingOS from "@/components/MarketingOS";
+import LandingPage from "@/components/LandingPage";
 
-export default function Home() {
-  return <MarketingOS />;
+export default function Home(){
+  return <LandingPage/>;
 }
