@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  validate:
+  web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,3 +23,29 @@ jobs:
           name: hay-package-lock
           path: package-lock.json
           if-no-files-found: ignore
+
+  render-worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: render-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run check
+
+  publish-worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: publish-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: node --check src/server.mjs

@@ -2,7 +2,14 @@ import React from "react";
 import { Composition } from "remotion";
 import { HayReel } from "./HayReel";
 import type { RenderInput } from "./types";
-import sampleInput from "../sample-input.json";
+import sampleInputJson from "../sample-input.json";
+
+const sampleInput: RenderInput = {
+  ...sampleInputJson,
+  project: sampleInputJson.project as RenderInput["project"],
+  sceneImages: sampleInputJson.sceneImages ?? {},
+  audioSrc: sampleInputJson.audioSrc ?? undefined,
+};
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -13,7 +20,7 @@ export const RemotionRoot: React.FC = () => {
       height={1920}
       fps={30}
       durationInFrames={450}
-      defaultProps={sampleInput as RenderInput}
+      defaultProps={sampleInput}
       calculateMetadata={({ props }) => ({
         durationInFrames: Math.max(1, Math.round(props.project.duration * 30)),
         width: props.project.width || 1080,

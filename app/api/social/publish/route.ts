@@ -6,6 +6,36 @@ import { dispatchPublish } from "@/lib/publish/client";
 export const runtime = "nodejs";
 const supported: SocialPlatform[] = ["instagram", "tiktok", "youtube", "facebook", "linkedin"];
 
+function sanitizeProviderSettings(platform: SocialPlatform, value: unknown) {
+  const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  if (platform === "tiktok") {
+    const privacy = typeof input.privacy_level === "string" ? input.privacy_level : "";
+    const consentAt = typeof input.consent_at === "string" ? input.consent_at : "";
+    const creatorInfoFetchedAt = typeof input.creator_info_fetched_at === "string" ? input.creator_info_fetched_at : "";
+    if (!privacy || !consentAt || !creatorInfoFetchedAt || typeof input.disable_comment !== "boolean" || typeof input.disable_duet !== "boolean" || typeof input.disable_stitch !== "boolean") {
+      return { error: "tiktok_publish_approval_required" as const };
+    }
+    return {
+      value: {
+        privacy_level: privacy,
+        disable_comment: input.disable_comment,
+        disable_duet: input.disable_duet,
+        disable_stitch: input.disable_stitch,
+        consent_at: consentAt,
+        creator_info_fetched_at: creatorInfoFetchedAt,
+        ...(typeof input.brand_content_toggle === "boolean" ? { brand_content_toggle: input.brand_content_toggle } : {}),
+        ...(typeof input.brand_organic_toggle === "boolean" ? { brand_organic_toggle: input.brand_organic_toggle } : {}),
+      },
+    };
+  }
+  if (platform === "youtube") {
+    const privacy = ["private", "unlisted", "public"].includes(String(input.privacyStatus)) ? String(input.privacyStatus) : "private";
+    return { value: { privacyStatus: privacy, ...(typeof input.title === "string" ? { title: input.title.slice(0, 100) } : {}) } };
+  }
+  if (platform === "instagram") return { value: { share_to_feed: input.share_to_feed !== false } };
+  return { value: {} };
+}
+
 export async function POST(request: Request) {
   try {
     if (!isSupabaseConfigured()) return NextResponse.json({ configured: false, message: "Supabase is required for publishing jobs." });
@@ -14,6 +44,9 @@ export async function POST(request: Request) {
     const contentItemId = String(body.contentItemId ?? "");
     const connectionId = String(body.connectionId ?? "");
     if (!supported.includes(platform) || !contentItemId || !connectionId) return NextResponse.json({ error: "invalid_publish_request" }, { status: 400 });
+
+    const settings = sanitizeProviderSettings(platform, body.providerSettings);
+    if ("error" in settings) return NextResponse.json({ error: settings.error, needsApproval: true }, { status: 422 });
 
     const supabase = await createClient();
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
@@ -40,7 +73,8 @@ export async function POST(request: Request) {
       platform,
       status: "queued",
       scheduled_for: scheduledFor || null,
-    }).select("id,status,scheduled_for,created_at").single();
+      provider_settings: settings.value,
+    }).select("id,status,scheduled_for,created_at,provider_settings").single();
     if (insertError || !job) throw insertError || new Error("publish_job_insert_failed");
 
     await supabase.from("content_items").update({ status: scheduledFor && !shouldDispatchNow ? "scheduled" : "approved", scheduled_for: scheduledFor || null, updated_at: new Date().toISOString() }).eq("id", contentItemId);

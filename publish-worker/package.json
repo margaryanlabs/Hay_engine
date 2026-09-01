@@ -1,0 +1,14 @@
+{
+  "name": "hay-publish-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/index.mjs",
+    "check": "node --check src/server.mjs && node --check src/metrics.mjs && node --check src/index.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.57.4"
+  }
+}

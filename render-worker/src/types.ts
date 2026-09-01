@@ -32,5 +32,6 @@ export type RenderProject = {
 export type RenderInput = {
   project: RenderProject;
   sceneImages?: Record<string, string>;
+  sceneVideos?: Record<string, string>;
   audioSrc?: string;
 };

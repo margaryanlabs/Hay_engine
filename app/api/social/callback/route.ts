@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { exchangeOAuthCode } from "@/lib/marketing/oauth";
+import { enrichOAuthCredential } from "@/lib/marketing/profile";
 import { storeCredential } from "@/lib/marketing/credentials";
 import type { SocialPlatform } from "@/lib/marketing/types";
 
@@ -38,8 +39,9 @@ export async function GET(request: Request) {
   if (!business) return NextResponse.json({ error: "business_not_found" }, { status: 404 });
 
   try {
-    const credential = await exchangeOAuthCode(state.platform, code);
-    if (!credential.accessToken) throw new Error("empty_access_token");
+    const exchanged = await exchangeOAuthCode(state.platform, code);
+    if (!exchanged.accessToken) throw new Error("empty_access_token");
+    const credential = await enrichOAuthCredential(state.platform, exchanged);
 
     const { data: existing } = await supabase.from("social_connections").select("id").eq("business_id", state.businessId).eq("platform", state.platform).limit(1).maybeSingle();
     const connectionRow = {
@@ -47,6 +49,7 @@ export async function GET(request: Request) {
       platform: state.platform,
       status: "connected",
       account_id: credential.accountId || null,
+      account_name: credential.accountName || null,
       scopes: credential.scope ? credential.scope.split(/[ ,]+/).filter(Boolean) : [],
       expires_at: credential.expiresAt || null,
       connected_at: new Date().toISOString(),
