@@ -4,18 +4,27 @@
 
 HAY Engine is an Armenian-first AI language and creator infrastructure project. Armenian is the priority language; English and Russian are first-class secondary interfaces/output languages.
 
-## Current MVP
+## Current Creator MVP
 
-- Armenian / English / Russian web studio
-- Armenian speech normalization
-- display-text vs spoken-text separation
-- brand/acronym pronunciation dictionary
-- finance/code-switch normalization (`BTC`, `$110K`, `funding rate`, etc.)
+- Armenian / English / Russian Creator Studio
+- one-request `prompt → CreatorProject` pipeline
+- Armenian speech normalization with separate display/spoken forms
+- brand/acronym/code-switch pronunciation dictionary
 - Eastern / Western Armenian architecture switch
-- Reel storyboard generation
-- deterministic fallback that works without paid APIs
+- Reel storyboard generation with deterministic fallback
+- automatic caption cue generation
+- scene asset direction (`generated-image`, `stock`, `motion`, `brand`)
+- Armenian typography rendered separately from generated media
+- live 9:16 Reel preview + scene timeline
 - optional OpenAI creative planner
-- optional ElevenLabs v3 Armenian speech generation with character timestamps
+- optional GPT Image scene generation
+- optional ElevenLabs v3 Armenian speech generation
+- provider health endpoint
+- render manifest contract for a dedicated Remotion worker
+
+## Why Armenian text is rendered separately
+
+HAY Engine does not ask image/video models to draw Armenian words when we need exact copy. Media prompts request **no text / no letters / no captions**. HAY Engine overlays real Armenian typography afterwards, so spelling and glyphs stay deterministic.
 
 ## Run locally
 
@@ -29,15 +38,26 @@ Open `http://localhost:3000`.
 
 The app works without provider keys in demo mode.
 
+## APIs
+
+- `POST /api/create` — create a complete Reel project manifest
+- `POST /api/normalize` — create speech-safe Armenian representation
+- `POST /api/storyboard` — generate a storyboard
+- `POST /api/voice` — generate Armenian voice when ElevenLabs is configured
+- `POST /api/image` — generate a vertical scene visual when OpenAI is configured
+- `GET /api/health` — inspect provider readiness
+
 ## Optional providers
 
 ### OpenAI
 
-Set `OPENAI_API_KEY` to enable AI-generated storyboards. The default model is configurable with `OPENAI_MODEL`.
+```bash
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5.6-luna
+OPENAI_IMAGE_MODEL=gpt-image-2
+```
 
 ### ElevenLabs
-
-Set:
 
 ```bash
 ELEVENLABS_API_KEY=...
@@ -45,15 +65,13 @@ ELEVENLABS_VOICE_ID=...
 ELEVENLABS_MODEL_ID=eleven_v3
 ```
 
-The voice route first passes Armenian through the HAY normalization layer and then calls ElevenLabs speech-with-timestamps.
+The voice route first passes Armenian through the HAY normalization layer and then calls the speech provider.
 
 ## Architecture
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-
-## Roadmap
-
-See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- [`docs/CREATOR_ENGINE.md`](docs/CREATOR_ENGINE.md)
+- [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 ## Dataset strategy
 
