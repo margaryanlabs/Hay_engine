@@ -1,7 +1,10 @@
 {
   "name": "hay-engine",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,15 +12,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "next": "latest",
-    "openai": "latest",
-    "react": "latest",
-    "react-dom": "latest"
+    "@supabase/ssr": "0.12.5",
+    "@supabase/supabase-js": "2.112.4",
+    "next": "16.3.3",
+    "openai": "7.5.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "typescript": "latest"
+    "typescript": "7.0.2"
   }
 }
