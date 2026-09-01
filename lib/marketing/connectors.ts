@@ -16,7 +16,7 @@ export const connectorCatalog: Record<SocialPlatform, ConnectorDefinition> = {
     label: "Instagram",
     publishing: "direct",
     permissions: ["profile", "media insights", "content publishing"],
-    env: ["META_CLIENT_ID", "META_CLIENT_SECRET", "META_REDIRECT_URI", "META_OAUTH_URL"],
+    env: ["META_CLIENT_ID", "META_CLIENT_SECRET", "META_REDIRECT_URI", "META_OAUTH_URL", "META_TOKEN_URL"],
     appReviewRequired: true,
     notes: "Professional/business publishing is enabled through an approved Meta app. Keep access tokens server-side.",
   },
@@ -43,7 +43,7 @@ export const connectorCatalog: Record<SocialPlatform, ConnectorDefinition> = {
     label: "Facebook",
     publishing: "direct",
     permissions: ["page identity", "page insights", "page content publishing"],
-    env: ["META_CLIENT_ID", "META_CLIENT_SECRET", "META_REDIRECT_URI", "META_OAUTH_URL"],
+    env: ["META_CLIENT_ID", "META_CLIENT_SECRET", "META_REDIRECT_URI", "META_OAUTH_URL", "META_TOKEN_URL"],
     appReviewRequired: true,
     notes: "Uses the same Meta app family as Instagram. Permissions depend on the approved app configuration.",
   },
@@ -64,7 +64,7 @@ export function getConnectorReadiness(platform: SocialPlatform) {
   return { ...connector, configured: missing.length === 0, missing };
 }
 
-export function buildOAuthUrl(platform: SocialPlatform) {
+export function buildOAuthUrl(platform: SocialPlatform, state: string) {
   const readiness = getConnectorReadiness(platform);
   if (!readiness.configured) return null;
 
@@ -74,7 +74,7 @@ export function buildOAuthUrl(platform: SocialPlatform) {
     url.searchParams.set("redirect_uri", process.env.TIKTOK_REDIRECT_URI!);
     url.searchParams.set("response_type", "code");
     url.searchParams.set("scope", "user.info.basic,video.list,video.publish,video.upload");
-    url.searchParams.set("state", crypto.randomUUID());
+    url.searchParams.set("state", state);
     return url.toString();
   }
 
@@ -86,7 +86,7 @@ export function buildOAuthUrl(platform: SocialPlatform) {
     url.searchParams.set("access_type", "offline");
     url.searchParams.set("prompt", "consent");
     url.searchParams.set("scope", "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly");
-    url.searchParams.set("state", crypto.randomUUID());
+    url.searchParams.set("state", state);
     return url.toString();
   }
 
@@ -97,7 +97,7 @@ export function buildOAuthUrl(platform: SocialPlatform) {
     url.searchParams.set("client_id", process.env.META_CLIENT_ID!);
     url.searchParams.set("redirect_uri", process.env.META_REDIRECT_URI!);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("state", crypto.randomUUID());
+    url.searchParams.set("state", state);
     return url.toString();
   }
 
