@@ -10,27 +10,19 @@ export type ElevenLabsSpeechResult = {
   contentType: string;
 };
 
-export async function createArmenianSpeech(text: string): Promise<ElevenLabsSpeechResult | null> {
+export async function createArmenianSpeech(text: string, providerVoiceId?: string): Promise<ElevenLabsSpeechResult | null> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
-  const voiceId = process.env.ELEVENLABS_VOICE_ID;
+  const voiceId = providerVoiceId || process.env.ELEVENLABS_VOICE_ID;
   if (!apiKey || !voiceId) return null;
 
   const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_v3";
   const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps?output_format=mp3_44100_128`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "xi-api-key": apiKey,
-    },
+    headers: { "Content-Type": "application/json", "xi-api-key": apiKey },
     body: JSON.stringify({
       text,
       model_id: modelId,
-      voice_settings: {
-        stability: 0.45,
-        similarity_boost: 0.75,
-        style: 0.25,
-        speed: 0.98,
-      },
+      voice_settings: { stability: 0.45, similarity_boost: 0.75, style: 0.25, speed: 0.98 },
     }),
   });
 

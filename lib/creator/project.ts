@@ -2,13 +2,10 @@ import { normalizeForSpeech } from "@/lib/hay/normalize";
 import { buildDemoStoryboard } from "@/lib/hay/storyboard";
 import type { ContentStyle, Dialect, Locale } from "@/lib/hay/types";
 import { generateStoryboardWithOpenAI } from "@/lib/providers/openai";
+import { isVeoConfigured } from "@/lib/providers/veo";
 import { buildCreatorScenes } from "./assets";
 import { buildCaptionCues } from "./captions";
 import type { CreatorProject } from "./types";
-
-function makeId() {
-  return `hay_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
 
 export async function createCreatorProject(args: {
   prompt: string;
@@ -28,11 +25,11 @@ export async function createCreatorProject(args: {
   const speech = normalizeForSpeech(storyboard.voiceover, args.language, args.dialect);
   const captions = buildCaptionCues(storyboard.voiceover, args.duration);
   const scenes = buildCreatorScenes(storyboard.scenes);
-  const voiceConfigured = Boolean(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID);
+  const voiceConfigured = Boolean(process.env.ELEVENLABS_API_KEY && (process.env.ELEVENLABS_VOICE_ID || process.env.ELEVENLABS_VOICE_ID_MALE || process.env.ELEVENLABS_VOICE_ID_FEMALE));
   const imageConfigured = Boolean(process.env.OPENAI_API_KEY);
 
   return {
-    id: makeId(),
+    id: crypto.randomUUID(),
     status: "renderable",
     createdAt: new Date().toISOString(),
     brief: args.prompt,
@@ -61,7 +58,7 @@ export async function createCreatorProject(args: {
     providers: {
       planner: storyboard.generatedBy,
       image: imageConfigured ? "openai" : "unconfigured",
-      video: "adapter-ready",
+      video: isVeoConfigured() ? "google-veo" : "unconfigured",
       voice: voiceConfigured ? "elevenlabs" : "unconfigured",
     },
   };
