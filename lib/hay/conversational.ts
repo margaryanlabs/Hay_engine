@@ -3,30 +3,39 @@ import OpenAI from "openai";
 export type ArmenianSpeechStyle = "standard" | "natural" | "yerevan";
 
 const naturalPairs: Array<[RegExp,string]> = [
-  [/\bներկայումս\b/giu,"հիմա"],
-  [/\bայժմ\b/giu,"հիմա"],
-  [/\bայնուհետև\b/giu,"հետո"],
-  [/\bցանկանում եք\b/giu,"ուզում եք"],
-  [/\bցանկանում ես\b/giu,"ուզում ես"],
-  [/\bցանկանում եմ\b/giu,"ուզում եմ"],
-  [/\bանհրաժեշտ է\b/giu,"պետք է"],
-  [/\bհնարավորություն ունեք\b/giu,"կարող եք"],
-  [/\bհնարավորություն ունես\b/giu,"կարող ես"],
-  [/\bիրականացնել\b/giu,"անել"],
-  [/\bիրականացնում ենք\b/giu,"անում ենք"],
-  [/\bհանդիսանում է\b/giu,"է"],
-  [/\bտվյալ դեպքում\b/giu,"էս դեպքում"],
+  [/(?<!\p{L})ներկայումս(?!\p{L})/giu,"հիմա"],
+  [/(?<!\p{L})այժմ(?!\p{L})/giu,"հիմա"],
+  [/(?<!\p{L})այնուհետև(?!\p{L})/giu,"հետո"],
+  [/(?<!\p{L})ցանկանում եք(?!\p{L})/giu,"ուզում եք"],
+  [/(?<!\p{L})ցանկանում ես(?!\p{L})/giu,"ուզում ես"],
+  [/(?<!\p{L})ցանկանում եմ(?!\p{L})/giu,"ուզում եմ"],
+  [/(?<!\p{L})անհրաժեշտ է(?!\p{L})/giu,"պետք է"],
+  [/(?<!\p{L})հնարավորություն ունեք(?!\p{L})/giu,"կարող եք"],
+  [/(?<!\p{L})հնարավորություն ունես(?!\p{L})/giu,"կարող ես"],
+  [/(?<!\p{L})իրականացնել(?!\p{L})/giu,"անել"],
+  [/(?<!\p{L})իրականացնում ենք(?!\p{L})/giu,"անում ենք"],
+  [/(?<!\p{L})հանդիսանում է(?!\p{L})/giu,"է"],
+  [/(?<!\p{L})տվյալ դեպքում(?!\p{L})/giu,"այս դեպքում"],
+  [/(?<!\p{L})սկսած այս պահից(?!\p{L})/giu,"այս պահից"],
+  [/(?<!\p{L})կատարել պատվեր(?!\p{L})/giu,"պատվիրել"],
+  [/(?<!\p{L})կատարել վճարում(?!\p{L})/giu,"վճարել"],
+  [/(?<!\p{L})կատարել ընտրություն(?!\p{L})/giu,"ընտրել"],
+  [/(?<!\p{L})ձեռք բերել(?!\p{L})/giu,"գնել"],
 ];
 
 const yerevanPairs: Array<[RegExp,string]> = [
-  [/\bայս մեկը\b/giu,"էս մեկը"],
-  [/\bայդ մեկը\b/giu,"էդ մեկը"],
-  [/\bայսպես\b/giu,"էսպես"],
-  [/\bայդպես\b/giu,"էդպես"],
-  [/\bայո\b/giu,"հա"],
+  [/(?<!\p{L})այս մեկը(?!\p{L})/giu,"էս մեկը"],
+  [/(?<!\p{L})այդ մեկը(?!\p{L})/giu,"էդ մեկը"],
+  [/(?<!\p{L})այսպես(?!\p{L})/giu,"էսպես"],
+  [/(?<!\p{L})այդպես(?!\p{L})/giu,"էդպես"],
+  [/(?<!\p{L})այս դեպքում(?!\p{L})/giu,"էս դեպքում"],
+  [/(?<!\p{L})այդ դեպքում(?!\p{L})/giu,"էդ դեպքում"],
+  [/(?<!\p{L})այս պահին(?!\p{L})/giu,"էս պահին"],
+  [/(?<!\p{L})այդ պահին(?!\p{L})/giu,"էդ պահին"],
+  [/(?<!\p{L})այո(?!\p{L})/giu,"հա"],
 ];
 
-function ruleBased(text:string, style:ArmenianSpeechStyle){
+export function ruleBasedNaturalizeArmenian(text:string, style:ArmenianSpeechStyle){
   let result=text.trim().replace(/\s+/g," ");
   if(style==="standard") return result;
   for(const [pattern,value] of naturalPairs) result=result.replace(pattern,value);
@@ -35,7 +44,7 @@ function ruleBased(text:string, style:ArmenianSpeechStyle){
 }
 
 export async function naturalizeArmenianText(text:string, style:ArmenianSpeechStyle="natural"){
-  const fallback=ruleBased(text,style);
+  const fallback=ruleBasedNaturalizeArmenian(text,style);
   if(style==="standard" || !process.env.OPENAI_API_KEY) return { text:fallback, generatedBy:"rules" as const, style };
   try{
     const client=new OpenAI({apiKey:process.env.OPENAI_API_KEY});
