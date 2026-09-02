@@ -16,6 +16,7 @@ import "./studio-calendar.css";
 import "./studio-policy.css";
 import "./studio-memory.css";
 import "./studio-workspace.css";
+import "./studio-series.css";
 import "./voice-lab.css";
 import "./quality.css";
 import "./login.css";
