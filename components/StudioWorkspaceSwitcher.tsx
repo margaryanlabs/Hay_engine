@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { selectBusinessInUrl, selectedBusinessId } from "@/lib/studio/business-selection";
+import { selectBusinessWorkspace, selectedBusinessId } from "@/lib/studio/business-selection";
 
 type Business={id:string;name:string;category:string;location?:string|null;primary_language?:"hy"|"en"|"ru"};
 
@@ -18,11 +18,16 @@ export default function StudioWorkspaceSwitcher(){
 
   async function load(){
     try{
+      const requested=selectedBusinessId();
+      if(requested){
+        const selected=await selectBusinessWorkspace(requested,false);
+        if(selected.changed){window.location.reload();return;}
+      }
       const response=await fetch("/api/businesses",{cache:"no-store"});
       if(response.status===401){setConfigured(true);setBusinesses([]);return;}
       const data=await response.json();
       setConfigured(data.configured!==false);setBusinesses(data.businesses||[]);
-    }catch{setConfigured(false);setBusinesses([]);}
+    }catch(error){setConfigured(false);setBusinesses([]);setMessage(error instanceof Error?error.message:"Workspace unavailable");}
   }
   useEffect(()=>{void load();},[]);
 
@@ -38,16 +43,22 @@ export default function StudioWorkspaceSwitcher(){
       const data=await response.json();
       if(!response.ok)throw new Error(data.detail||data.error||"business_create_failed");
       if(data.configured===false){setMessage("Activate the dedicated HAY database to create workspaces.");return;}
-      selectBusinessInUrl(String(data.business.id));
+      await selectBusinessWorkspace(String(data.business.id));
     }catch(error){setMessage(error instanceof Error?error.message:"Workspace creation failed");}
     finally{setBusy(false);}
+  }
+
+  async function changeWorkspace(id:string){
+    if(!id||busy)return;
+    setBusy(true);setMessage("");
+    try{await selectBusinessWorkspace(id);}catch(error){setBusy(false);setMessage(error instanceof Error?error.message:"Workspace selection failed");}
   }
 
   return <section className="studioWorkspaceBar" aria-label="Business workspace selector">
     <div className="workspaceIdentity"><span><i/>WORKSPACE</span><strong>{configured===false?"DEMO":selected?.name||"NO BUSINESS"}</strong><small>{selected?`${selected.category}${selected.location?` · ${selected.location}`:""}`:"Create or select a business workspace"}</small></div>
     <div className="workspaceSelect">
       <span>ACTIVE BRAND</span>
-      <select value={selected?.id||""} disabled={!businesses.length} onChange={event=>selectBusinessInUrl(event.target.value)}>
+      <select value={selected?.id||""} disabled={!businesses.length||busy} onChange={event=>void changeWorkspace(event.target.value)}>
         {!businesses.length&&<option value="">No business</option>}
         {businesses.map(item=><option key={item.id} value={item.id}>{item.name} · {item.category}</option>)}
       </select>
