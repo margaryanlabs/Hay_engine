@@ -28,12 +28,21 @@ const labels = {
   ru: { title:"Финальная проверка", publish:"Опубликовать / запланировать", close:"Закрыть", caption:"Текст публикации", schedule:"Время публикации", now:"Сейчас", account:"Аккаунт", noAccount:"Этот канал пока не подключён.", consent:"Я проверил публикацию и явно подтверждаю отправку.", privacy:"Видимость", disclosure:"Коммерческий контент", own:"Свой бренд", branded:"Платное партнёрство", comments:"Отключить комментарии", duet:"Отключить Duet", stitch:"Отключить Stitch" },
 } as const;
 
+function yerevanScheduleInput(value?:string){
+  if(!value)return "";
+  const date=new Date(value);
+  if(Number.isNaN(date.getTime()))return "";
+  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Yerevan",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(date);
+  const part=(type:string)=>parts.find(item=>item.type===type)?.value||"";
+  return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
+}
+
 export default function PublishDialog({ item, connections, locale, onClose, onMessage, onQueued }: Props) {
   const t = labels[locale];
   const connection = useMemo(() => connections.find(c => c.platform === item.platform && c.status === "connected"), [connections, item.platform]);
   const [caption,setCaption]=useState(item.caption);
   const [cta,setCta]=useState(item.cta);
-  const [schedule,setSchedule]=useState("");
+  const [schedule,setSchedule]=useState(()=>yerevanScheduleInput(item.publishAt));
   const [busy,setBusy]=useState(false);
   const [creator,setCreator]=useState<TikTokCreator|null>(null);
   const [creatorFetchedAt,setCreatorFetchedAt]=useState("");
@@ -50,6 +59,7 @@ export default function PublishDialog({ item, connections, locale, onClose, onMe
   const [shareToFeed,setShareToFeed]=useState(true);
   const [error,setError]=useState("");
 
+  useEffect(()=>{setSchedule(yerevanScheduleInput(item.publishAt));},[item.id,item.publishAt]);
   useEffect(()=>{
     if(item.platform!=="tiktok"||!connection?.id)return;
     let cancelled=false;
@@ -61,7 +71,7 @@ export default function PublishDialog({ item, connections, locale, onClose, onMe
     return()=>{cancelled=true;};
   },[item.platform,connection?.id]);
 
-  const scheduleIso=()=>schedule?new Date(schedule).toISOString():undefined;
+  const scheduleIso=()=>schedule?new Date(`${schedule}:00+04:00`).toISOString():undefined;
   const tiktokReady=item.platform!=="tiktok"||Boolean(creator&&creatorFetchedAt&&privacy&&consent&&(!commercial||ownBrand||brandedContent));
   const canPublish=Boolean(connection?.id)&&!busy&&tiktokReady;
 
@@ -90,7 +100,7 @@ export default function PublishDialog({ item, connections, locale, onClose, onMe
       if(!response.ok)throw new Error(data.error||"publish_queue_failed");
       const status=String(data.job?.status||data.next||"queued");
       onQueued?.(status);
-      onMessage(schedule?`${item.platform}: publication scheduled.`:`${item.platform}: publish job queued.`);
+      onMessage(schedule?`${item.platform}: publication scheduled for ${schedule.replace("T"," ")} AMT.`:`${item.platform}: publish job queued.`);
       onClose();
     }catch(err){setError(err instanceof Error?err.message:"Publish failed");}
     finally{setBusy(false);}
@@ -106,7 +116,7 @@ export default function PublishDialog({ item, connections, locale, onClose, onMe
       {!connection?.id&&<div className="publishWarning">{t.noAccount}</div>}
       <label className="publishField">{t.caption}<textarea value={caption} onChange={e=>setCaption(e.target.value)} maxLength={5000}/></label>
       <label className="publishField">CTA<input value={cta} onChange={e=>setCta(e.target.value)} maxLength={1000}/></label>
-      <label className="publishField">{t.schedule}<input type="datetime-local" value={schedule} onChange={e=>setSchedule(e.target.value)}/><small>{schedule||t.now}</small></label>
+      <label className="publishField">{t.schedule}<input type="datetime-local" value={schedule} onChange={e=>setSchedule(e.target.value)}/><small>{schedule?`${schedule.replace("T"," ")} · AMT / Asia-Yerevan`:t.now}</small></label>
 
       {item.platform==="instagram"&&<label className="publishToggle"><input type="checkbox" checked={shareToFeed} onChange={e=>setShareToFeed(e.target.checked)}/><span/>Share Reel to feed</label>}
       {item.platform==="youtube"&&<div className="publishProvider"><label>{t.privacy}<select value={youtubePrivacy} onChange={e=>setYoutubePrivacy(e.target.value as typeof youtubePrivacy)}><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label><label>Title<input value={youtubeTitle} onChange={e=>setYoutubeTitle(e.target.value)} maxLength={100}/></label></div>}

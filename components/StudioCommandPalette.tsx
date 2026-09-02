@@ -24,6 +24,8 @@ export default function StudioCommandPalette(){
     {label:"Social Channels",hint:"CONNECT",action:()=>scroll(".channelsCard")},
     {label:"Competitor Radar",hint:"RADAR",action:()=>scroll(".competitorsCard")},
     {label:"Content Pulse",hint:"CALENDAR",action:()=>scroll(".contentPulse")},
+    {label:"Smart Publishing Calendar",hint:"SCHEDULE",action:()=>scroll(".studioScheduleQueue")},
+    {label:"Publishing Policy",hint:"CONTROL",action:()=>scroll(".studioPolicy")},
     {label:"Approval Inbox",hint:"DECIDE",action:()=>scroll(".studioApprovalPanel")},
     {label:"Performance Memory",hint:"LEARN",action:()=>scroll(".studioPerformancePanel")},
     {label:"Creator Engine",hint:"CREATE",action:()=>go("/creator")},

@@ -2,10 +2,11 @@
 
 **Create anything. Naturally Armenian.**
 
-HAY Engine is an Armenian-first AI language and creator infrastructure project. Armenian is the priority language; English and Russian are first-class secondary interfaces/output languages.
+HAY Engine is an Armenian-first AI language, creator and marketing operating system. Armenian is the priority language; English and Russian are first-class secondary interfaces/output languages.
 
-## Current Creator MVP
+## Current product layers
 
+### HAY Creator
 - Armenian / English / Russian Creator Studio
 - one-request `prompt → CreatorProject` pipeline
 - Armenian speech normalization with separate display/spoken forms
@@ -16,11 +17,20 @@ HAY Engine is an Armenian-first AI language and creator infrastructure project. 
 - scene asset direction (`generated-image`, `stock`, `motion`, `brand`)
 - Armenian typography rendered separately from generated media
 - live 9:16 Reel preview + scene timeline
-- optional OpenAI creative planner
-- optional GPT Image scene generation
-- optional ElevenLabs v3 Armenian speech generation
-- provider health endpoint
-- render manifest contract for a dedicated Remotion worker
+- optional OpenAI creative planner and image generation
+- optional ElevenLabs Armenian speech generation
+- Veo provider contract and Remotion render worker
+
+### HAY Marketing OS
+- business and competitor intelligence
+- 7–30 day content strategy and planning
+- real approval inbox and performance memory
+- Smart Calendar with Armenia-local baseline publishing windows
+- Instagram / TikTok / YouTube connection and publish pipeline
+- durable render and publish jobs
+- per-channel publishing policy: `manual`, `approval`, `autoqueue`
+- TikTok remains explicit-consent gated even when automation is enabled
+- real metrics feed the next planning cycle; no synthetic performance numbers
 
 ## Why Armenian text is rendered separately
 
@@ -43,9 +53,30 @@ The app works without provider keys in demo mode.
 - `POST /api/create` — create a complete Reel project manifest
 - `POST /api/normalize` — create speech-safe Armenian representation
 - `POST /api/storyboard` — generate a storyboard
-- `POST /api/voice` — generate Armenian voice when ElevenLabs is configured
+- `POST /api/voice` — generate Armenian voice when a speech provider is configured
 - `POST /api/image` — generate a vertical scene visual when OpenAI is configured
-- `GET /api/health` — inspect provider readiness
+- `GET /api/health` — inspect provider/runtime readiness
+- `POST /api/marketing/plan` — create and persist a marketing plan
+- `POST /api/marketing/autopilot` — create the HAY analyze→plan→create→approve→publish→learn run
+- `GET/PATCH /api/social/connections` — inspect connections and publishing policies
+- `POST /api/social/publish` — finalize or schedule a provider publish job
+- `GET /api/studio/overview` — approvals, performance, calendar and operational state
+
+## Dedicated Supabase setup
+
+Use a **dedicated HAY project**. Do not mix HAY tables/tokens into unrelated products.
+
+Apply SQL in this order:
+
+1. `supabase/schema.sql`
+2. `supabase/002_publish_settings_and_metrics.sql`
+3. `supabase/003_publish_worker_state.sql`
+4. `supabase/004_render_pipeline.sql`
+5. `supabase/005_publishing_policies.sql`
+6. `supabase/storage.sql`
+7. `supabase/vault.sql`
+
+`005_publishing_policies.sql` adds per-channel automation policy and prevents duplicate active publish jobs. Until it is applied, HAY keeps content approval working and degrades publishing-policy features safely.
 
 ## Optional providers
 
