@@ -32,11 +32,17 @@ async function authBusiness(request:Request){
 export async function GET(request: Request) {
   const auth=await authBusiness(request);
   if("response" in auth)return auth.response;
-  const {data,error}=await auth.supabase.from("social_connections")
+  const enhanced=await auth.supabase.from("social_connections")
     .select("id,platform,status,account_name,account_id,scopes,expires_at,connected_at,automation_mode,publish_defaults")
     .eq("business_id",auth.businessId);
-  if(error)return NextResponse.json({error:"connections_read_failed",detail:error.message},{status:500});
-  return NextResponse.json({configured:true,connections:data||[]});
+  if(!enhanced.error)return NextResponse.json({configured:true,connections:enhanced.data||[],policyMigrationRequired:false});
+
+  const fallback=await auth.supabase.from("social_connections")
+    .select("id,platform,status,account_name,account_id,scopes,expires_at,connected_at")
+    .eq("business_id",auth.businessId);
+  if(fallback.error)return NextResponse.json({error:"connections_read_failed",detail:fallback.error.message},{status:500});
+  const connections=(fallback.data||[]).map(item=>({...item,automation_mode:"approval",publish_defaults:{}}));
+  return NextResponse.json({configured:true,connections,policyMigrationRequired:true});
 }
 
 export async function PATCH(request:Request){
@@ -59,7 +65,11 @@ export async function PATCH(request:Request){
       .update({automation_mode:effectiveMode,publish_defaults:defaults})
       .eq("id",connectionId).eq("business_id",auth.businessId)
       .select("id,platform,status,account_name,account_id,scopes,expires_at,connected_at,automation_mode,publish_defaults").single();
-    if(error)throw error;
+    if(error){
+      const detail=String(error.message||"");
+      if(detail.includes("automation_mode")||detail.includes("publish_defaults"))return NextResponse.json({error:"publishing_policy_migration_required",migration:"supabase/005_publishing_policies.sql"},{status:409});
+      throw error;
+    }
     return NextResponse.json({configured:true,connection:data,tiktokAutoqueueDowngraded:connection.platform==="tiktok"&&mode==="autoqueue"});
   }catch(error){
     console.error("Connection policy update failed",error);
