@@ -45,11 +45,12 @@ export async function GET(request:Request){
     ]);
     if(contentResult.error)return NextResponse.json({error:"campaign_analytics_metrics_failed",detail:contentResult.error.message},{status:500});
     if(metricsResult.error&&!missingMetricsTable(metricsResult.error))return NextResponse.json({error:"campaign_analytics_metrics_failed",detail:metricsResult.error.message},{status:500});
-    if(missingMetricsTable(metricsResult.error)&&!attribution.available)return NextResponse.json({configured:true,business:{id:String(business.id),name:business.name},campaign:selectedCampaign.campaign,analytics:null,campaigns:summaries,reason:"apply_supabase_002_publish_settings_and_metrics"});
+    const primaryKpi=String(selectedCampaign.campaign.primaryKpi||"reach");const outcomeKpi=primaryKpi==="conversion"||primaryKpi==="retention";
+    if(missingMetricsTable(metricsResult.error)&&(!attribution.available||!outcomeKpi))return NextResponse.json({configured:true,business:{id:String(business.id),name:business.name},campaign:selectedCampaign.campaign,analytics:null,campaigns:summaries,reason:"apply_supabase_002_publish_settings_and_metrics"});
 
     const latest=new Map<string,Record<string,unknown>>();
     for(const raw of (metricsResult.data||[]) as Array<Record<string,unknown>>){const id=String(raw.content_item_id||"");if(id&&!latest.has(id))latest.set(id,raw);}
-    const metricIds=new Set([...latest.keys(),...attribution.byContent.keys()].filter(id=>ids.includes(id)));
+    const metricIds=new Set((outcomeKpi?[...latest.keys(),...attribution.byContent.keys()]:[...latest.keys()]).filter(id=>ids.includes(id)));
     const mergedMetrics=[...metricIds].map(id=>{
       const row=latest.get(id)||{};const outcome=effectiveOutcome(number(row.clicks),number(row.conversions),attribution.byContent.get(id));
       return {...row,content_item_id:id,measured_at:String(row.measured_at||new Date().toISOString()),clicks:outcome.clicks,conversions:outcome.conversions};
