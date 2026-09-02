@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { buildContentSeriesArchitecture } from "./series";
 import type { MarketingPlan } from "./types";
 
 export type PersistedPlanResult = {
@@ -61,17 +62,20 @@ export async function persistMarketingPlan(plan: MarketingPlan, requestedBusines
   const owned = await ensureOwnedBusiness(plan, requestedBusinessId);
   if (!owned) return { persisted: false, plan, idMap: {}, reason: "unauthenticated" };
   const { supabase, businessId } = owned;
+  const seriesDraft=buildContentSeriesArchitecture(plan);
+  const baseStrategy={
+    brand: plan.brand,
+    competitors: plan.competitors,
+    strategySummary: plan.strategySummary,
+    generatedAt: plan.createdAt,
+    schedulePolicy: "baseline_yerevan_until_learned_windows",
+    series: seriesDraft,
+  };
 
   const { data: planRow, error: planError } = await supabase.from("marketing_plans").insert({
     business_id: businessId,
     horizon_days: plan.horizonDays,
-    strategy: {
-      brand: plan.brand,
-      competitors: plan.competitors,
-      strategySummary: plan.strategySummary,
-      generatedAt: plan.createdAt,
-      schedulePolicy: "baseline_yerevan_until_learned_windows",
-    },
+    strategy: baseStrategy,
     generated_by: plan.generatedBy,
   }).select("id").single();
   if (planError || !planRow?.id) throw planError || new Error("marketing_plan_persist_failed");
@@ -100,6 +104,10 @@ export async function persistMarketingPlan(plan: MarketingPlan, requestedBusines
     idMap[item.id] = durableId;
     durableItems.push({ ...item, id: durableId });
   }
+
+  const durableSeries=buildContentSeriesArchitecture(plan,idMap);
+  const {error:strategyError}=await supabase.from("marketing_plans").update({strategy:{...baseStrategy,series:durableSeries}}).eq("id",planRow.id).eq("business_id",businessId);
+  if(strategyError)console.warn("Series strategy durability update skipped",strategyError.message);
 
   return {
     persisted: true,
