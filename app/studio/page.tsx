@@ -4,6 +4,7 @@ import StudioCampaignBrain from "@/components/StudioCampaignBrain";
 import StudioCommandPalette from "@/components/StudioCommandPalette";
 import StudioContentMemory from "@/components/StudioContentMemory";
 import StudioContentSeries from "@/components/StudioContentSeries";
+import StudioConversionBridge from "@/components/StudioConversionBridge";
 import StudioDecisionConsole from "@/components/StudioDecisionConsole";
 import StudioOnboarding from "@/components/StudioOnboarding";
 import StudioPublishingPolicy from "@/components/StudioPublishingPolicy";
@@ -25,6 +26,7 @@ export default function StudioPage(){
     <StudioTodayBrief/>
     <StudioCampaignBrain/>
     <StudioCampaignAnalytics/>
+    <StudioConversionBridge/>
     <StudioDecisionConsole/>
     <StudioScheduleQueue/>
     <StudioContentSeries/>
