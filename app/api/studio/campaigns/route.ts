@@ -4,6 +4,16 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const runtime="nodejs";
 const WORKSPACE_COOKIE="hay_business_id";
+const YEREVAN_OFFSET="+04:00";
+
+function liveStatus(startDate:unknown,endDate:unknown){
+  const start=Date.parse(`${String(startDate||"")}T00:00:00${YEREVAN_OFFSET}`);
+  const end=Date.parse(`${String(endDate||"")}T23:59:59${YEREVAN_OFFSET}`);
+  const now=Date.now();
+  if(Number.isFinite(start)&&now<start)return "upcoming";
+  if(Number.isFinite(end)&&now>end)return "completed";
+  return "active";
+}
 
 export async function GET(request:Request){
   if(!isSupabaseConfigured())return NextResponse.json({configured:false,business:null,campaigns:[]});
@@ -34,7 +44,7 @@ export async function GET(request:Request){
       const campaign=raw as Record<string,unknown>;
       const id=String(campaign.id||`${campaign.name||"campaign"}:${campaign.startDate||plan.created_at}`);
       if(seen.has(id))continue;seen.add(id);
-      campaigns.push({...campaign,id,planId:String(plan.id),planCreatedAt:String(plan.created_at||"")});
+      campaigns.push({...campaign,id,status:liveStatus(campaign.startDate,campaign.endDate),planId:String(plan.id),planCreatedAt:String(plan.created_at||"")});
       if(campaigns.length>=8)break;
     }
     return NextResponse.json({configured:true,business:{id:String(business.id),name:business.name},campaigns});
