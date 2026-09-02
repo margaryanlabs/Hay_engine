@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const runtime="nodejs";
+type TrackingLinkRow={id:string;slug:string;destination_url:string;is_active:boolean};
 
 function httpsUrl(value:unknown){
   try{
@@ -42,13 +43,13 @@ export async function POST(request:Request){
     const origin=(process.env.NEXT_PUBLIC_SITE_URL||new URL(request.url).origin).replace(/\/$/,"");
     if(existing.data)return NextResponse.json({configured:true,reused:true,link:existing.data,trackingUrl:`${origin}/r/${existing.data.slug}`});
 
-    let created:null|{id:string;slug:string;destination_url:string;is_active:boolean}=null;
+    let created:TrackingLinkRow|null=null;
     for(let attempt=0;attempt<3&&!created;attempt++){
       const slug=crypto.randomUUID().replaceAll("-","").slice(0,14);
       const result=await supabase.from("tracking_links").insert({business_id:business.id,content_item_id:contentItemId,slug,destination_url:normalized,is_active:true}).select("id,slug,destination_url,is_active").single();
       if(missingTable(result.error))return NextResponse.json({error:"attribution_migration_required",migration:"supabase/006_first_party_attribution.sql"},{status:409});
       if(result.error){if(result.error.code==="23505")continue;return NextResponse.json({error:"tracking_link_create_failed",detail:result.error.message},{status:500});}
-      created=result.data as typeof created;
+      if(result.data)created={id:String(result.data.id),slug:String(result.data.slug),destination_url:String(result.data.destination_url),is_active:Boolean(result.data.is_active)};
     }
     if(!created)return NextResponse.json({error:"tracking_slug_collision"},{status:500});
     return NextResponse.json({configured:true,reused:false,link:created,trackingUrl:`${origin}/r/${created.slug}`});
