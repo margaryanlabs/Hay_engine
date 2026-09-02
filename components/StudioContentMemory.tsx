@@ -29,7 +29,12 @@ export default function StudioContentMemory(){
     finally{setLoading(false);}
   }
 
-  useEffect(()=>{void load();},[]);
+  useEffect(()=>{
+    void load();
+    const refresh=()=>{void load();};
+    window.addEventListener("hay:studio-refresh",refresh);
+    return()=>window.removeEventListener("hay:studio-refresh",refresh);
+  },[]);
   const dominantFormat=useMemo(()=>topEntries(memory?.formatCounts||{})[0]||null,[memory]);
   const dominantObjective=useMemo(()=>topEntries(memory?.objectiveCounts||{})[0]||null,[memory]);
 
