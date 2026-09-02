@@ -4,6 +4,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 export type ContentMemoryContext = {
   recentItems: Array<{ platform:string; format:string; objective:string; hook:string; concept:string; status:string; createdAt:string }>;
   recentHooks: string[];
+  recentSeries: Array<{key:string;title:string;primaryObjective:string;plannedWeeks:number;cadence:string;episodeCount:number;nextAngle:string}>;
   formatCounts: Record<string,number>;
   platformCounts: Record<string,number>;
   objectiveCounts: Record<string,number>;
@@ -26,13 +27,14 @@ export async function loadContentMemory(businessId?:string,businessName?:string)
   else if(businessName?.trim())businessQuery=businessQuery.eq("name",businessName.trim());
   const {data:business}=await businessQuery.maybeSingle();
   if(!business?.id)return null;
+  const resolvedBusinessId=String(business.id);
 
-  const {data,error}=await supabase.from("content_items")
-    .select("platform,format,objective,hook,concept,status,created_at")
-    .eq("business_id",String(business.id))
-    .order("created_at",{ascending:false})
-    .limit(80);
-  if(error||!data?.length)return null;
+  const [contentResult,planResult]=await Promise.all([
+    supabase.from("content_items").select("platform,format,objective,hook,concept,status,created_at").eq("business_id",resolvedBusinessId).order("created_at",{ascending:false}).limit(80),
+    supabase.from("marketing_plans").select("strategy,created_at").eq("business_id",resolvedBusinessId).order("created_at",{ascending:false}).limit(8),
+  ]);
+  const data=contentResult.data;
+  if(contentResult.error||!data?.length)return null;
 
   const recentItems=data.map(item=>({
     platform:clean(item.platform),format:clean(item.format),objective:clean(item.objective),hook:clean(item.hook),concept:clean(item.concept),status:clean(item.status),createdAt:clean(item.created_at),
@@ -47,9 +49,36 @@ export async function loadContentMemory(businessId?:string,businessName?:string)
   const duplicateRatio=repeatedHooks.length/Math.max(1,recentHooks.length);
   const level:ContentMemoryContext["duplicateRisk"]["level"]=duplicateRatio>=.25?"high":duplicateRatio>=.1?"medium":"low";
 
+  const seenSeries=new Set<string>();
+  const recentSeries:ContentMemoryContext["recentSeries"]=[];
+  for(const row of planResult.data||[]){
+    const strategy=(row.strategy&&typeof row.strategy==="object"?row.strategy:{}) as Record<string,unknown>;
+    const architecture=(strategy.series&&typeof strategy.series==="object"?strategy.series:{}) as Record<string,unknown>;
+    const list=Array.isArray(architecture.series)?architecture.series:[];
+    for(const raw of list){
+      if(!raw||typeof raw!=="object")continue;
+      const item=raw as Record<string,unknown>;
+      const key=clean(item.key)||clean(item.title);
+      if(!key||seenSeries.has(key))continue;
+      seenSeries.add(key);
+      recentSeries.push({
+        key,
+        title:clean(item.title)||key,
+        primaryObjective:clean(item.primaryObjective)||"trust",
+        plannedWeeks:Number(item.plannedWeeks)||4,
+        cadence:clean(item.cadence)||"1× / week",
+        episodeCount:Array.isArray(item.episodes)?item.episodes.length:0,
+        nextAngle:clean(item.nextAngle),
+      });
+      if(recentSeries.length>=8)break;
+    }
+    if(recentSeries.length>=8)break;
+  }
+
   return {
     recentItems:recentItems.slice(0,40),
     recentHooks,
+    recentSeries,
     formatCounts:countBy(recentItems.map(item=>item.format)),
     platformCounts:countBy(recentItems.map(item=>item.platform)),
     objectiveCounts:countBy(recentItems.map(item=>item.objective)),
@@ -59,6 +88,6 @@ export async function loadContentMemory(businessId?:string,businessName?:string)
 
 export function contentMemoryForPlan(memory:ContentMemoryContext|null){
   if(!memory)return "";
-  const compact={recentHooks:memory.recentHooks.slice(0,24),recentItems:memory.recentItems.slice(0,24),formatCounts:memory.formatCounts,platformCounts:memory.platformCounts,objectiveCounts:memory.objectiveCounts,duplicateRisk:memory.duplicateRisk};
-  return `\n\nHAY CONTENT MEMORY — real recent content from this business:\n${JSON.stringify(compact)}\nPlanning rules: treat draft, scheduled and published items as already used for duplication control. Do not repeat hooks verbatim. Avoid near-duplicate concepts, openings and CTAs. Continue a proven theme only with a materially new angle, proof, audience segment or format. Deliberately rebalance overused formats/objectives while preserving measured winners. Build recognizable series where continuity is useful, but every episode must add new information.`;
+  const compact={recentHooks:memory.recentHooks.slice(0,24),recentItems:memory.recentItems.slice(0,24),recentSeries:memory.recentSeries,formatCounts:memory.formatCounts,platformCounts:memory.platformCounts,objectiveCounts:memory.objectiveCounts,duplicateRisk:memory.duplicateRisk};
+  return `\n\nHAY CONTENT MEMORY — real recent content from this business:\n${JSON.stringify(compact)}\nPlanning rules: treat draft, scheduled and published items as already used for duplication control. Do not repeat hooks verbatim. Avoid near-duplicate concepts, openings and CTAs. Continue strong recentSeries when strategically useful, but every episode must add a materially new angle, proof, audience segment or format. Retire weak or exhausted series instead of forcing continuity. Deliberately rebalance overused formats/objectives while preserving measured winners.`;
 }
