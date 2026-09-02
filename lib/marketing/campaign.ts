@@ -49,6 +49,14 @@ const CAMPAIGN_WINDOWS:Record<SocialPlatform,string[]>={instagram:["12:30","19:3
 
 function text(value:unknown,max=500){return typeof value==="string"?value.trim().slice(0,max):"";}
 function isoDay(value:unknown){const raw=text(value,32);if(!raw)return "";const time=Date.parse(raw);return Number.isFinite(time)?new Date(time).toISOString().slice(0,10):"";}
+function localIso(day:string,time:string){return `${day}T${time}:00${YEREVAN_OFFSET}`;}
+function localDayStart(day:string){return Date.parse(`${day}T00:00:00${YEREVAN_OFFSET}`);}
+function localDayEnd(day:string){return Date.parse(`${day}T23:59:59${YEREVAN_OFFSET}`);}
+function yerevanDay(time:number){
+  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Yerevan",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(time));
+  const read=(type:string)=>parts.find(part=>part.type===type)?.value||"";
+  return `${read("year")}-${read("month")}-${read("day")}`;
+}
 function objectiveToKpi(objective:string):CampaignBlueprint["primaryKpi"]{
   const value=objective.toLowerCase();
   if(/sale|book|lead|order|reserve|conversion|revenue|signup|purchase/.test(value))return "conversion";
@@ -61,7 +69,7 @@ function objectiveToKpi(objective:string):CampaignBlueprint["primaryKpi"]{
 export function normalizeCampaignBrief(input:unknown):CampaignBrief{
   const row=input&&typeof input==="object"&&!Array.isArray(input)?input as Record<string,unknown>:{};
   const type=allowedTypes.includes(row.type as CampaignType)?row.type as CampaignType:"promotion";
-  const today=new Date().toISOString().slice(0,10);
+  const today=yerevanDay(Date.now());
   const startDate=isoDay(row.startDate)||today;
   const requestedEnd=isoDay(row.endDate);
   const start=Date.parse(startDate);
@@ -85,7 +93,7 @@ export function campaignPlanningContext(brief:CampaignBrief,business:BusinessPro
 }
 
 function campaignStatus(brief:CampaignBrief){
-  const now=Date.now();const start=Date.parse(brief.startDate);const end=Date.parse(brief.endDate)+DAY-1;
+  const now=Date.now();const start=localDayStart(brief.startDate);const end=localDayEnd(brief.endDate);
   return now<start?"upcoming" as const:now>end?"completed" as const:"active" as const;
 }
 
@@ -93,7 +101,7 @@ function phaseWindows(brief:CampaignBrief):Array<Omit<CampaignPhase,"contentItem
   const start=Date.parse(brief.startDate);const end=Date.parse(brief.endDate)+DAY-1;
   const days=Math.max(1,Math.floor((end-start)/DAY)+1);
   const launchAnchor=brief.eventDate?Math.min(end,Math.max(start,Date.parse(brief.eventDate))):start+Math.max(0,Math.floor(days*.28)-1)*DAY;
-  const lastCallStart=Math.max(launchAnchor+DAY, end-Math.max(DAY,Math.floor(days*.2)*DAY));
+  const lastCallStart=Math.max(launchAnchor+DAY,end-Math.max(DAY,Math.floor(days*.2)*DAY));
   const launchEnd=Math.min(lastCallStart-DAY,launchAnchor+Math.max(DAY,Math.floor(days*.18)*DAY));
   const sustainStart=Math.min(end,launchEnd+DAY);
   const toDay=(time:number)=>new Date(Math.min(end,Math.max(start,time))).toISOString().slice(0,10);
@@ -105,14 +113,12 @@ function phaseWindows(brief:CampaignBrief):Array<Omit<CampaignPhase,"contentItem
   return result;
 }
 
-function localIso(day:string,time:string){return `${day}T${time}:00${YEREVAN_OFFSET}`;}
-
 export function applyCampaignWindowSchedule(plan:MarketingPlan,brief:CampaignBrief,now=new Date()):MarketingPlan{
-  const requestedStart=Date.parse(`${brief.startDate}T00:00:00${YEREVAN_OFFSET}`);
-  const end=Date.parse(`${brief.endDate}T23:59:59${YEREVAN_OFFSET}`);
+  const requestedStart=localDayStart(brief.startDate);
+  const end=localDayEnd(brief.endDate);
   const minimumLead=now.getTime()+90*60*1000;
   const effectiveStart=Math.min(end,Math.max(requestedStart,minimumLead));
-  const startDay=new Date(effectiveStart).toISOString().slice(0,10);
+  const startDay=requestedStart>=minimumLead?brief.startDate:yerevanDay(effectiveStart);
   const endDay=brief.endDate;
   const span=Math.max(0,Math.round((Date.parse(`${endDay}T00:00:00Z`)-Date.parse(`${startDay}T00:00:00Z`))/DAY));
   const use=new Map<SocialPlatform,number>();
@@ -127,6 +133,7 @@ export function applyCampaignWindowSchedule(plan:MarketingPlan,brief:CampaignBri
       const nextDay=new Date(Date.parse(`${dayDate}T00:00:00Z`)+DAY).toISOString().slice(0,10);
       publishAt=localIso(nextDay,windows[count%windows.length]);
     }
+    if(Date.parse(publishAt)<minimumLead&&dayDate===endDay){publishAt=new Date(Math.min(end,minimumLead+index*15*60*1000)).toISOString();}
     return {...item,day:offset+1,publishAt};
   });
   return {...plan,horizonDays:Math.max(1,span+1),items};
@@ -134,10 +141,10 @@ export function applyCampaignWindowSchedule(plan:MarketingPlan,brief:CampaignBri
 
 export function buildCampaignBlueprint(brief:CampaignBrief,plan:MarketingPlan,idMap:Record<string,string>={}):CampaignBlueprint{
   const windows=phaseWindows(brief);
-  const planStart=plan.items.map(item=>item.publishAt?Date.parse(item.publishAt):Number.NaN).filter(Number.isFinite).sort((a,b)=>a-b)[0]||Date.parse(brief.startDate);
+  const planStart=plan.items.map(item=>item.publishAt?Date.parse(item.publishAt):Number.NaN).filter(Number.isFinite).sort((a,b)=>a-b)[0]||localDayStart(brief.startDate);
   const items=plan.items.map(item=>({id:idMap[item.id]||item.id,time:item.publishAt?Date.parse(item.publishAt):planStart+(Math.max(1,item.day)-1)*DAY}));
   const phases=windows.map((phase,index)=>{
-    const phaseStart=Date.parse(phase.startDate);const phaseEnd=Date.parse(phase.endDate)+DAY-1;
+    const phaseStart=localDayStart(phase.startDate);const phaseEnd=localDayEnd(phase.endDate);
     let contentItemIds=items.filter(item=>item.time>=phaseStart&&item.time<=phaseEnd).map(item=>item.id);
     if(!contentItemIds.length){contentItemIds=items.filter((_,itemIndex)=>itemIndex%windows.length===index).map(item=>item.id);}
     return {...phase,contentItemIds};
