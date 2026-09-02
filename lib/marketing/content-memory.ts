@@ -21,10 +21,9 @@ export async function loadContentMemory(businessId?:string,businessName?:string)
   const userId=claims?.claims?.sub;
   if(claimsError||!userId)return null;
 
-  let businessQuery=supabase.from("businesses").select("id").eq("owner_id",userId).limit(1);
+  let businessQuery=supabase.from("businesses").select("id").eq("owner_id",userId).order("created_at",{ascending:false}).limit(1);
   if(businessId)businessQuery=businessQuery.eq("id",businessId);
   else if(businessName?.trim())businessQuery=businessQuery.eq("name",businessName.trim());
-  else return null;
   const {data:business}=await businessQuery.maybeSingle();
   if(!business?.id)return null;
 
