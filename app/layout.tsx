@@ -14,6 +14,7 @@ import "./studio-decisions.css";
 import "./studio-today.css";
 import "./studio-calendar.css";
 import "./studio-policy.css";
+import "./studio-memory.css";
 import "./voice-lab.css";
 import "./quality.css";
 import "./login.css";
