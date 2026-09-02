@@ -43,7 +43,7 @@ export default function StudioConversionBridge(){
   const selectedContent=contentById.get(selected)||null;
   const existing=(data?.links||[]).find(link=>link.content_item_id===selected)||null;
   const endpoint=data?.eventEndpoint||"https://YOUR-HAY-DOMAIN/api/attribution/event";
-  const snippet=`<script>\nconst p=new URLSearchParams(location.search);\nif(p.get("hay_click")) localStorage.setItem("hay_click",p.get("hay_click"));\nwindow.hayConvert=(eventType,opts={})=>{\n  const clickId=localStorage.getItem("hay_click");\n  if(!clickId)return Promise.resolve({skipped:true});\n  return fetch("${endpoint}",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({clickId,eventType,...opts})});\n};\n</script>`;
+  const snippet=`<script>\nconst p=new URLSearchParams(location.search);\nif(p.get("hay_click")) sessionStorage.setItem("hay_click",p.get("hay_click"));\nwindow.hayConvert=(eventType,opts={})=>{\n  const clickId=sessionStorage.getItem("hay_click");\n  if(!clickId)return Promise.resolve({skipped:true});\n  return fetch("${endpoint}",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({clickId,eventType,...opts})});\n};\n</script>`;
 
   async function createLink(){
     if(!selected||!destination.trim()||busy)return;setBusy(true);setMessage("");setCreatedUrl("");
@@ -85,7 +85,7 @@ export default function StudioConversionBridge(){
 
           <article className="conversionInstall">
             <div className="conversionPanelTitle"><span>02 / WEBSITE BRIDGE</span><b>NO PII</b></div>
-            <p>Add this once to the business website. It stores only the random <code>hay_click</code> identifier and exposes <code>hayConvert()</code>.</p>
+            <p>Add this once to the business website. It keeps only the random <code>hay_click</code> identifier for the current browser tab/session and exposes <code>hayConvert()</code>.</p>
             <pre>{snippet}</pre>
             <div className="conversionExamples"><span>EXAMPLES</span><code>hayConvert("lead")</code><code>hayConvert("booking")</code><code>hayConvert("purchase", &#123;value:49000,currency:"AMD",eventId:"order-123"&#125;)</code></div>
             <button onClick={()=>void copy(snippet)}>COPY INSTALL SNIPPET</button>
