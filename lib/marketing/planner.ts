@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { applyBaselineSchedule } from "./scheduler";
 import type { BusinessProfile, CompetitorInput, ContentFormat, ContentItem, MarketingPlan, SocialPlatform } from "./types";
 import type { MarketingPerformanceContext } from "./performance";
 
@@ -41,17 +42,18 @@ function normalizeAiItem(value:unknown,index:number,fallback:ContentItem,busines
 
 export async function buildMarketingPlan(business:BusinessProfile,competitors:CompetitorInput[]=[],horizonDays=7,performance:MarketingPerformanceContext|null=null):Promise<MarketingPlan>{
   const fallback=demoPlan(business,competitors,horizonDays);
-  if(!process.env.OPENAI_API_KEY)return fallback;
+  if(!process.env.OPENAI_API_KEY)return applyBaselineSchedule(fallback);
   try{
     const client=new OpenAI({apiKey:process.env.OPENAI_API_KEY});
     const performanceInstruction=performance?`\n\nMEASURED PERFORMANCE FROM PREVIOUS PUBLISHED CONTENT:\n${JSON.stringify(performance)}\nUse this evidence to reinforce winning platforms/formats/hooks while still reserving roughly 20-30% of the plan for controlled experiments. Do not confuse correlation with causation and do not invent missing metrics.`:"\n\nMEASURED PERFORMANCE: none yet. Treat the first plan as a deliberate baseline with varied hooks and formats so HAY can learn.";
     const response=await client.responses.create({model:process.env.OPENAI_MARKETING_MODEL||process.env.OPENAI_MODEL||"gpt-5.6-luna",reasoning:{effort:"low"},input:`You are HAY Marketing OS, an Armenian-first senior strategist, SMM lead and creative director.\n\nBuild a ${horizonDays}-day executable social content plan. Armenian must be native, idiomatic Eastern Armenian when language is hy, not a literal translation. Avoid fake performance claims. Differentiate strategy, content pillars, hooks and conversion assets.\n\nBUSINESS:\n${JSON.stringify(business)}\n\nCOMPETITORS SUPPLIED BY USER:\n${JSON.stringify(competitors)}${performanceInstruction}\n\nReturn ONLY valid JSON with this shape:\n{"brand":{"positioning":"","promise":"","audience":[""],"differentiators":[""],"contentPillars":[""],"voice":[""],"risks":[""]},"competitors":[{"name":"","strength":"","gap":"","opportunity":""}],"strategySummary":"","items":[{"day":1,"platform":"instagram","format":"reel","objective":"reach","hook":"","concept":"","caption":"","cta":"","hashtags":["#"],"assetBrief":""}]}\nUse platforms instagram, tiktok, youtube, facebook. Use formats reel, story, carousel, post, short, video. Include at least ${Math.max(horizonDays,7)} content items.`});
     const parsed=parseJson(response.output_text);
-    if(!parsed||typeof parsed!=="object")return fallback;
+    if(!parsed||typeof parsed!=="object")return applyBaselineSchedule(fallback);
     const root=parsed as Record<string,unknown>;
     const aiBrand=root.brand&&typeof root.brand==="object"?root.brand as Record<string,unknown>:{};
     const brand={positioning:stringValue(aiBrand.positioning,fallback.brand.positioning),promise:stringValue(aiBrand.promise,fallback.brand.promise),audience:stringArray(aiBrand.audience,fallback.brand.audience),differentiators:stringArray(aiBrand.differentiators,fallback.brand.differentiators),contentPillars:stringArray(aiBrand.contentPillars,fallback.brand.contentPillars),voice:stringArray(aiBrand.voice,fallback.brand.voice),risks:stringArray(aiBrand.risks,fallback.brand.risks)};
     const aiItems=Array.isArray(root.items)?root.items:[];
-    return {...fallback,brand,strategySummary:stringValue(root.strategySummary,fallback.strategySummary),items:aiItems.length?aiItems.map((item,index)=>normalizeAiItem(item,index,fallback.items[index%fallback.items.length],business)):fallback.items,generatedBy:"openai"};
-  }catch(error){console.error("Marketing plan generation failed",error);return fallback;}
+    const generated={...fallback,brand,strategySummary:stringValue(root.strategySummary,fallback.strategySummary),items:aiItems.length?aiItems.map((item,index)=>normalizeAiItem(item,index,fallback.items[index%fallback.items.length],business)):fallback.items,generatedBy:"openai" as const};
+    return applyBaselineSchedule(generated);
+  }catch(error){console.error("Marketing plan generation failed",error);return applyBaselineSchedule(fallback);}
 }

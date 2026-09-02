@@ -37,7 +37,7 @@ const scorePlatform = (row:{views:number;saves:number;clicks:number;conversions:
 
 export async function GET(request: Request) {
   if (!isSupabaseConfigured()) {
-    return NextResponse.json({ configured: false, approvals: [], metrics: null, recentPublished: [], operations: null });
+    return NextResponse.json({ configured: false, approvals: [], metrics: null, recentPublished: [], operations: null, calendar: [] });
   }
 
   const supabase = await createClient();
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   const { data: businesses, error: businessError } = await businessQuery.order("created_at", { ascending: false }).limit(1);
   if (businessError) return NextResponse.json({ error: "business_read_failed", detail: businessError.message }, { status: 500 });
   const business = businesses?.[0];
-  if (!business) return NextResponse.json({ configured: true, business: null, approvals: [], metrics: null, recentPublished: [], operations: null });
+  if (!business) return NextResponse.json({ configured: true, business: null, approvals: [], metrics: null, recentPublished: [], operations: null, calendar: [] });
 
   const businessId = String(business.id);
   const [contentResult, jobsResult, metricsResult] = await Promise.all([
@@ -61,12 +61,12 @@ export async function GET(request: Request) {
       .select("id,platform,format,language,objective,hook,caption,cta,asset_url,status,scheduled_for,published_at,created_at,updated_at")
       .eq("business_id", businessId)
       .order("updated_at", { ascending: false })
-      .limit(40),
+      .limit(60),
     supabase.from("publish_jobs")
       .select("id,content_item_id,connection_id,platform,status,scheduled_for,external_post_id,error,attempt_count,created_at,updated_at")
       .eq("business_id", businessId)
       .order("updated_at", { ascending: false })
-      .limit(40),
+      .limit(60),
     supabase.from("content_metrics")
       .select("content_item_id,platform,external_post_id,measured_at,impressions,reach,views,likes,comments,shares,saves,clicks,conversions,watch_time_seconds")
       .eq("business_id", businessId)
@@ -140,10 +140,7 @@ export async function GET(request: Request) {
   const recentPublished = jobs
     .filter(job => job.status === "published")
     .slice(0, 8)
-    .map(job => ({
-      ...job,
-      content: contentById.get(String(job.content_item_id)) || null,
-    }));
+    .map(job => ({ ...job, content: contentById.get(String(job.content_item_id)) || null }));
 
   const now = Date.now();
   const next24h = now + 24 * 60 * 60 * 1000;
@@ -152,13 +149,21 @@ export async function GET(request: Request) {
     .map(job => ({ ...job, scheduledAt: new Date(String(job.scheduled_for)).getTime() }))
     .filter(job => Number.isFinite(job.scheduledAt) && job.scheduledAt >= now)
     .sort((a,b) => a.scheduledAt - b.scheduledAt);
-  const nextScheduled = scheduledJobs.slice(0, 4).map(job => ({
-    id: job.id,
-    platform: job.platform,
-    status: job.status,
-    scheduledFor: job.scheduled_for,
-    content: contentById.get(String(job.content_item_id)) || null,
-  }));
+
+  const plannedContent = content
+    .filter(item => item.scheduled_for && !["published", "failed"].includes(String(item.status)))
+    .map(item => ({ ...item, scheduledAt: new Date(String(item.scheduled_for)).getTime() }))
+    .filter(item => Number.isFinite(item.scheduledAt) && item.scheduledAt >= now)
+    .sort((a,b) => a.scheduledAt - b.scheduledAt);
+
+  const jobContentIds = new Set(scheduledJobs.map(job => String(job.content_item_id)));
+  const combinedSchedule = [
+    ...scheduledJobs.map(job => ({ id:String(job.id), contentItemId:String(job.content_item_id), platform:String(job.platform), status:String(job.status), scheduledFor:job.scheduled_for, scheduledAt:job.scheduledAt, source:"publish_job" as const, content:contentById.get(String(job.content_item_id)) || null })),
+    ...plannedContent.filter(item => !jobContentIds.has(String(item.id))).map(item => ({ id:String(item.id), contentItemId:String(item.id), platform:String(item.platform), status:String(item.status), scheduledFor:item.scheduled_for, scheduledAt:item.scheduledAt, source:"plan" as const, content:item })),
+  ].sort((a,b)=>a.scheduledAt-b.scheduledAt);
+
+  const nextScheduled = combinedSchedule.slice(0, 4).map(item => ({ id:item.id, platform:item.platform, status:item.status, scheduledFor:item.scheduledFor, source:item.source, content:item.content }));
+  const calendar = plannedContent.slice(0, 21).map(item => ({ id:String(item.id), platform:String(item.platform), format:String(item.format), objective:String(item.objective), hook:String(item.hook||""), status:String(item.status), scheduledFor:item.scheduled_for, hasPublishJob:jobByContentId.has(String(item.id)), publishJobStatus:jobByContentId.get(String(item.id))?.status || null }));
   const failedJobs = jobs.filter(job => job.status === "failed").slice(0, 5).map(job => ({ id: job.id, platform: job.platform, error: job.error, attemptCount: job.attempt_count }));
   const statusCounts = content.reduce<Record<string,number>>((acc,item)=>{const key=String(item.status||"unknown");acc[key]=(acc[key]||0)+1;return acc;},{});
   const needsApproval = jobs.filter(job => job.status === "needs_approval").length;
@@ -172,7 +177,7 @@ export async function GET(request: Request) {
     publishedCount: statusCounts.published || 0,
     needsApprovalCount: needsApproval,
     failedCount: failedJobs.length,
-    scheduledNext24h: scheduledJobs.filter(job => job.scheduledAt <= next24h).length,
+    scheduledNext24h: combinedSchedule.filter(item => item.scheduledAt <= next24h).length,
     nextScheduled,
     failedJobs,
     bestPlatform,
@@ -185,5 +190,6 @@ export async function GET(request: Request) {
     metrics: { totals, byPlatform, measuredItems: latestMetrics.length, latestMeasuredAt: metrics[0]?.measured_at || null },
     recentPublished,
     operations,
+    calendar,
   });
 }

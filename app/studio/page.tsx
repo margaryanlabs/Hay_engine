@@ -2,6 +2,7 @@ import MarketingOS from "@/components/MarketingOS";
 import StudioCommandPalette from "@/components/StudioCommandPalette";
 import StudioDecisionConsole from "@/components/StudioDecisionConsole";
 import StudioOnboarding from "@/components/StudioOnboarding";
+import StudioScheduleQueue from "@/components/StudioScheduleQueue";
 import StudioStatusRail from "@/components/StudioStatusRail";
 import StudioTodayBrief from "@/components/StudioTodayBrief";
 
@@ -16,6 +17,7 @@ export default function StudioPage(){
     <MarketingOS/>
     <StudioTodayBrief/>
     <StudioDecisionConsole/>
+    <StudioScheduleQueue/>
     <StudioOnboarding/>
     <StudioCommandPalette/>
   </>;

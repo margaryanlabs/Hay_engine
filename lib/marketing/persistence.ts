@@ -70,6 +70,7 @@ export async function persistMarketingPlan(plan: MarketingPlan, requestedBusines
       competitors: plan.competitors,
       strategySummary: plan.strategySummary,
       generatedAt: plan.createdAt,
+      schedulePolicy: "baseline_yerevan_until_learned_windows",
     },
     generated_by: plan.generatedBy,
   }).select("id").single();
@@ -91,6 +92,7 @@ export async function persistMarketingPlan(plan: MarketingPlan, requestedBusines
       cta: item.cta,
       hashtags: item.hashtags,
       asset_brief: item.assetBrief,
+      scheduled_for: item.publishAt || null,
       status: item.status === "idea" ? "idea" : "draft",
     }).select("id").single();
     if (error || !row?.id) throw error || new Error("content_item_persist_failed");
