@@ -25,6 +25,8 @@ export default function StudioCommandPalette(){
     {label:"Competitor Radar",hint:"RADAR",action:()=>scroll(".competitorsCard")},
     {label:"Content Pulse",hint:"CALENDAR",action:()=>scroll(".contentPulse")},
     {label:"Smart Publishing Calendar",hint:"SCHEDULE",action:()=>scroll(".studioScheduleQueue")},
+    {label:"Content Series",hint:"4-WEEK",action:()=>scroll(".studioSeries")},
+    {label:"Content Memory",hint:"ANTI-REPEAT",action:()=>scroll(".studioMemory")},
     {label:"Publishing Policy",hint:"CONTROL",action:()=>scroll(".studioPolicy")},
     {label:"Approval Inbox",hint:"DECIDE",action:()=>scroll(".studioApprovalPanel")},
     {label:"Performance Memory",hint:"LEARN",action:()=>scroll(".studioPerformancePanel")},
