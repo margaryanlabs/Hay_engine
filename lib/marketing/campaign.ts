@@ -1,5 +1,5 @@
 import "server-only";
-import type { BusinessProfile, MarketingPlan } from "./types";
+import type { BusinessProfile, MarketingPlan, SocialPlatform } from "./types";
 
 export type CampaignType="launch"|"promotion"|"event"|"seasonal"|"holiday"|"sales";
 export type CampaignPhaseName="prelaunch"|"launch"|"sustain"|"last_call";
@@ -44,6 +44,8 @@ export type CampaignBlueprint={
 
 const allowedTypes:CampaignType[]=["launch","promotion","event","seasonal","holiday","sales"];
 const DAY=24*60*60*1000;
+const YEREVAN_OFFSET="+04:00";
+const CAMPAIGN_WINDOWS:Record<SocialPlatform,string[]>={instagram:["12:30","19:30"],tiktok:["18:30","21:00"],youtube:["18:00","20:00"],facebook:["13:00","20:00"],linkedin:["10:00","14:00"]};
 
 function text(value:unknown,max=500){return typeof value==="string"?value.trim().slice(0,max):"";}
 function isoDay(value:unknown){const raw=text(value,32);if(!raw)return "";const time=Date.parse(raw);return Number.isFinite(time)?new Date(time).toISOString().slice(0,10):"";}
@@ -103,6 +105,33 @@ function phaseWindows(brief:CampaignBrief):Array<Omit<CampaignPhase,"contentItem
   return result;
 }
 
+function localIso(day:string,time:string){return `${day}T${time}:00${YEREVAN_OFFSET}`;}
+
+export function applyCampaignWindowSchedule(plan:MarketingPlan,brief:CampaignBrief,now=new Date()):MarketingPlan{
+  const requestedStart=Date.parse(`${brief.startDate}T00:00:00${YEREVAN_OFFSET}`);
+  const end=Date.parse(`${brief.endDate}T23:59:59${YEREVAN_OFFSET}`);
+  const minimumLead=now.getTime()+90*60*1000;
+  const effectiveStart=Math.min(end,Math.max(requestedStart,minimumLead));
+  const startDay=new Date(effectiveStart).toISOString().slice(0,10);
+  const endDay=brief.endDate;
+  const span=Math.max(0,Math.round((Date.parse(`${endDay}T00:00:00Z`)-Date.parse(`${startDay}T00:00:00Z`))/DAY));
+  const use=new Map<SocialPlatform,number>();
+  const total=Math.max(1,plan.items.length);
+  const items=plan.items.map((item,index)=>{
+    const offset=total===1?0:Math.round(index*span/(total-1));
+    const dayDate=new Date(Date.parse(`${startDay}T00:00:00Z`)+offset*DAY).toISOString().slice(0,10);
+    const windows=CAMPAIGN_WINDOWS[item.platform]||["19:00"];
+    const count=use.get(item.platform)||0;use.set(item.platform,count+1);
+    let publishAt=localIso(dayDate,windows[count%windows.length]);
+    if(Date.parse(publishAt)<minimumLead&&dayDate<endDay){
+      const nextDay=new Date(Date.parse(`${dayDate}T00:00:00Z`)+DAY).toISOString().slice(0,10);
+      publishAt=localIso(nextDay,windows[count%windows.length]);
+    }
+    return {...item,day:offset+1,publishAt};
+  });
+  return {...plan,horizonDays:Math.max(1,span+1),items};
+}
+
 export function buildCampaignBlueprint(brief:CampaignBrief,plan:MarketingPlan,idMap:Record<string,string>={}):CampaignBlueprint{
   const windows=phaseWindows(brief);
   const planStart=plan.items.map(item=>item.publishAt?Date.parse(item.publishAt):Number.NaN).filter(Number.isFinite).sort((a,b)=>a-b)[0]||Date.parse(brief.startDate);
@@ -110,9 +139,7 @@ export function buildCampaignBlueprint(brief:CampaignBrief,plan:MarketingPlan,id
   const phases=windows.map((phase,index)=>{
     const phaseStart=Date.parse(phase.startDate);const phaseEnd=Date.parse(phase.endDate)+DAY-1;
     let contentItemIds=items.filter(item=>item.time>=phaseStart&&item.time<=phaseEnd).map(item=>item.id);
-    if(!contentItemIds.length){
-      contentItemIds=items.filter((_,itemIndex)=>itemIndex%windows.length===index).map(item=>item.id);
-    }
+    if(!contentItemIds.length){contentItemIds=items.filter((_,itemIndex)=>itemIndex%windows.length===index).map(item=>item.id);}
     return {...phase,contentItemIds};
   });
   return {
