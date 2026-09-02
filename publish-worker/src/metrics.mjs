@@ -5,6 +5,7 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v25.0";
 const META_TOKEN_MODE = process.env.META_TOKEN_MODE || "facebook";
 const METRIC_INTERVAL_MS = Math.max(60 * 60_000, Number(process.env.METRIC_SNAPSHOT_INTERVAL_MS || 6 * 60 * 60_000));
+const YEREVAN_OFFSET = "+04:00";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -93,6 +94,160 @@ async function youtubeMetrics(videoId, credential) {
   };
 }
 
+function object(value) { return value && typeof value === "object" && !Array.isArray(value) ? value : {}; }
+function text(value) { return String(value || "").trim(); }
+function num(value) { return Number(value) || 0; }
+function campaignContentIds(campaign) {
+  const ids = [];
+  for (const raw of Array.isArray(campaign?.phases) ? campaign.phases : []) {
+    const phase = object(raw);
+    for (const id of Array.isArray(phase.contentItemIds) ? phase.contentItemIds : []) {
+      const value = text(id);
+      if (value) ids.push(value);
+    }
+  }
+  return [...new Set(ids)];
+}
+function campaignPrimaryMetric(kpi) {
+  if (kpi === "conversion" || kpi === "retention") return "conversions";
+  if (kpi === "trust") return "saves";
+  if (kpi === "community") return "comments";
+  return "reach";
+}
+function campaignStatus(campaign) {
+  const start = Date.parse(`${text(campaign?.startDate)}T00:00:00${YEREVAN_OFFSET}`);
+  const end = Date.parse(`${text(campaign?.endDate)}T23:59:59${YEREVAN_OFFSET}`);
+  const now = Date.now();
+  if (Number.isFinite(start) && now < start) return "upcoming";
+  if (Number.isFinite(end) && now > end) return "completed";
+  return "active";
+}
+function evidenceQuality(total, measured) {
+  if (!measured) return "none";
+  if (measured < 3) return "early";
+  if (measured / Math.max(1, total) < 0.7) return "partial";
+  return "strong";
+}
+
+async function updateCampaignLearning(businessId, contentItemId) {
+  const { data: content, error: contentError } = await supabase.from("content_items")
+    .select("id,plan_id").eq("id", contentItemId).eq("business_id", businessId).maybeSingle();
+  if (contentError || !content?.plan_id) return { skipped: true, reason: "campaign_plan_missing" };
+
+  const { data: plan, error: planError } = await supabase.from("marketing_plans")
+    .select("id,strategy").eq("id", content.plan_id).eq("business_id", businessId).maybeSingle();
+  if (planError || !plan) return { skipped: true, reason: "campaign_plan_missing" };
+  const strategy = object(plan.strategy);
+  const campaign = object(strategy.campaign);
+  if (!Object.keys(campaign).length) return { skipped: true, reason: "not_campaign_plan" };
+  const ids = campaignContentIds(campaign);
+  if (!ids.includes(String(contentItemId)) || !ids.length) return { skipped: true, reason: "content_not_in_campaign" };
+
+  const [contentResult, metricResult] = await Promise.all([
+    supabase.from("content_items").select("id,platform,format,objective,hook").eq("business_id", businessId).in("id", ids),
+    supabase.from("content_metrics").select("content_item_id,measured_at,views,reach,likes,comments,shares,saves,clicks,conversions,watch_time_seconds")
+      .eq("business_id", businessId).in("content_item_id", ids).order("measured_at", { ascending: false }).limit(500),
+  ]);
+  if (contentResult.error || metricResult.error) return { skipped: true, reason: "campaign_learning_read_failed" };
+
+  const contentById = new Map((contentResult.data || []).map(row => [String(row.id), row]));
+  const latest = new Map();
+  for (const row of metricResult.data || []) {
+    const id = String(row.content_item_id || "");
+    if (id && !latest.has(id)) latest.set(id, row);
+  }
+  const primaryMetric = campaignPrimaryMetric(text(campaign.primaryKpi));
+  const measured = [];
+  let primaryTotal = 0;
+  let viewsTotal = 0;
+  let reachTotal = 0;
+  let latestMeasuredAt = "";
+  for (const id of ids) {
+    const metric = latest.get(id);
+    if (!metric) continue;
+    const item = contentById.get(id) || {};
+    const primaryValue = num(metric[primaryMetric]);
+    const views = num(metric.views);
+    const reach = num(metric.reach);
+    primaryTotal += primaryValue;
+    viewsTotal += views;
+    reachTotal += reach;
+    if (!latestMeasuredAt || Date.parse(metric.measured_at) > Date.parse(latestMeasuredAt)) latestMeasuredAt = String(metric.measured_at || "");
+    measured.push({
+      id,
+      platform: text(item.platform) || "unknown",
+      format: text(item.format) || "unknown",
+      objective: text(item.objective),
+      hook: text(item.hook),
+      primaryValue,
+      views,
+      reach,
+    });
+  }
+
+  const bestPrimary = measured.filter(item => item.primaryValue > 0).sort((a, b) => b.primaryValue - a.primaryValue)[0] || null;
+  const reachLeader = [...measured].sort((a, b) => (b.reach || b.views) - (a.reach || a.views))[0] || null;
+  const formatMap = new Map();
+  for (const item of measured) {
+    const current = formatMap.get(item.format) || { items: 0, primaryTotal: 0, viewsTotal: 0, reachTotal: 0 };
+    current.items += 1;
+    current.primaryTotal += item.primaryValue;
+    current.viewsTotal += item.views;
+    current.reachTotal += item.reach;
+    formatMap.set(item.format, current);
+  }
+  const formatSignals = [...formatMap.entries()].map(([format, value]) => ({
+    format,
+    measuredItems: value.items,
+    averagePrimaryMetric: value.primaryTotal / Math.max(1, value.items),
+    averageViews: value.viewsTotal / Math.max(1, value.items),
+    averageReach: value.reachTotal / Math.max(1, value.items),
+  })).sort((a, b) => b.averagePrimaryMetric - a.averagePrimaryMetric || b.averageReach - a.averageReach || b.averageViews - a.averageViews);
+
+  const phaseSignals = [];
+  for (const raw of Array.isArray(campaign.phases) ? campaign.phases : []) {
+    const phase = object(raw);
+    const phaseIds = Array.isArray(phase.contentItemIds) ? phase.contentItemIds.map(String) : [];
+    const phaseMeasured = measured.filter(item => phaseIds.includes(item.id));
+    phaseSignals.push({
+      name: text(phase.name),
+      label: text(phase.label),
+      totalItems: phaseIds.length,
+      measuredItems: phaseMeasured.length,
+      averagePrimaryMetric: phaseMeasured.reduce((sum, item) => sum + item.primaryValue, 0) / Math.max(1, phaseMeasured.length),
+      averageViews: phaseMeasured.reduce((sum, item) => sum + item.views, 0) / Math.max(1, phaseMeasured.length),
+      averageReach: phaseMeasured.reduce((sum, item) => sum + item.reach, 0) / Math.max(1, phaseMeasured.length),
+    });
+  }
+
+  const learning = {
+    version: "campaign-learning-v1",
+    campaignId: text(campaign.id),
+    campaignName: text(campaign.name),
+    campaignStatus: campaignStatus(campaign),
+    primaryKpi: text(campaign.primaryKpi) || "reach",
+    primaryMetric,
+    totalItems: ids.length,
+    measuredItems: measured.length,
+    coverage: measured.length / Math.max(1, ids.length),
+    evidenceQuality: evidenceQuality(ids.length, measured.length),
+    primaryMetricTotal: primaryTotal,
+    viewsTotal,
+    reachTotal,
+    topPrimaryContent: bestPrimary,
+    secondaryReachLeader: reachLeader,
+    formatSignals: formatSignals.slice(0, 5),
+    phaseSignals,
+    causalStatus: "observational_only",
+    latestMeasuredAt: latestMeasuredAt || null,
+    updatedAt: new Date().toISOString(),
+  };
+  const { error: updateError } = await supabase.from("marketing_plans").update({ strategy: { ...strategy, campaignLearning: learning } })
+    .eq("id", plan.id).eq("business_id", businessId);
+  if (updateError) throw updateError;
+  return { updated: true, learning };
+}
+
 async function recentlyMeasured(contentItemId) {
   const { data } = await supabase.from("content_metrics").select("measured_at").eq("content_item_id", contentItemId).order("measured_at", { ascending: false }).limit(1).maybeSingle();
   return data?.measured_at && Date.now() - Date.parse(data.measured_at) < METRIC_INTERVAL_MS;
@@ -128,7 +283,10 @@ export async function collectMetricSnapshot(job) {
   };
   const { error } = await supabase.from("content_metrics").insert(row);
   if (error) throw error;
-  return { inserted: true, row };
+  let learning = null;
+  try { learning = await updateCampaignLearning(job.business_id, job.content_item_id); }
+  catch (error) { console.error("Campaign learning update failed", job.content_item_id, error instanceof Error ? error.message : error); }
+  return { inserted: true, row, learning };
 }
 
 let collecting = false;
