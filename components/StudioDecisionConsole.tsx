@@ -35,7 +35,12 @@ export default function StudioDecisionConsole(){
     finally{setLoading(false);}
   }
 
-  useEffect(()=>{void load();},[]);
+  useEffect(()=>{
+    void load();
+    const refresh=()=>{void load();};
+    window.addEventListener("hay:studio-refresh",refresh);
+    return()=>window.removeEventListener("hay:studio-refresh",refresh);
+  },[]);
 
   async function approve(item:Approval){
     setBusy(item.id);setMessage("");
