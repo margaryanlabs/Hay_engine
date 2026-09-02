@@ -66,23 +66,50 @@ export async function POST(request: Request) {
 
     const scheduledFor = body.scheduledFor ? new Date(String(body.scheduledFor)).toISOString() : content.scheduled_for;
     const shouldDispatchNow = !scheduledFor || new Date(scheduledFor).getTime() <= Date.now() + 60_000;
-    const { data: job, error: insertError } = await supabase.from("publish_jobs").insert({
-      business_id: content.business_id,
-      content_item_id: contentItemId,
-      connection_id: connectionId,
-      platform,
-      status: "queued",
-      scheduled_for: scheduledFor || null,
-      provider_settings: settings.value,
-    }).select("id,status,scheduled_for,created_at,provider_settings").single();
-    if (insertError || !job) throw insertError || new Error("publish_job_insert_failed");
+
+    const { data: existingActive } = await supabase.from("publish_jobs")
+      .select("id,status,scheduled_for,created_at,provider_settings,connection_id")
+      .eq("content_item_id",contentItemId)
+      .in("status",["queued","processing","needs_auth","needs_approval"])
+      .order("created_at",{ascending:false}).limit(1).maybeSingle();
+
+    if (existingActive?.status === "processing") {
+      return NextResponse.json({ configured:true, job:existingActive, dispatched:true, next:"already_processing" });
+    }
+
+    let job: { id:string; status:string; scheduled_for?:string|null; created_at?:string; provider_settings?:unknown };
+    if (existingActive?.id) {
+      const { data:updated,error:updateError } = await supabase.from("publish_jobs").update({
+        connection_id:connectionId,
+        platform,
+        status:"queued",
+        scheduled_for:scheduledFor||null,
+        provider_settings:settings.value,
+        error:null,
+        updated_at:new Date().toISOString(),
+      }).eq("id",existingActive.id).select("id,status,scheduled_for,created_at,provider_settings").single();
+      if(updateError||!updated)throw updateError||new Error("publish_job_update_failed");
+      job=updated;
+    } else {
+      const { data:inserted, error:insertError } = await supabase.from("publish_jobs").insert({
+        business_id: content.business_id,
+        content_item_id: contentItemId,
+        connection_id: connectionId,
+        platform,
+        status: "queued",
+        scheduled_for: scheduledFor || null,
+        provider_settings: settings.value,
+      }).select("id,status,scheduled_for,created_at,provider_settings").single();
+      if (insertError || !inserted) throw insertError || new Error("publish_job_insert_failed");
+      job=inserted;
+    }
 
     await supabase.from("content_items").update({ status: scheduledFor && !shouldDispatchNow ? "scheduled" : "approved", scheduled_for: scheduledFor || null, updated_at: new Date().toISOString() }).eq("id", contentItemId);
-    if (!shouldDispatchNow) return NextResponse.json({ configured: true, job, dispatched: false, next: "scheduler" });
+    if (!shouldDispatchNow) return NextResponse.json({ configured: true, job, dispatched: false, next: "scheduler", reusedPreparedJob:Boolean(existingActive?.id) });
 
     const dispatch = await dispatchPublish({ jobId: job.id, connectionId, contentItemId });
-    if (!dispatch.configured) return NextResponse.json({ configured: true, job, dispatched: false, worker: dispatch, next: "configure_publish_worker" });
-    return NextResponse.json({ configured: true, job, dispatched: true, worker: dispatch });
+    if (!dispatch.configured) return NextResponse.json({ configured: true, job, dispatched: false, worker: dispatch, next: "configure_publish_worker", reusedPreparedJob:Boolean(existingActive?.id) });
+    return NextResponse.json({ configured: true, job, dispatched: true, worker: dispatch, reusedPreparedJob:Boolean(existingActive?.id) });
   } catch (error) {
     console.error("Publish queue failed", error);
     return NextResponse.json({ error: "publish_queue_failed" }, { status: 500 });
