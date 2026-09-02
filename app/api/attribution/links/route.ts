@@ -10,8 +10,9 @@ function httpsUrl(value:unknown){
     return url;
   }catch{return null;}
 }
+function baseHost(value:string){const host=value.toLowerCase();return host.startsWith("www.")?host.slice(4):host;}
 function allowedDestination(destination:URL,website:URL){
-  const host=destination.hostname.toLowerCase();const root=website.hostname.toLowerCase();
+  const host=baseHost(destination.hostname);const root=baseHost(website.hostname);
   return host===root||host.endsWith(`.${root}`);
 }
 function missingTable(error:{code?:string;message?:string}|null|undefined){return error?.code==="42P01"||String(error?.message||"").includes("tracking_links");}
