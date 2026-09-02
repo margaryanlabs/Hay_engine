@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { prepareApprovedPublishJob } from "@/lib/publish/policy";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -26,7 +27,12 @@ export async function PATCH(request: Request) {
     if (body.status && ["draft","approved","scheduled"].includes(String(body.status))) patch.status = body.status;
     const { data, error } = await supabase.from("content_items").update(patch).eq("id",contentItemId).select("id,caption,cta,hashtags,status,asset_url,asset_urls,scheduled_for").single();
     if (error) throw error;
-    return NextResponse.json({ configured:true, content:data });
+
+    const prepare = data.status==="approved" || data.status==="scheduled"
+      ? await prepareApprovedPublishJob({supabase,userId:String(userId),contentItemId})
+      : {prepared:false,reason:"not_approved"};
+
+    return NextResponse.json({ configured:true, content:data, publishPreparation:prepare });
   } catch (error) {
     console.error("Content review update failed",error);
     return NextResponse.json({ error:"content_update_failed", detail:error instanceof Error?error.message:String(error) }, { status:500 });
