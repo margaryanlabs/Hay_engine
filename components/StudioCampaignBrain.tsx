@@ -8,6 +8,7 @@ type Campaign={id:string;name:string;type:string;objective:string;offer:string;s
 type CampaignsResponse={configured:boolean;error?:string;business?:{id:string;name:string}|null;campaigns?:Campaign[]};
 
 const addDays=(value:string,days:number)=>{const date=new Date(`${value}T00:00:00Z`);date.setUTCDate(date.getUTCDate()+days);return date.toISOString().slice(0,10);};
+const yerevanToday=()=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Yerevan",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());const read=(type:string)=>parts.find(part=>part.type===type)?.value||"";return `${read("year")}-${read("month")}-${read("day")}`;};
 const typeLabel=(value:string)=>({launch:"PRODUCT / SERVICE LAUNCH",promotion:"PROMOTION",event:"EVENT",seasonal:"SEASONAL",holiday:"HOLIDAY / LOCAL MOMENT",sales:"SALES PUSH"}[value]||value.toUpperCase());
 const phaseCode=(value:string)=>({prelaunch:"01",launch:"02",sustain:"03",last_call:"04"}[value]||"·");
 
@@ -44,7 +45,7 @@ export default function StudioCampaignBrain(){
   }
 
   useEffect(()=>{
-    const today=new Date().toISOString().slice(0,10);setStartDate(today);setEndDate(addDays(today,13));void load();
+    const today=yerevanToday();setStartDate(today);setEndDate(addDays(today,13));void load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
@@ -65,7 +66,7 @@ export default function StudioCampaignBrain(){
       if(data.persistence?.persisted===false){setMessage(`Campaign generated but not persisted · ${data.persistence?.reason||"database unavailable"}`);return;}
       const campaign=data.campaign as Campaign;
       setCampaigns(current=>[campaign,...current.filter(item=>item.id!==campaign.id)].slice(0,8));
-      setMessage(`Campaign plan saved · ${data.plan?.items?.length||0} content items mapped inside ${campaign.startDate} → ${campaign.endDate}.`);
+      setMessage(`Campaign plan saved · ${data.plan?.items?.length||0} draft items mapped inside ${campaign.startDate} → ${campaign.endDate}.`);
       window.dispatchEvent(new Event("hay:studio-refresh"));
     }catch(error){setMessage(error instanceof Error?error.message:"Campaign generation failed");}
     finally{setBusy(false);}
@@ -103,7 +104,7 @@ export default function StudioCampaignBrain(){
       campaigns.map(campaign=><article key={campaign.id} className={`campaignCard ${campaign.status}`}>
         <div className="campaignCardTop"><div><span>{typeLabel(campaign.type)}</span><h3>{campaign.name}</h3><p>{campaign.objective}</p></div><div className="campaignKpi"><span>PRIMARY KPI</span><strong>{campaign.primaryKpi.toUpperCase()}</strong><small>{campaign.startDate} → {campaign.endDate}</small></div></div>
         {campaign.offer&&<div className="campaignOffer"><span>OFFER</span><strong>{campaign.offer}</strong></div>}
-        <div className="campaignPhases">{(campaign.phases||[]).map(phase=><div key={`${campaign.id}-${phase.name}`}><b>{phaseCode(phase.name)}</b><span>{phase.label}</span><strong>{phase.startDate} → {phase.endDate}</strong><small>{phase.contentItemIds?.length||0} content items</small></div>)}</div>
+        <div className="campaignPhases">{(campaign.phases||[]).map(phase=><div key={`${campaign.id}-${phase.name}`}><b>{phaseCode(phase.name)}</b><span>{phase.label}</span><strong>{phase.startDate} → {phase.endDate}</strong><small>{phase.contentItemIds?.length||0} draft items</small></div>)}</div>
       </article>)}
     </div>
   </section>;
