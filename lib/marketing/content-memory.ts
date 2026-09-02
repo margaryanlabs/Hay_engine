@@ -15,6 +15,12 @@ export type ContentMemoryContext = {
 function clean(value:unknown){return String(value||"").trim();}
 function hookKey(value:string){return value.toLocaleLowerCase("hy-AM").replace(/[^\p{L}\p{N}]+/gu," ").trim().replace(/\s+/g," ");}
 function countBy(values:string[]){const out:Record<string,number>={};for(const value of values){if(value)out[value]=(out[value]||0)+1;}return out;}
+function liveCampaignStatus(startDate:string,endDate:string){
+  const start=Date.parse(`${startDate}T00:00:00+04:00`);const end=Date.parse(`${endDate}T23:59:59+04:00`);const now=Date.now();
+  if(Number.isFinite(start)&&now<start)return "upcoming";
+  if(Number.isFinite(end)&&now>end)return "completed";
+  return "active";
+}
 
 export async function loadContentMemory(businessId?:string,businessName?:string):Promise<ContentMemoryContext|null>{
   if(!isSupabaseConfigured())return null;
@@ -37,14 +43,9 @@ export async function loadContentMemory(businessId?:string,businessName?:string)
   const data=contentResult.data;
   if(contentResult.error||!data?.length)return null;
 
-  const recentItems=data.map(item=>({
-    platform:clean(item.platform),format:clean(item.format),objective:clean(item.objective),hook:clean(item.hook),concept:clean(item.concept),status:clean(item.status),createdAt:clean(item.created_at),
-  }));
+  const recentItems=data.map(item=>({platform:clean(item.platform),format:clean(item.format),objective:clean(item.objective),hook:clean(item.hook),concept:clean(item.concept),status:clean(item.status),createdAt:clean(item.created_at)}));
   const hookCounts=new Map<string,{label:string;count:number}>();
-  for(const item of recentItems){
-    const key=hookKey(item.hook);if(!key)continue;
-    const current=hookCounts.get(key)||{label:item.hook,count:0};current.count+=1;hookCounts.set(key,current);
-  }
+  for(const item of recentItems){const key=hookKey(item.hook);if(!key)continue;const current=hookCounts.get(key)||{label:item.hook,count:0};current.count+=1;hookCounts.set(key,current);}
   const repeatedHooks=[...hookCounts.values()].filter(item=>item.count>1).sort((a,b)=>b.count-a.count).map(item=>item.label).slice(0,12);
   const recentHooks=[...new Set(recentItems.map(item=>item.hook).filter(Boolean))].slice(0,30);
   const duplicateRatio=repeatedHooks.length/Math.max(1,recentHooks.length);
@@ -73,22 +74,14 @@ export async function loadContentMemory(businessId?:string,businessName?:string)
       const id=clean(item.id)||`${clean(item.name)}:${clean(item.startDate)}`;
       if(id&&!seenCampaigns.has(id)){
         seenCampaigns.add(id);
-        recentCampaigns.push({id,name:clean(item.name)||"Campaign",type:clean(item.type),objective:clean(item.objective),offer:clean(item.offer),startDate:clean(item.startDate),endDate:clean(item.endDate),primaryKpi:clean(item.primaryKpi),status:clean(item.status)});
+        const startDate=clean(item.startDate);const endDate=clean(item.endDate);
+        recentCampaigns.push({id,name:clean(item.name)||"Campaign",type:clean(item.type),objective:clean(item.objective),offer:clean(item.offer),startDate,endDate,primaryKpi:clean(item.primaryKpi),status:liveCampaignStatus(startDate,endDate)});
       }
     }
     if(recentSeries.length>=8&&recentCampaigns.length>=6)break;
   }
 
-  return {
-    recentItems:recentItems.slice(0,40),
-    recentHooks,
-    recentSeries:recentSeries.slice(0,8),
-    recentCampaigns:recentCampaigns.slice(0,6),
-    formatCounts:countBy(recentItems.map(item=>item.format)),
-    platformCounts:countBy(recentItems.map(item=>item.platform)),
-    objectiveCounts:countBy(recentItems.map(item=>item.objective)),
-    duplicateRisk:{level,repeatedHooks,totalRemembered:recentItems.length},
-  };
+  return {recentItems:recentItems.slice(0,40),recentHooks,recentSeries:recentSeries.slice(0,8),recentCampaigns:recentCampaigns.slice(0,6),formatCounts:countBy(recentItems.map(item=>item.format)),platformCounts:countBy(recentItems.map(item=>item.platform)),objectiveCounts:countBy(recentItems.map(item=>item.objective)),duplicateRisk:{level,repeatedHooks,totalRemembered:recentItems.length}};
 }
 
 export function contentMemoryForPlan(memory:ContentMemoryContext|null){
