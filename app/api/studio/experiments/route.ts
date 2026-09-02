@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { effectiveOutcome, loadAttributionSummary } from "@/lib/marketing/attribution";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const runtime="nodejs";
@@ -36,20 +37,28 @@ export async function GET(request:Request){
     if(!runs.length)return NextResponse.json({configured:true,business:{id:String(business.id),name:business.name},runs:[]});
 
     const ids=[...new Set(runs.flatMap(run=>[text(run.controlContentId),text(run.variantContentId)]).filter(Boolean))];
-    const [contentResult,metricsResult]=await Promise.all([
+    const [contentResult,metricsResult,attribution]=await Promise.all([
       supabase.from("content_items").select("id,status,published_at,hook,platform,format").eq("business_id",business.id).in("id",ids),
       supabase.from("content_metrics").select("content_item_id,measured_at,views,reach,likes,comments,shares,saves,clicks,conversions,watch_time_seconds").eq("business_id",business.id).in("content_item_id",ids).order("measured_at",{ascending:false}).limit(500),
+      loadAttributionSummary(supabase,String(business.id),ids),
     ]);
-    if(missingMetrics(metricsResult.error))return NextResponse.json({configured:true,business:{id:String(business.id),name:business.name},runs:[],reason:"apply_supabase_002_publish_settings_and_metrics"});
-    if(contentResult.error||metricsResult.error)return NextResponse.json({error:"experiment_metrics_failed",detail:contentResult.error?.message||metricsResult.error?.message},{status:500});
+    if(contentResult.error)return NextResponse.json({error:"experiment_metrics_failed",detail:contentResult.error.message},{status:500});
+    if(metricsResult.error&&!missingMetrics(metricsResult.error))return NextResponse.json({error:"experiment_metrics_failed",detail:metricsResult.error.message},{status:500});
+    if(missingMetrics(metricsResult.error)&&!attribution.available)return NextResponse.json({configured:true,business:{id:String(business.id),name:business.name},runs:[],reason:"apply_supabase_002_publish_settings_and_metrics"});
     const contentById=new Map((contentResult.data||[]).map(row=>[String(row.id),row]));const latest=new Map<string,JsonRecord>();
     for(const raw of metricsResult.data||[]){const row=record(raw);const id=text(row.content_item_id);if(id&&!latest.has(id))latest.set(id,row);}
 
     const resolved=runs.map(run=>{
-      const controlId=text(run.controlContentId);const variantId=text(run.variantContentId);const metric=text(run.primaryMetric)||"reach";const controlMetric=latest.get(controlId);const variantMetric=latest.get(variantId);const controlValue=metricValue(controlMetric,metric);const variantValue=metricValue(variantMetric,metric);const both=Boolean(controlMetric&&variantMetric);const winner=!both?null:variantValue>controlValue?"variant":controlValue>variantValue?"control":"tie";
+      const controlId=text(run.controlContentId);const variantId=text(run.variantContentId);const metric=text(run.primaryMetric)||"reach";
+      const controlBase=latest.get(controlId);const variantBase=latest.get(variantId);const controlAttr=attribution.byContent.get(controlId);const variantAttr=attribution.byContent.get(variantId);
+      const controlOutcome=effectiveOutcome(num(controlBase?.clicks),num(controlBase?.conversions),controlAttr);const variantOutcome=effectiveOutcome(num(variantBase?.clicks),num(variantBase?.conversions),variantAttr);
+      const controlMetric=controlBase?{...controlBase,clicks:controlOutcome.clicks,conversions:controlOutcome.conversions}:controlAttr?{content_item_id:controlId,clicks:controlOutcome.clicks,conversions:controlOutcome.conversions}:undefined;
+      const variantMetric=variantBase?{...variantBase,clicks:variantOutcome.clicks,conversions:variantOutcome.conversions}:variantAttr?{content_item_id:variantId,clicks:variantOutcome.clicks,conversions:variantOutcome.conversions}:undefined;
+      const outcomeMetric=metric==="clicks"||metric==="conversions";const controlMeasured=outcomeMetric?Boolean(controlBase||controlAttr):Boolean(controlBase);const variantMeasured=outcomeMetric?Boolean(variantBase||variantAttr):Boolean(variantBase);
+      const controlValue=metricValue(controlMetric,metric);const variantValue=metricValue(variantMetric,metric);const both=controlMeasured&&variantMeasured;const winner=!both?null:variantValue>controlValue?"variant":controlValue>variantValue?"control":"tie";
       const variantContent=contentById.get(variantId);const controlContent=contentById.get(controlId);
-      return {...run,status:both?"measured":variantContent?.status==="published"?"running":"draft",control:{id:controlId,value:controlValue,measuredAt:text(controlMetric?.measured_at),status:controlContent?.status||null,hook:controlContent?.hook||text(run.controlHook)},variant:{id:variantId,value:variantValue,measuredAt:text(variantMetric?.measured_at),status:variantContent?.status||null,hook:variantContent?.hook||text(run.variantHook)},winner,lift:both&&controlValue>0?(variantValue-controlValue)/controlValue:null};
+      return {...run,status:both?"measured":variantContent?.status==="published"?"running":"draft",control:{id:controlId,value:controlValue,measuredAt:text(controlBase?.measured_at),status:controlContent?.status||null,hook:controlContent?.hook||text(run.controlHook)},variant:{id:variantId,value:variantValue,measuredAt:text(variantBase?.measured_at),status:variantContent?.status||null,hook:variantContent?.hook||text(run.variantHook)},winner,lift:both&&controlValue>0?(variantValue-controlValue)/controlValue:null,firstPartyAttributionUsed:outcomeMetric&&Boolean(controlAttr||variantAttr)};
     });
-    return NextResponse.json({configured:true,business:{id:String(business.id),name:business.name},runs:resolved});
+    return NextResponse.json({configured:true,business:{id:String(business.id),name:business.name},runs:resolved,firstPartyAttribution:{available:attribution.available,clicks:attribution.totals.clicks,conversions:attribution.totals.conversions}});
   }catch(error){console.error("Experiment results failed",error);return NextResponse.json({error:"experiment_results_failed",detail:error instanceof Error?error.message:String(error)},{status:500});}
 }

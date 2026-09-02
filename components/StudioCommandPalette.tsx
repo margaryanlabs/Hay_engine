@@ -25,6 +25,7 @@ export default function StudioCommandPalette(){
     {label:"Competitor Radar",hint:"RADAR",action:()=>scroll(".competitorsCard")},
     {label:"Campaign Brain",hint:"LAUNCH / OFFER",action:()=>scroll(".studioCampaignBrain")},
     {label:"Campaign Analytics",hint:"MEASURE / TEST",action:()=>scroll(".studioCampaignAnalytics")},
+    {label:"Conversion Bridge",hint:"CLICKS → LEADS",action:()=>scroll(".studioConversionBridge")},
     {label:"Content Pulse",hint:"CALENDAR",action:()=>scroll(".contentPulse")},
     {label:"Smart Publishing Calendar",hint:"SCHEDULE",action:()=>scroll(".studioScheduleQueue")},
     {label:"Content Series",hint:"4-WEEK",action:()=>scroll(".studioSeries")},
