@@ -1,4 +1,5 @@
 import MarketingOS from "@/components/MarketingOS";
+import StudioCampaignBrain from "@/components/StudioCampaignBrain";
 import StudioCommandPalette from "@/components/StudioCommandPalette";
 import StudioContentMemory from "@/components/StudioContentMemory";
 import StudioContentSeries from "@/components/StudioContentSeries";
@@ -21,6 +22,7 @@ export default function StudioPage(){
     <StudioWorkspaceSwitcher/>
     <MarketingOS/>
     <StudioTodayBrief/>
+    <StudioCampaignBrain/>
     <StudioDecisionConsole/>
     <StudioScheduleQueue/>
     <StudioContentSeries/>
