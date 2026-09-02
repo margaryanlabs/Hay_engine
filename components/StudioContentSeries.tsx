@@ -22,7 +22,12 @@ export default function StudioContentSeries(){
     }catch{setData({configured:false,error:"unavailable"});}
     finally{setLoading(false);}
   }
-  useEffect(()=>{void load();},[]);
+  useEffect(()=>{
+    void load();
+    const refresh=()=>{void load();};
+    window.addEventListener("hay:studio-refresh",refresh);
+    return()=>window.removeEventListener("hay:studio-refresh",refresh);
+  },[]);
 
   const series=data?.architecture?.series||[];
   function runPlan(){document.querySelector<HTMLElement>(".heroActions .hayPrimary")?.click();}
