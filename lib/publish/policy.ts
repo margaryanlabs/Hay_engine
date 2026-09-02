@@ -50,7 +50,10 @@ export async function prepareApprovedPublishJob(args:{supabase:ServerClient;user
     .eq("platform",content.platform)
     .eq("status","connected")
     .order("connected_at",{ascending:false}).limit(1).maybeSingle();
-  if(connectionError)throw connectionError;
+  if(connectionError){
+    console.warn("Publishing policy unavailable; approval remains saved without queue preparation",connectionError.message);
+    return {prepared:false,reason:"publishing_policy_unavailable_apply_migration_005"};
+  }
   if(!connection?.id||!connection.credential_ref)return {prepared:false,reason:"social_connection_not_ready"};
 
   const mode=(String(connection.automation_mode||"approval") as AutomationMode);
