@@ -9,6 +9,7 @@ import type { BusinessProfile, CompetitorInput } from "@/lib/marketing/types";
 
 export const runtime="nodejs";
 const DAY=24*60*60*1000;
+const YEREVAN_OFFSET="+04:00";
 
 export async function POST(request:Request){
   try{
@@ -18,9 +19,11 @@ export async function POST(request:Request){
     const brief=normalizeCampaignBrief(body.campaign);
     const start=Date.parse(brief.startDate);const end=Date.parse(brief.endDate);
     const durationDays=Math.floor((end-start)/DAY)+1;
+    const campaignEnd=Date.parse(`${brief.endDate}T23:59:59${YEREVAN_OFFSET}`);
     if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)return NextResponse.json({error:"invalid_campaign_window"},{status:400});
     if(durationDays>90)return NextResponse.json({error:"campaign_window_too_long",maxDays:90},{status:400});
-    if(end+DAY<=Date.now())return NextResponse.json({error:"campaign_already_ended"},{status:400});
+    if(campaignEnd<=Date.now())return NextResponse.json({error:"campaign_already_ended"},{status:400});
+    if(campaignEnd<=Date.now()+90*60*1000)return NextResponse.json({error:"campaign_window_too_close",minimumLeadMinutes:90},{status:400});
     if(brief.eventDate&&(Date.parse(brief.eventDate)<start||Date.parse(brief.eventDate)>end))return NextResponse.json({error:"event_date_outside_campaign_window"},{status:400});
 
     const requestedBusinessId=typeof body.businessId==="string"?body.businessId:undefined;
