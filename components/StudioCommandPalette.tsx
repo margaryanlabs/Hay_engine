@@ -23,6 +23,7 @@ export default function StudioCommandPalette(){
     {label:"Business Intelligence",hint:"BUSINESS",action:()=>scroll(".businessCard")},
     {label:"Social Channels",hint:"CONNECT",action:()=>scroll(".channelsCard")},
     {label:"Competitor Radar",hint:"RADAR",action:()=>scroll(".competitorsCard")},
+    {label:"Campaign Brain",hint:"LAUNCH / OFFER",action:()=>scroll(".studioCampaignBrain")},
     {label:"Content Pulse",hint:"CALENDAR",action:()=>scroll(".contentPulse")},
     {label:"Smart Publishing Calendar",hint:"SCHEDULE",action:()=>scroll(".studioScheduleQueue")},
     {label:"Content Series",hint:"4-WEEK",action:()=>scroll(".studioSeries")},
