@@ -13,6 +13,7 @@ import "./studio-onboarding.css";
 import "./studio-decisions.css";
 import "./studio-today.css";
 import "./studio-calendar.css";
+import "./studio-policy.css";
 import "./voice-lab.css";
 import "./quality.css";
 import "./login.css";
