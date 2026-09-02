@@ -3,6 +3,7 @@ import StudioCommandPalette from "@/components/StudioCommandPalette";
 import StudioDecisionConsole from "@/components/StudioDecisionConsole";
 import StudioOnboarding from "@/components/StudioOnboarding";
 import StudioStatusRail from "@/components/StudioStatusRail";
+import StudioTodayBrief from "@/components/StudioTodayBrief";
 
 export const metadata = {
   title: "HAY Studio — Marketing OS",
@@ -13,6 +14,7 @@ export default function StudioPage(){
   return <>
     <StudioStatusRail/>
     <MarketingOS/>
+    <StudioTodayBrief/>
     <StudioDecisionConsole/>
     <StudioOnboarding/>
     <StudioCommandPalette/>
