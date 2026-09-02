@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { effectiveOutcome, loadAttributionSummary } from "@/lib/marketing/attribution";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
   if (!business) return NextResponse.json({ configured: true, business: null, approvals: [], metrics: null, recentPublished: [], operations: null, calendar: [] });
 
   const businessId = String(business.id);
-  const [contentResult, jobsResult, metricsResult] = await Promise.all([
+  const [contentResult, jobsResult, metricsResult, attribution] = await Promise.all([
     supabase.from("content_items")
       .select("id,platform,format,language,objective,hook,caption,cta,asset_url,status,scheduled_for,published_at,created_at,updated_at")
       .eq("business_id", businessId)
@@ -84,6 +85,7 @@ export async function GET(request: Request) {
       .eq("business_id", businessId)
       .order("measured_at", { ascending: false })
       .limit(250),
+    loadAttributionSummary(supabase,businessId),
   ]);
 
   for (const result of [contentResult, jobsResult, metricsResult]) {
@@ -121,7 +123,12 @@ export async function GET(request: Request) {
     const contentItemId = String(row.content_item_id || "");
     if (contentItemId && !latestByContent.has(contentItemId)) latestByContent.set(contentItemId, row);
   }
-  const latestMetrics = [...latestByContent.values()];
+  const outcomeIds = new Set([...latestByContent.keys(), ...attribution.byContent.keys()]);
+  const latestMetrics:MetricRow[] = [...outcomeIds].map(contentItemId => {
+    const row=latestByContent.get(contentItemId)||{};
+    const outcome=effectiveOutcome(number(row.clicks),number(row.conversions),attribution.byContent.get(contentItemId));
+    return {...row,content_item_id:contentItemId,platform:row.platform||String(contentById.get(contentItemId)?.platform||"unknown"),clicks:outcome.clicks,conversions:outcome.conversions};
+  });
   const emptyTotals: MetricTotals = { impressions: 0, reach: 0, views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0, conversions: 0, watchTimeSeconds: 0 };
   const totals = latestMetrics.reduce<MetricTotals>((acc, row) => ({
     impressions: acc.impressions + number(row.impressions),
@@ -199,7 +206,7 @@ export async function GET(request: Request) {
     configured: true,
     business: { id: businessId, name: business.name },
     approvals,
-    metrics: { totals, byPlatform, measuredItems: latestMetrics.length, latestMeasuredAt: metrics[0]?.measured_at || null },
+    metrics: { totals, byPlatform, measuredItems: latestMetrics.length, latestMeasuredAt: metrics[0]?.measured_at || null, firstPartyAttribution:{available:attribution.available,trackedClicks:attribution.totals.clicks,trackedConversions:attribution.totals.conversions} },
     recentPublished,
     operations,
     calendar,
