@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+const WORKSPACE_COOKIE="hay_business_id";
 
 type MetricRow = {
   content_item_id?: string | null;
@@ -46,12 +48,22 @@ export async function GET(request: Request) {
   if (authError || !userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const url = new URL(request.url);
-  const requestedBusinessId = url.searchParams.get("businessId");
+  const explicitBusinessId = url.searchParams.get("businessId");
+  const workspaceBusinessId = (await cookies()).get(WORKSPACE_COOKIE)?.value || null;
+  const requestedBusinessId = explicitBusinessId || workspaceBusinessId;
 
   let businessQuery = supabase.from("businesses").select("id,name").eq("owner_id", userId);
   if (requestedBusinessId) businessQuery = businessQuery.eq("id", requestedBusinessId);
-  const { data: businesses, error: businessError } = await businessQuery.order("created_at", { ascending: false }).limit(1);
+  let { data: businesses, error: businessError } = await businessQuery.order("created_at", { ascending: false }).limit(1);
   if (businessError) return NextResponse.json({ error: "business_read_failed", detail: businessError.message }, { status: 500 });
+
+  if (!businesses?.[0] && !explicitBusinessId && workspaceBusinessId) {
+    const fallback = await supabase.from("businesses").select("id,name").eq("owner_id", userId).order("created_at", { ascending: false }).limit(1);
+    businesses = fallback.data;
+    businessError = fallback.error;
+    if (businessError) return NextResponse.json({ error: "business_read_failed", detail: businessError.message }, { status: 500 });
+  }
+
   const business = businesses?.[0];
   if (!business) return NextResponse.json({ configured: true, business: null, approvals: [], metrics: null, recentPublished: [], operations: null, calendar: [] });
 
