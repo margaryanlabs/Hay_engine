@@ -5,7 +5,7 @@ import { contentMemoryForPlan, loadContentMemory } from "@/lib/marketing/content
 import { buildMarketingPlan } from "@/lib/marketing/planner";
 import { loadMarketingPerformance } from "@/lib/marketing/performance";
 import { persistMarketingPlan } from "@/lib/marketing/persistence";
-import type { BusinessProfile, CompetitorInput } from "@/lib/marketing/types";
+import type { BusinessProfile, CompetitorInput, MarketingPlan } from "@/lib/marketing/types";
 
 export const runtime="nodejs";
 const DAY=24*60*60*1000;
@@ -41,7 +41,8 @@ export async function POST(request:Request){
     const planningDays=Math.min(30,Math.max(7,durationDays));
     const raw=await buildMarketingPlan(planningBusiness,competitors,planningDays,performance);
     const restored={...raw,business,competitors:competitorSignals.length?competitorSignals:raw.competitors};
-    const scheduled=applyCampaignWindowSchedule(restored,brief);
+    const windowed=applyCampaignWindowSchedule(restored,brief);
+    const scheduled:MarketingPlan={...windowed,items:windowed.items.map(item=>({...item,status:"draft" as const}))};
     const campaign=buildCampaignBlueprint(brief,scheduled);
     const persisted=await persistMarketingPlan(scheduled,requestedBusinessId,{campaign});
     const durableCampaign=remapCampaignBlueprint(campaign,persisted.idMap);
