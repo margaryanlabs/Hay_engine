@@ -5,6 +5,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 export const runtime="nodejs";
 
 type JsonRecord=Record<string,unknown>;
+type PlanRow={id:string;strategy:unknown;created_at?:string|null};
 function record(value:unknown):JsonRecord{return value&&typeof value==="object"&&!Array.isArray(value)?value as JsonRecord:{};}
 function text(value:unknown){return String(value||"").trim();}
 function campaignMetric(kpi:string){if(kpi==="conversion")return "conversions";if(kpi==="trust")return "saves";if(kpi==="community")return "comments";if(kpi==="retention")return "conversions";return "reach";}
@@ -32,14 +33,14 @@ export async function POST(request:Request){
 
     const {data:plans,error:plansError}=await supabase.from("marketing_plans").select("id,strategy,created_at").eq("business_id",source.business_id).order("created_at",{ascending:false}).limit(40);
     if(plansError)return NextResponse.json({error:"campaign_read_failed",detail:plansError.message},{status:500});
-    let planRow:(typeof plans)[number]|undefined;let strategy:JsonRecord={};let campaign:JsonRecord={};
-    for(const row of plans||[]){const nextStrategy=record(row.strategy);const nextCampaign=record(nextStrategy.campaign);if(text(nextCampaign.id)===campaignId){planRow=row;strategy=nextStrategy;campaign=nextCampaign;break;}}
+    let planRow:PlanRow|undefined;let strategy:JsonRecord={};let campaign:JsonRecord={};
+    for(const row of (plans||[]) as PlanRow[]){const nextStrategy=record(row.strategy);const nextCampaign=record(nextStrategy.campaign);if(text(nextCampaign.id)===campaignId){planRow=row;strategy=nextStrategy;campaign=nextCampaign;break;}}
     if(!planRow)return NextResponse.json({error:"campaign_not_found"},{status:404});
     const phase=phaseForContent(campaign,sourceContentId);
     if(!phase)return NextResponse.json({error:"source_not_in_campaign"},{status:409});
 
     const existing=Array.isArray(strategy.experiments)?strategy.experiments.map(record):[];
-    const duplicate=existing.find(item=>text(item.controlContentId)===sourceContentId&&text(item.variable)==="hook"&&!["measured","cancelled"].includes(text(item.status)));
+    const duplicate=existing.find(item=>text(item.controlContentId)===sourceContentId&&text(item.variable)==="hook");
     if(duplicate)return NextResponse.json({error:"experiment_already_exists",experiment:duplicate},{status:409});
 
     const scheduledFor=comparableExperimentWindow(source.scheduled_for,text(campaign.endDate));
