@@ -33,10 +33,11 @@ type MetricTotals = {
 };
 
 const number = (value: unknown) => Number(value || 0);
+const scorePlatform = (row:{views:number;saves:number;clicks:number;conversions:number}) => row.views + row.saves * 4 + row.clicks * 6 + row.conversions * 20;
 
 export async function GET(request: Request) {
   if (!isSupabaseConfigured()) {
-    return NextResponse.json({ configured: false, approvals: [], metrics: null, recentPublished: [] });
+    return NextResponse.json({ configured: false, approvals: [], metrics: null, recentPublished: [], operations: null });
   }
 
   const supabase = await createClient();
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
   const { data: businesses, error: businessError } = await businessQuery.order("created_at", { ascending: false }).limit(1);
   if (businessError) return NextResponse.json({ error: "business_read_failed", detail: businessError.message }, { status: 500 });
   const business = businesses?.[0];
-  if (!business) return NextResponse.json({ configured: true, business: null, approvals: [], metrics: null, recentPublished: [] });
+  if (!business) return NextResponse.json({ configured: true, business: null, approvals: [], metrics: null, recentPublished: [], operations: null });
 
   const businessId = String(business.id);
   const [contentResult, jobsResult, metricsResult] = await Promise.all([
@@ -103,7 +104,6 @@ export async function GET(request: Request) {
     })
     .slice(0, 12);
 
-  // Keep only the latest metrics snapshot for each content item so totals are not double-counted.
   const latestByContent = new Map<string, MetricRow>();
   for (const row of metrics) {
     const contentItemId = String(row.content_item_id || "");
@@ -145,11 +145,45 @@ export async function GET(request: Request) {
       content: contentById.get(String(job.content_item_id)) || null,
     }));
 
+  const now = Date.now();
+  const next24h = now + 24 * 60 * 60 * 1000;
+  const scheduledJobs = jobs
+    .filter(job => job.scheduled_for && !["published", "failed", "cancelled"].includes(String(job.status)))
+    .map(job => ({ ...job, scheduledAt: new Date(String(job.scheduled_for)).getTime() }))
+    .filter(job => Number.isFinite(job.scheduledAt) && job.scheduledAt >= now)
+    .sort((a,b) => a.scheduledAt - b.scheduledAt);
+  const nextScheduled = scheduledJobs.slice(0, 4).map(job => ({
+    id: job.id,
+    platform: job.platform,
+    status: job.status,
+    scheduledFor: job.scheduled_for,
+    content: contentById.get(String(job.content_item_id)) || null,
+  }));
+  const failedJobs = jobs.filter(job => job.status === "failed").slice(0, 5).map(job => ({ id: job.id, platform: job.platform, error: job.error, attemptCount: job.attempt_count }));
+  const statusCounts = content.reduce<Record<string,number>>((acc,item)=>{const key=String(item.status||"unknown");acc[key]=(acc[key]||0)+1;return acc;},{});
+  const needsApproval = jobs.filter(job => job.status === "needs_approval").length;
+  const bestPlatform = byPlatform.slice().sort((a,b)=>scorePlatform(b)-scorePlatform(a))[0] || null;
+
+  const operations = {
+    attentionCount: approvals.filter(item => item.action !== "scheduled").length + failedJobs.length,
+    draftCount: statusCounts.draft || 0,
+    approvedCount: statusCounts.approved || 0,
+    scheduledCount: statusCounts.scheduled || 0,
+    publishedCount: statusCounts.published || 0,
+    needsApprovalCount: needsApproval,
+    failedCount: failedJobs.length,
+    scheduledNext24h: scheduledJobs.filter(job => job.scheduledAt <= next24h).length,
+    nextScheduled,
+    failedJobs,
+    bestPlatform,
+  };
+
   return NextResponse.json({
     configured: true,
     business: { id: businessId, name: business.name },
     approvals,
     metrics: { totals, byPlatform, measuredItems: latestMetrics.length, latestMeasuredAt: metrics[0]?.measured_at || null },
     recentPublished,
+    operations,
   });
 }
