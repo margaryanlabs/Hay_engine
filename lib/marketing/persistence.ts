@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { remapCampaignBlueprint, type CampaignBlueprint } from "./campaign";
 import { buildContentSeriesArchitecture } from "./series";
 import type { MarketingPlan } from "./types";
 
@@ -11,6 +12,8 @@ export type PersistedPlanResult = {
   idMap: Record<string, string>;
   reason?: string;
 };
+
+type PersistPlanOptions={campaign?:CampaignBlueprint};
 
 async function ensureOwnedBusiness(plan: MarketingPlan, requestedBusinessId?: string) {
   const supabase = await createClient();
@@ -57,7 +60,7 @@ async function ensureOwnedBusiness(plan: MarketingPlan, requestedBusinessId?: st
   return { supabase, userId, businessId: String(created.id) };
 }
 
-export async function persistMarketingPlan(plan: MarketingPlan, requestedBusinessId?: string): Promise<PersistedPlanResult> {
+export async function persistMarketingPlan(plan: MarketingPlan, requestedBusinessId?: string, options:PersistPlanOptions={}): Promise<PersistedPlanResult> {
   if (!isSupabaseConfigured()) return { persisted: false, plan, idMap: {}, reason: "supabase_unconfigured" };
   const owned = await ensureOwnedBusiness(plan, requestedBusinessId);
   if (!owned) return { persisted: false, plan, idMap: {}, reason: "unauthenticated" };
@@ -70,6 +73,7 @@ export async function persistMarketingPlan(plan: MarketingPlan, requestedBusines
     generatedAt: plan.createdAt,
     schedulePolicy: "baseline_yerevan_until_learned_windows",
     series: seriesDraft,
+    ...(options.campaign?{campaign:options.campaign}:{}),
   };
 
   const { data: planRow, error: planError } = await supabase.from("marketing_plans").insert({
@@ -106,8 +110,10 @@ export async function persistMarketingPlan(plan: MarketingPlan, requestedBusines
   }
 
   const durableSeries=buildContentSeriesArchitecture(plan,idMap);
-  const {error:strategyError}=await supabase.from("marketing_plans").update({strategy:{...baseStrategy,series:durableSeries}}).eq("id",planRow.id).eq("business_id",businessId);
-  if(strategyError)console.warn("Series strategy durability update skipped",strategyError.message);
+  const durableCampaign=options.campaign?remapCampaignBlueprint(options.campaign,idMap):undefined;
+  const durableStrategy={...baseStrategy,series:durableSeries,...(durableCampaign?{campaign:durableCampaign}:{})};
+  const {error:strategyError}=await supabase.from("marketing_plans").update({strategy:durableStrategy}).eq("id",planRow.id).eq("business_id",businessId);
+  if(strategyError)console.warn("Plan strategy durability update skipped",strategyError.message);
 
   return {
     persisted: true,

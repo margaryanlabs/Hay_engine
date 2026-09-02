@@ -27,8 +27,10 @@ export default function StudioTodayBrief(){
       finally{if(active)setLoading(false);}
     }
     void load();
+    const refresh=()=>{void load();};
+    window.addEventListener("hay:studio-refresh",refresh);
     const timer=window.setInterval(load,60000);
-    return()=>{active=false;window.clearInterval(timer);};
+    return()=>{active=false;window.removeEventListener("hay:studio-refresh",refresh);window.clearInterval(timer);};
   },[]);
 
   const nextMove=useMemo(()=>{
