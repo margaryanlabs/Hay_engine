@@ -1,6 +1,7 @@
 import MarketingOS from "@/components/MarketingOS";
 import StudioCommandPalette from "@/components/StudioCommandPalette";
 import StudioContentMemory from "@/components/StudioContentMemory";
+import StudioContentSeries from "@/components/StudioContentSeries";
 import StudioDecisionConsole from "@/components/StudioDecisionConsole";
 import StudioOnboarding from "@/components/StudioOnboarding";
 import StudioPublishingPolicy from "@/components/StudioPublishingPolicy";
@@ -22,6 +23,7 @@ export default function StudioPage(){
     <StudioTodayBrief/>
     <StudioDecisionConsole/>
     <StudioScheduleQueue/>
+    <StudioContentSeries/>
     <StudioContentMemory/>
     <StudioPublishingPolicy/>
     <StudioOnboarding/>
