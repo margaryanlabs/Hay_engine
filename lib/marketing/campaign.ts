@@ -75,17 +75,7 @@ export function normalizeCampaignBrief(input:unknown):CampaignBrief{
   const start=Date.parse(startDate);
   const endDate=requestedEnd&&Date.parse(requestedEnd)>=start?requestedEnd:new Date(start+13*DAY).toISOString().slice(0,10);
   const eventDate=isoDay(row.eventDate);
-  return {
-    name:text(row.name,120)||"HAY Campaign",
-    type,
-    objective:text(row.objective,300)||"Create measurable demand and a clear audience action.",
-    offer:text(row.offer,700),
-    startDate,
-    endDate,
-    eventDate:eventDate||undefined,
-    audience:text(row.audience,500)||undefined,
-    constraints:text(row.constraints,1000)||undefined,
-  };
+  return {name:text(row.name,120)||"HAY Campaign",type,objective:text(row.objective,300)||"Create measurable demand and a clear audience action.",offer:text(row.offer,700),startDate,endDate,eventDate:eventDate||undefined,audience:text(row.audience,500)||undefined,constraints:text(row.constraints,1000)||undefined};
 }
 
 export function campaignPlanningContext(brief:CampaignBrief,business:BusinessProfile){
@@ -129,10 +119,7 @@ export function applyCampaignWindowSchedule(plan:MarketingPlan,brief:CampaignBri
     const windows=CAMPAIGN_WINDOWS[item.platform]||["19:00"];
     const count=use.get(item.platform)||0;use.set(item.platform,count+1);
     let publishAt=localIso(dayDate,windows[count%windows.length]);
-    if(Date.parse(publishAt)<minimumLead&&dayDate<endDay){
-      const nextDay=new Date(Date.parse(`${dayDate}T00:00:00Z`)+DAY).toISOString().slice(0,10);
-      publishAt=localIso(nextDay,windows[count%windows.length]);
-    }
+    if(Date.parse(publishAt)<minimumLead&&dayDate<endDay){const nextDay=new Date(Date.parse(`${dayDate}T00:00:00Z`)+DAY).toISOString().slice(0,10);publishAt=localIso(nextDay,windows[count%windows.length]);}
     if(Date.parse(publishAt)<minimumLead&&dayDate===endDay){publishAt=new Date(Math.min(end,minimumLead+index*15*60*1000)).toISOString();}
     return {...item,day:offset+1,publishAt};
   });
@@ -143,33 +130,12 @@ export function buildCampaignBlueprint(brief:CampaignBrief,plan:MarketingPlan,id
   const windows=phaseWindows(brief);
   const planStart=plan.items.map(item=>item.publishAt?Date.parse(item.publishAt):Number.NaN).filter(Number.isFinite).sort((a,b)=>a-b)[0]||localDayStart(brief.startDate);
   const items=plan.items.map(item=>({id:idMap[item.id]||item.id,time:item.publishAt?Date.parse(item.publishAt):planStart+(Math.max(1,item.day)-1)*DAY}));
-  const phases=windows.map((phase,index)=>{
+  const phases=windows.map(phase=>{
     const phaseStart=localDayStart(phase.startDate);const phaseEnd=localDayEnd(phase.endDate);
-    let contentItemIds=items.filter(item=>item.time>=phaseStart&&item.time<=phaseEnd).map(item=>item.id);
-    if(!contentItemIds.length){contentItemIds=items.filter((_,itemIndex)=>itemIndex%windows.length===index).map(item=>item.id);}
+    const contentItemIds=items.filter(item=>item.time>=phaseStart&&item.time<=phaseEnd).map(item=>item.id);
     return {...phase,contentItemIds};
   });
-  return {
-    id:`campaign-${crypto.randomUUID()}`,
-    name:brief.name,
-    type:brief.type,
-    objective:brief.objective,
-    offer:brief.offer,
-    startDate:brief.startDate,
-    endDate:brief.endDate,
-    eventDate:brief.eventDate,
-    audience:brief.audience||plan.business.audience||"Primary business audience",
-    primaryKpi:objectiveToKpi(brief.objective),
-    status:campaignStatus(brief),
-    phases,
-    guardrails:[
-      "Never invent discount, scarcity, availability, testimonial or event facts.",
-      "Keep campaign dates and offer wording exact across every channel.",
-      "Campaign priority is temporary; evergreen brand memory remains authoritative outside the window.",
-      ...(brief.constraints?[brief.constraints]:[]),
-    ],
-    createdAt:new Date().toISOString(),
-  };
+  return {id:`campaign-${crypto.randomUUID()}`,name:brief.name,type:brief.type,objective:brief.objective,offer:brief.offer,startDate:brief.startDate,endDate:brief.endDate,eventDate:brief.eventDate,audience:brief.audience||plan.business.audience||"Primary business audience",primaryKpi:objectiveToKpi(brief.objective),status:campaignStatus(brief),phases,guardrails:["Never invent discount, scarcity, availability, testimonial or event facts.","Keep campaign dates and offer wording exact across every channel.","Campaign priority is temporary; evergreen brand memory remains authoritative outside the window.",...(brief.constraints?[brief.constraints]:[])],createdAt:new Date().toISOString()};
 }
 
 export function remapCampaignBlueprint(campaign:CampaignBlueprint,idMap:Record<string,string>):CampaignBlueprint{
