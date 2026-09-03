@@ -89,6 +89,24 @@ for (const route of meteredProviderRoutes) {
   assert.match(source, /recordUsage\s*\(/, `${route} must meter generated content after successful persistence`);
 }
 
+const meteredLanguageRoutes = [
+  "app/api/translate/route.ts",
+  "app/api/transcribe/route.ts",
+];
+for (const route of meteredLanguageRoutes) {
+  const source = readFileSync(route, "utf8");
+  assert.match(source, /checkLanguageProviderAccess\s*\(/, `${route} must preserve the language-specific auth/demo policy`);
+  assert.match(source, /checkUsageAllowance\s*\(/, `${route} must enforce bounded authenticated Studio usage before provider calls`);
+  assert.match(source, /recordUsage\s*\(/, `${route} must meter successful provider-backed language work`);
+}
+
+const translateRouteSource = readFileSync("app/api/translate/route.ts", "utf8");
+assert.match(
+  translateRouteSource,
+  /MAX_TRANSLATE_CHARS\s*=\s*20_000/,
+  "Studio translation must keep a hard per-request text size bound",
+);
+
 const entitlementSource = readFileSync("lib/commercial/entitlements.ts", "utf8");
 assert.match(
   entitlementSource,
@@ -136,10 +154,12 @@ assert.ok(
 
 console.log(JSON.stringify({
   securityPolicy: "passed",
-  cases: 19,
+  cases: 26,
   providerCostRoutes: meteredProviderRoutes,
+  meteredLanguageRoutes,
   usageBusinessOwnership: true,
   productionProviderFailClosed: true,
   veoOperationOwnership: true,
   voicePreProviderGate: true,
+  translationSizeBound: true,
 }, null, 2));
