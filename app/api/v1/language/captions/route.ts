@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authenticateDeveloperRequest, recordDeveloperApiUsage } from "@/lib/developer/api-keys";
+import { authenticateDeveloperRequest, developerApiMaxTextChars, recordDeveloperApiUsage } from "@/lib/developer/api-keys";
 import { captionsFromAlignment } from "@/lib/creator/alignment";
 import { buildCaptionCues } from "@/lib/creator/captions";
 import type { CaptionCue } from "@/lib/creator/types";
@@ -20,6 +20,8 @@ export async function POST(request:Request){
   if(!auth.allowed)return NextResponse.json({error:auth.reason},{status:auth.status});
   const body=await request.json();
   const text=String(body.text||"").trim();
+  const maxTextChars=developerApiMaxTextChars();
+  if(text.length>maxTextChars)return NextResponse.json({error:"text_too_large",maxTextChars},{status:413});
   const duration=Math.min(3600,Math.max(.5,Number(body.duration)||15));
   const wordsPerCue=Math.min(8,Math.max(2,Number(body.wordsPerCue)||4));
   const alignment=body.alignment&&typeof body.alignment==="object"?body.alignment as ElevenLabsAlignment:null;
