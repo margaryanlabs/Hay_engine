@@ -30,11 +30,16 @@ export function planEnforcementEnabled() {
   return process.env.HAY_ENFORCE_PLANS === "true";
 }
 
+function unauthenticatedProviderAccessEnabled() {
+  return process.env.NODE_ENV !== "production" || process.env.HAY_ALLOW_UNAUTHENTICATED_PROVIDER_API === "true";
+}
+
 export async function getCommercialContext() {
   if (!isSupabaseConfigured()) {
     return {
       configured: false,
       authenticated: false,
+      allowUnauthenticatedProviderAccess: unauthenticatedProviderAccessEnabled(),
       enforcementEnabled: false,
       migrationReady: false,
       planId: "free" as CommercialPlanId,
@@ -56,6 +61,7 @@ export async function getCommercialContext() {
     return {
       configured: true,
       authenticated: false,
+      allowUnauthenticatedProviderAccess: false,
       enforcementEnabled: planEnforcementEnabled(),
       migrationReady: true,
       planId: "free" as CommercialPlanId,
@@ -133,6 +139,7 @@ export async function getCommercialContext() {
   return {
     configured: true,
     authenticated: true,
+    allowUnauthenticatedProviderAccess: false,
     userId,
     enforcementEnabled: planEnforcementEnabled(),
     migrationReady,
