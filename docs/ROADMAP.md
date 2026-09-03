@@ -47,13 +47,14 @@ This file tracks what is actually missing in the current repository. Completed i
 - [x] Armenian transcript correction layer with protected-value fail-safe
 - [x] versioned core pronunciation registry + inspectable pronunciation API
 - [x] Language Lab for pronunciation / transcription / captions / translation testing
+- [x] blind native-speaker benchmark protocol + `/benchmark` review harness
+- [ ] collect enough independent native-speaker reviews to publish statistically useful provider comparisons
 - [ ] STT provider benchmark and quality/cost routing (OpenAI adapter is live; Chirp 3 is the next benchmark adapter)
 - [ ] pronunciation management UI backed by persistent reviewed entries
 - [ ] reviewed Western Armenian evaluation set
 - [ ] larger Armenian/Russian/English code-switch benchmark
 - [ ] reviewed Armenia names / brands / places pronunciation graph
 - [ ] human correction capture with explicit consent
-- [ ] blind native-speaker benchmark for naturalness, pronunciation and prosody
 
 ## Phase 3 — commercial core
 
@@ -97,7 +98,7 @@ This file tracks what is actually missing in the current repository. Completed i
 5. Set `HAY_ENFORCE_PLANS=true` only after migration + billing sync are verified.
 6. Run `npm run typecheck`, `npm run quality`, `npm run build`, render-worker check and publish-worker check.
 7. Onboard the first real businesses in managed mode and measure time-to-first-useful-plan, publish success and attributed outcomes.
-8. Run the blind native-speaker Armenian benchmark before making comparative "best Armenian" claims.
+8. Collect independent blind native-speaker benchmark reviews before making comparative "best Armenian" claims.
 
 ## Non-goal
 

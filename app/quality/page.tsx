@@ -9,8 +9,8 @@ export default function QualityPage(){
   return <main className="qualityPage">
     <header className="qualityNav">
       <a href="/"><HayLogo compact/></a>
-      <nav><a href="/studio">Marketing OS</a><a href="/creator">Creator</a><a href="/voice">Voice</a><a className="active" href="/quality">Quality</a></nav>
-      <span>HAY / LANGUAGE LAB</span>
+      <nav><a href="/studio">Marketing OS</a><a href="/creator">Creator</a><a href="/voice">Voice</a><a href="/language">Language</a><a className="active" href="/quality">Quality</a><a href="/benchmark">Native Benchmark</a></nav>
+      <span>HAY / LANGUAGE QUALITY</span>
     </header>
 
     <section className="qualityHero">
@@ -37,6 +37,6 @@ export default function QualityPage(){
 
     {failed.length>0&&<section className="qualityFailures"><span>03 / FAILURES</span>{failed.map(item=><article key={item.id}><b>{item.id}</b><p>{item.failures.join(" · ")}</p></article>)}</section>}
 
-    <footer className="qualityFooter"><span>HAY ARMENIAN QUALITY LAYER</span><span>STANDARD · NATURAL · YEREVAN · SPEECH</span><a href="/voice">OPEN VOICE LAB ↗</a></footer>
+    <footer className="qualityFooter"><span>HAY ARMENIAN QUALITY LAYER</span><span>DETERMINISTIC REGRESSION ≠ PUBLIC PROVIDER CLAIM</span><a href="/benchmark">OPEN NATIVE BENCHMARK ↗</a></footer>
   </main>;
 }
