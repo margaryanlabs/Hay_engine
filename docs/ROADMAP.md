@@ -45,16 +45,20 @@ This file tracks what is actually missing in the current repository. Completed i
 - [x] Armenian/English code-switch regression coverage
 - [x] commercial currency / brand-suffix / social-name regression pack
 - [x] Armenian transcript correction layer with protected-value fail-safe
-- [x] versioned core pronunciation registry + inspectable pronunciation API
+- [x] versioned curated-core pronunciation registry + inspectable pronunciation API
+- [x] persistent reviewed/account/business pronunciation registry
+- [x] DB-managed pronunciation version increment + append-only audit snapshots
+- [x] pronunciation management UI with provenance fields and business scoping
+- [x] runtime precedence: business → account → HAY-reviewed system → curated core
+- [x] runtime pronunciation override regression gate
 - [x] Language Lab for pronunciation / transcription / captions / translation testing
 - [x] blind native-speaker benchmark protocol + `/benchmark` review harness
 - [ ] collect enough independent native-speaker reviews to publish statistically useful provider comparisons
 - [ ] STT provider benchmark and quality/cost routing (OpenAI adapter is live; Chirp 3 is the next benchmark adapter)
-- [ ] pronunciation management UI backed by persistent reviewed entries
 - [ ] reviewed Western Armenian evaluation set
 - [ ] larger Armenian/Russian/English code-switch benchmark
 - [ ] reviewed Armenia names / brands / places pronunciation graph
-- [ ] human correction capture with explicit consent
+- [ ] human correction capture workflow with explicit consent (schema fields exist; capture/promotion workflow is not complete)
 
 ## Phase 3 — commercial core
 
@@ -81,33 +85,37 @@ This file tracks what is actually missing in the current repository. Completed i
 ## Phase 4 — API and proprietary data moat
 
 - [x] `/normalize`
-- [x] `/pronounce` + versioned core pronunciation registry
-- [x] `/voice`
+- [x] `/pronounce` + layered persistent pronunciation runtime
+- [x] `/voice` using the active pronunciation registry
 - [x] `/transcribe` with Armenian post-correction
 - [x] standalone `/captions` with cues + SRT + WebVTT
 - [x] `/translate` with Armenian-first syntax and protected-value preservation
 - [x] model/quality dashboard via `/quality` and `/api/quality`
 - [x] interactive `/language` Language Lab surface
+- [x] `/pronunciations` owner/business Dictionary Console
 - [x] revocable developer authentication / API keys
 - [x] stable `/api/v1/language/*` developer surface
 - [x] `/developers` key + usage console
 - [x] API usage metering distinct from Studio subscriptions
-- [ ] persistent versioned pronunciation dictionary management
-- [ ] dataset provenance and license registry in persistence
+- [x] persistent versioned pronunciation dictionary management
+- [x] pronunciation provenance + consent/license fields with append-only history
+- [ ] general dataset provenance and license registry beyond pronunciation data
 - [ ] fine-tuned Armenian speech/language components only where blind benchmarks justify them
 
 ## Go-live checklist
 
 1. Create a dedicated HAY Supabase project; do not reuse Meqena or the old shared Margaryan Labs database.
-2. Apply the canonical HAY Supabase migrations through `007_commercial_core.sql`.
-3. Configure provider keys and workers required by the launch package.
-4. Configure Creator / Growth / Business hosted checkout URLs and `HAY_BILLING_SYNC_SECRET`.
-5. Verify the chosen payment provider's signed webhook, then call HAY `/api/billing/sync` from that trusted adapter.
-6. Set `HAY_ENFORCE_PLANS=true` only after migration + billing sync are verified.
-7. For Developer API launch, choose a positive `HAY_DEVELOPER_API_HOURLY_REQUEST_LIMIT`, create a test `hay_live_*` key, verify success + `429` behavior + usage recording + revoke, then set `HAY_DEVELOPER_API_ENABLED=true`.
-8. Run `npm run typecheck`, `npm run quality`, `npm run build`, render-worker check and publish-worker check.
-9. Onboard the first real businesses in managed mode and measure time-to-first-useful-plan, publish success and attributed outcomes.
-10. Collect independent blind native-speaker benchmark reviews before making comparative "best Armenian" claims.
+2. Apply the canonical HAY Supabase migrations through `008_language_registry.sql`.
+3. Verify `/api/setup/status` reports the commercial/developer schemas and `languageData.pronunciationRegistry` correctly.
+4. Configure provider keys and workers required by the launch package.
+5. Configure Creator / Growth / Business hosted checkout URLs and `HAY_BILLING_SYNC_SECRET`.
+6. Verify the chosen payment provider's signed webhook, then call HAY `/api/billing/sync` from that trusted adapter.
+7. Set `HAY_ENFORCE_PLANS=true` only after migration + billing sync are verified.
+8. For Developer API launch, choose a positive `HAY_DEVELOPER_API_HOURLY_REQUEST_LIMIT`, create a test `hay_live_*` key, verify success + `429` behavior + usage recording + revoke, then set `HAY_DEVELOPER_API_ENABLED=true`.
+9. In `/pronunciations`, create/update/archive an account override and one owned-business override; confirm versions increment and runtime precedence falls back correctly.
+10. Run `npm run typecheck`, `npm run quality`, `npm run build`, render-worker check and publish-worker check.
+11. Onboard the first real businesses in managed mode and measure time-to-first-useful-plan, publish success and attributed outcomes.
+12. Collect independent blind native-speaker benchmark reviews before making comparative "best Armenian" claims.
 
 ## Non-goal
 
