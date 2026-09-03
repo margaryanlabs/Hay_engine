@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { planEnforcementEnabled } from "@/lib/commercial/entitlements";
+import { atomicUsageMigrationsReady } from "@/lib/commercial/usage-reservations";
 import { developerApiEnabled, developerApiHourlyLimit, developerApiMaxTextChars, developerApiMigrationReady } from "@/lib/developer/api-keys";
 import { correctionFlywheelReady } from "@/lib/hay/correction-store";
 import { pronunciationRegistryReady } from "@/lib/hay/pronunciation-store";
@@ -102,6 +103,7 @@ export async function GET() {
       // Detailed setup diagnostics report the blocker below.
     }
   }
+  const atomicUsageMigration = admin ? await atomicUsageMigrationsReady() : false;
   const developerMigration = admin ? await developerApiMigrationReady() : false;
   const pronunciationRegistry = admin ? await pronunciationRegistryReady() : false;
   const correctionFlywheel = admin ? await correctionFlywheelReady() : false;
@@ -117,7 +119,7 @@ export async function GET() {
     agency: Boolean(process.env.HAY_CHECKOUT_AGENCY_URL),
   };
   const billingSync = Boolean(process.env.HAY_BILLING_SYNC_SECRET) && admin;
-  const commercialReady = supabase && admin && commercialMigration && billingSync && checkout.creator && checkout.growth && checkout.business;
+  const commercialReady = supabase && admin && commercialMigration && atomicUsageMigration && billingSync && checkout.creator && checkout.growth && checkout.business;
   const developerApiReady = supabase && admin && developerMigration && developerEnabled && developerRateLimitReady;
   const coreReady = providers.strategy && supabase && admin;
   const marketingReady = coreReady && workers.publish;
@@ -150,6 +152,7 @@ export async function GET() {
       developerApi: {
         enabled: developerEnabled,
         migration: developerMigration,
+        requiredMigration: "012_atomic_developer_api_requests.sql",
         version: "v1",
         keyPrefix: "hay_live_",
         hashedAtRest: true,
@@ -162,6 +165,8 @@ export async function GET() {
       social,
       commercial: {
         migration: commercialMigration,
+        atomicUsageMigration,
+        requiredMigrations: ["007_commercial_core.sql","010_atomic_usage_reservations.sql","011_atomic_usage_resize.sql"],
         planEnforcement: planEnforcementEnabled(),
         billingSync,
         checkout,
@@ -171,13 +176,15 @@ export async function GET() {
         ...(!providers.strategy ? ["openai_key_required_for_ai_strategy"] : []),
         ...(!workers.publish ? ["publish_worker_required_for_automatic_posting"] : []),
         ...(supabase && !commercialMigration ? ["commercial_migration_007_required"] : []),
+        ...(commercialMigration && !atomicUsageMigration ? ["atomic_usage_migrations_010_011_required"] : []),
         ...(admin && !pronunciationRegistry ? ["language_registry_migration_008_required"] : []),
         ...(admin && !correctionFlywheel ? ["language_correction_migration_009_required"] : []),
         ...(correctionFlywheel && !reviewerAllowlist ? ["language_reviewer_allowlist_required"] : []),
-        ...(admin && !developerMigration ? ["developer_api_schema_required"] : []),
+        ...(admin && !developerMigration ? ["developer_api_migration_012_required"] : []),
         ...(developerMigration && !developerEnabled ? ["developer_api_disabled"] : []),
         ...(developerEnabled && !developerRateLimitReady ? ["developer_api_hourly_rate_limit_required"] : []),
         ...(commercialMigration && !billingSync ? ["billing_sync_secret_required"] : []),
+        ...(commercialMigration && !atomicUsageMigration && planEnforcementEnabled() ? ["plan_enforcement_requires_atomic_usage_migrations"] : []),
         ...(commercialMigration && !planEnforcementEnabled() ? ["plan_enforcement_disabled"] : []),
         ...(!checkout.creator || !checkout.growth || !checkout.business ? ["paid_checkout_links_required"] : []),
         ...(!providers.transcription ? ["openai_key_required_for_transcription"] : []),

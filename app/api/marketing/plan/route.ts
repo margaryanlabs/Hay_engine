@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkUsageAllowance, recordUsage } from "@/lib/commercial/entitlements";
+import { commitUsageReservation, releaseUsageReservation, reserveUsage, resizeUsageReservation, type UsageReservation } from "@/lib/commercial/usage-reservations";
 import { analyzeCompetitorEvidence, collectCompetitorEvidence, competitorContextForPlan } from "@/lib/marketing/competitor-intelligence";
 import { contentMemoryForPlan, loadContentMemory } from "@/lib/marketing/content-memory";
 import { buildMarketingPlan } from "@/lib/marketing/planner";
@@ -9,7 +9,15 @@ import type { BusinessProfile, CompetitorInput } from "@/lib/marketing/types";
 
 export const runtime = "nodejs";
 
+function usageStatus(reason:string|undefined){
+  if(reason==="unauthorized")return 401;
+  if(reason==="request_in_progress"||reason==="duplicate_request")return 409;
+  if(reason==="commercial_migration_required"||reason==="atomic_usage_admin_required"||reason==="atomic_usage_migration_required"||reason==="atomic_usage_reservation_failed"||reason==="atomic_usage_resize_migration_required"||reason==="reservation_resize_failed")return 503;
+  return 402;
+}
+
 export async function POST(request: Request) {
+  let pendingReservation:UsageReservation|null=null;
   try {
     const body = await request.json();
     const business = body.business as BusinessProfile | undefined;
@@ -21,13 +29,24 @@ export async function POST(request: Request) {
     }
 
     const minimumAssets = Math.max(7, horizonDays);
-    const allowance = await checkUsageAllowance("content_assets", minimumAssets);
-    if (!allowance.allowed) {
-      const status = allowance.reason === "unauthorized" ? 401 : allowance.reason === "commercial_migration_required" ? 503 : 402;
-      return NextResponse.json({ error: allowance.reason, meter: "content_assets", required: minimumAssets, commercial: allowance.context }, { status });
-    }
-
     const requestedBusinessId = typeof body.businessId === "string" ? body.businessId : undefined;
+    const requestId=typeof body.requestId==="string"?body.requestId.trim().slice(0,200):"";
+    const reservation=await reserveUsage({
+      meter:"content_assets",
+      quantity:minimumAssets,
+      businessId:requestedBusinessId||null,
+      source:"marketing_plan",
+      idempotencyKey:requestId?`marketing-plan:${requestId}`:undefined,
+      metadata:{horizonDays,businessName:business.name},
+    });
+    if(!reservation.allowed){
+      return NextResponse.json({error:reservation.reason,meter:"content_assets",required:minimumAssets,commercial:reservation.context},{status:usageStatus(reservation.reason)});
+    }
+    if(reservation.duplicate){
+      return NextResponse.json({error:"duplicate_marketing_plan_request",commercialUsage:{recorded:true,duplicate:true,eventId:reservation.eventId,metadata:reservation.metadata}},{status:409});
+    }
+    pendingReservation=reservation;
+
     const [performance, competitorEvidence, contentMemory] = await Promise.all([
       loadMarketingPerformance(requestedBusinessId, business.name),
       collectCompetitorEvidence(competitors),
@@ -42,14 +61,27 @@ export async function POST(request: Request) {
     const generated = { ...generatedRaw, business, competitors: competitorSignals.length ? competitorSignals : generatedRaw.competitors };
     const persisted = await persistMarketingPlan(generated, requestedBusinessId);
 
-    const usage = await recordUsage({
-      meter: "content_assets",
-      quantity: generated.items.length,
-      businessId: persisted.businessId || requestedBusinessId || null,
-      source: "marketing_plan",
-      idempotencyKey: typeof body.requestId === "string" && body.requestId ? `marketing-plan:${body.requestId}` : undefined,
-      metadata: { horizonDays, generatedBy: generated.generatedBy, planId: persisted.planId || generated.id },
+    const actualAssets=persisted.plan.items.length;
+    if(actualAssets!==minimumAssets){
+      const resized=await resizeUsageReservation(reservation,actualAssets);
+      if(!resized.resized){
+        // Planning and persistence already completed. Keep the original reservation
+        // occupied instead of releasing paid provider work when exact reconciliation fails.
+        pendingReservation=null;
+        return NextResponse.json({error:resized.reason,meter:"content_assets",required:actualAssets,commercial:reservation.context},{status:usageStatus(resized.reason)});
+      }
+    }
+
+    pendingReservation=null;
+    const usage = await commitUsageReservation(reservation,{
+      horizonDays,
+      actualAssets,
+      generatedBy:generated.generatedBy,
+      planId:persisted.planId||generated.id,
     });
+    if(!usage.recorded){
+      return NextResponse.json({error:"marketing_plan_usage_commit_failed",commercialUsage:usage},{status:503});
+    }
 
     return NextResponse.json({
       ...persisted.plan,
@@ -68,6 +100,7 @@ export async function POST(request: Request) {
       commercialUsage: usage,
     });
   } catch (error) {
+    if(pendingReservation)await releaseUsageReservation(pendingReservation).catch(()=>undefined);
     console.error("Marketing plan API failed", error);
     return NextResponse.json({ error: "marketing_plan_failed" }, { status: 500 });
   }

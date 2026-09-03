@@ -27,6 +27,7 @@ HAY Engine is an Armenian-first AI language, creator and marketing operating sys
 - raw developer keys are displayed once; only SHA-256 hashes are stored
 - coarse `language` scope or endpoint-specific language scopes
 - dedicated request / character / audio-byte usage ledger, separate from Studio subscriptions
+- atomic per-key rolling-hour request admission before provider work
 - mandatory operator-configured per-key hourly request limit before the API becomes ready
 - bounded developer text payloads (20k characters by default, configurable)
 - owner console at `/developers` for key creation, revocation and current-month usage
@@ -67,7 +68,8 @@ HAY Engine is an Armenian-first AI language, creator and marketing operating sys
 - Free / Creator / Growth / Business entitlement model
 - owner-scoped plan limits for brands and social channels
 - append-only Studio usage metering for content assets, AI video credits and Armenian voice minutes
-- separate developer API usage ledger
+- atomic reserve → resize → commit accounting for provider-backed Studio work
+- separate developer API usage ledger with atomic request-slot admission
 - Studio plan/usage visibility
 - provider-neutral hosted checkout contract
 - trusted server-to-server entitlement sync endpoint
@@ -148,6 +150,9 @@ Apply SQL in this order:
 9. `supabase/007_commercial_core.sql`
 10. `supabase/008_language_registry.sql`
 11. `supabase/009_language_corrections_and_dataset_registry.sql`
+12. `supabase/010_atomic_usage_reservations.sql`
+13. `supabase/011_atomic_usage_resize.sql`
+14. `supabase/012_atomic_developer_api_requests.sql`
 
 Migration 007 contains the commercial schema: entitlements, Studio usage, developer API keys and developer API usage. Developer credentials/usage are intentionally not available to `anon` or normal `authenticated` Data API clients; owner-facing routes authenticate the user first and then use the server-only admin client.
 
@@ -155,9 +160,13 @@ Migration 008 adds the persistent pronunciation registry and append-only audit s
 
 Migration 009 adds consent-aware human corrections, correction audit snapshots, the general `dataset_records` provenance registry and dataset audit snapshots. Corrections are private-by-default: product-improvement consent is required before a correction can enter the reviewer queue or reviewed HAY data. Benchmark and model-training permissions are separate flags and cannot bypass that requirement. Withdrawal revokes linked dataset eligibility.
 
+Migration 010 adds atomic Studio usage reservations and service-role-only reserve/commit/release RPCs. Migration 011 adds exact reservation resizing under the same entitlement lock. Together they prevent concurrent provider-backed Studio requests from overspending the same remaining plan capacity.
+
+Migration 012 adds atomic Developer API request admission. It locks the exact API-key row, checks the rolling-hour request limit and inserts the durable request slot before route/provider work can begin.
+
 Configure reviewer access with server-only `HAY_LANGUAGE_REVIEWER_EMAILS`. Do not prefix it with `NEXT_PUBLIC_`.
 
-Do not set `HAY_ENFORCE_PLANS=true` until migration 007 is applied and the billing sync path has been verified. Do not set `HAY_DEVELOPER_API_ENABLED=true` until the developer tables exist, a positive hourly request limit is configured, and the API has been smoke-tested with a revocable key.
+Do not set `HAY_ENFORCE_PLANS=true` until migrations `007`, `010` and `011` are applied, `/api/setup/status` reports `commercial.atomicUsageMigration: true`, and the billing sync path has been verified. Do not set `HAY_DEVELOPER_API_ENABLED=true` until migrations `007` and `012` are applied, `/api/setup/status` reports `developerApi.migration: true`, a positive hourly request limit is configured, and the API has been smoke-tested with a revocable key.
 
 ## Billing rollout
 
