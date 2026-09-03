@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "outDir": "../.security-build",
+    "rootDir": "..",
+    "types": ["node"]
+  },
+  "include": [
+    "security-policy-check.ts",
+    "../lib/commercial/usage-policy.ts"
+  ]
+}
