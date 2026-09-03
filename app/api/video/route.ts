@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkUsageAllowance, recordUsage } from "@/lib/commercial/entitlements";
 import { extractVeoVideoUri, getVeoOperation, isVeoConfigured, startVeoVideo } from "@/lib/providers/veo";
 
 export const runtime = "nodejs";
@@ -10,6 +11,12 @@ export async function POST(request: Request) {
     if (!prompt) return NextResponse.json({ error: "prompt_required" }, { status: 400 });
     if (!isVeoConfigured()) return NextResponse.json({ configured: false, message: "Add GEMINI_API_KEY to enable Veo 3.1 video generation." });
 
+    const allowance=await checkUsageAllowance("ai_video_credits",1);
+    if(!allowance.allowed){
+      const status=allowance.reason==="unauthorized"?401:allowance.reason==="commercial_migration_required"?503:402;
+      return NextResponse.json({error:allowance.reason,meter:"ai_video_credits",required:1,commercial:allowance.context},{status});
+    }
+
     const requested = Number(body.durationSeconds) || 8;
     const durationSeconds = ([4, 6, 8].includes(requested) ? requested : 8) as 4 | 6 | 8;
     const resolution = (["720p", "1080p", "4k"].includes(body.resolution) ? body.resolution : "720p") as "720p" | "1080p" | "4k";
@@ -19,7 +26,15 @@ export async function POST(request: Request) {
       aspectRatio: body.aspectRatio === "16:9" ? "16:9" : "9:16",
       resolution,
     });
-    return NextResponse.json({ configured: true, operation });
+    const usage=await recordUsage({
+      meter:"ai_video_credits",
+      quantity:1,
+      businessId:typeof body.businessId==="string"?body.businessId:null,
+      source:"veo_video",
+      idempotencyKey:typeof body.requestId==="string"&&body.requestId?`video:${body.requestId}`:undefined,
+      metadata:{durationSeconds,resolution,aspectRatio:body.aspectRatio==="16:9"?"16:9":"9:16",operationName:operation?.name||null},
+    });
+    return NextResponse.json({ configured: true, operation, commercialUsage:usage });
   } catch (error) {
     console.error("Veo start failed", error);
     return NextResponse.json({ error: "video_generation_failed" }, { status: 500 });
