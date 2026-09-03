@@ -48,9 +48,10 @@ export function normalizeForSpeech(
   replaceCurrency(new RegExp(`(${groupedNumber})\\s*(?:₾|GEL\\b)`,"giu"),"լարի");
   replaceCurrency(new RegExp(`(?:₾|GEL\\b)\\s*(${groupedNumber})`,"giu"),"լարի");
 
-  spokenText = spokenText.replace(/\$\s*([0-9]+(?:[,.][0-9]+)?)\s*([kKmM])?/g, (source, raw, suffix) => {
-    const normalizedRaw=String(raw).replace(",",".");
-    const base = Number(normalizedRaw);
+  // A comma in a dollar token is treated as a thousands separator; a dot is decimal.
+  // This keeps `$14,900` distinct from `$14.9` while preserving `$115.5K` exactly.
+  spokenText = spokenText.replace(/\$\s*((?:[0-9]{1,3}(?:,[0-9]{3})+)|(?:[0-9]+(?:\.[0-9]+)?))\s*([kKmM])?/g, (source, raw, suffix) => {
+    const base = numericValue(String(raw));
     const multiplier = suffix?.toLowerCase() === "k" ? 1_000 : suffix?.toLowerCase() === "m" ? 1_000_000 : 1;
     const value = base * multiplier;
     if(!Number.isFinite(value))return source;
