@@ -29,6 +29,7 @@ import "./correction-consent.css";
 import "./quality.css";
 import "./login.css";
 import "./product-ui.css";
+import "./product-ui-legacy.css";
 
 export const metadata: Metadata = {
   title: "HAY Engine — AI Marketing Autopilot for Armenia",
