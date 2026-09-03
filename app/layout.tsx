@@ -3,7 +3,6 @@ import "./globals.css";
 import "./landing-v5.css";
 import "./creator.css";
 import "./marketing.css";
-import "./marketing-v2.css";
 import "./competitor-intel.css";
 import "./studio-status.css";
 import "./studio-commercial.css";
@@ -29,6 +28,7 @@ import "./correction-lab.css";
 import "./correction-consent.css";
 import "./quality.css";
 import "./login.css";
+import "./product-ui.css";
 
 export const metadata: Metadata = {
   title: "HAY Engine — AI Marketing Autopilot for Armenia",
