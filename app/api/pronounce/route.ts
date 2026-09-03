@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getPronunciationEntries, HAY_PRONUNCIATION_VERSION, pronounceArmenian } from "@/lib/hay/pronunciation-registry";
-import { currentPronunciationOwner, loadPersistentPronunciations, pronunciationRegistryReady } from "@/lib/hay/pronunciation-store";
+import { getPronunciationEntries, HAY_PRONUNCIATION_VERSION } from "@/lib/hay/pronunciation-registry";
+import { currentPronunciationOwner, normalizeWithPronunciationRegistry, pronunciationRegistryReady } from "@/lib/hay/pronunciation-store";
 import type { Dialect } from "@/lib/hay/types";
 
 export const runtime = "nodejs";
@@ -23,9 +23,13 @@ export async function POST(request: Request) {
   const dialect: Dialect = body.dialect === "western" ? "western" : "eastern";
   const owner=await currentPronunciationOwner();
   const businessId=typeof body.businessId==="string"?body.businessId:null;
-  const layer=await loadPersistentPronunciations({ownerId:owner?.ownerId,businessId,dialect});
+  const result=await normalizeWithPronunciationRegistry({text,locale:"hy",dialect,ownerId:owner?.ownerId,businessId});
+  const version=result.registry.version!=="core"?`${HAY_PRONUNCIATION_VERSION}+${result.registry.version}`:HAY_PRONUNCIATION_VERSION;
   return NextResponse.json({
-    ...pronounceArmenian(text,dialect,layer.overrides,layer.version),
-    registry:{persistent:layer.configured,appliedEntries:layer.entries.length,businessApplied:Boolean(layer.validBusiness)},
+    version,
+    locale:"hy-AM",
+    dialect,
+    ...result.normalized,
+    registry:result.registry,
   });
 }
