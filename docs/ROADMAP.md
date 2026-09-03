@@ -44,9 +44,11 @@ This file tracks what is actually missing in the current repository. Completed i
 - [x] business-domain Armenian regression packs
 - [x] Armenian/English code-switch regression coverage
 - [x] commercial currency / brand-suffix / social-name regression pack
-- [ ] STT provider benchmark and routing
-- [ ] Armenian transcript correction layer
-- [ ] pronunciation management UI backed by versioned dictionary entries
+- [x] Armenian transcript correction layer with protected-value fail-safe
+- [x] versioned core pronunciation registry + inspectable pronunciation API
+- [x] Language Lab for pronunciation / transcription / captions / translation testing
+- [ ] STT provider benchmark and quality/cost routing (OpenAI adapter is live; Chirp 3 is the next benchmark adapter)
+- [ ] pronunciation management UI backed by persistent reviewed entries
 - [ ] reviewed Western Armenian evaluation set
 - [ ] larger Armenian/Russian/English code-switch benchmark
 - [ ] reviewed Armenia names / brands / places pronunciation graph
@@ -73,15 +75,16 @@ This file tracks what is actually missing in the current repository. Completed i
 ## Phase 4 — API and proprietary data moat
 
 - [x] `/normalize`
+- [x] `/pronounce` + versioned core pronunciation registry
 - [x] `/voice`
+- [x] `/transcribe` with Armenian post-correction
+- [x] standalone `/captions` with cues + SRT + WebVTT
+- [x] `/translate` with Armenian-first syntax and protected-value preservation
 - [x] model/quality dashboard via `/quality` and `/api/quality`
+- [x] interactive `/language` Language Lab surface
 - [ ] public developer authentication / API keys
-- [ ] `/pronounce`
-- [ ] `/transcribe`
-- [ ] standalone `/captions`
-- [ ] `/translate`
 - [ ] API usage metering distinct from Studio subscriptions
-- [ ] versioned pronunciation dictionaries
+- [ ] persistent versioned pronunciation dictionary management
 - [ ] dataset provenance and license registry in persistence
 - [ ] fine-tuned Armenian speech/language components only where blind benchmarks justify them
 

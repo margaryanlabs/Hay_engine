@@ -21,6 +21,7 @@ import "./studio-campaign-analytics.css";
 import "./studio-experiment-runner.css";
 import "./studio-conversion.css";
 import "./voice-lab.css";
+import "./language-lab.css";
 import "./quality.css";
 import "./login.css";
 

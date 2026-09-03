@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { planEnforcementEnabled } from "@/lib/commercial/entitlements";
 import { getConnectorReadiness } from "@/lib/marketing/connectors";
 import { isPublishWorkerConfigured } from "@/lib/publish/client";
+import { isOpenAITranscriptionConfigured } from "@/lib/providers/openai-transcription";
 import { isVeoConfigured } from "@/lib/providers/veo";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
@@ -16,6 +17,17 @@ export async function GET() {
     image: Boolean(process.env.OPENAI_API_KEY),
     voice: Boolean(process.env.ELEVENLABS_API_KEY && (process.env.ELEVENLABS_VOICE_ID || process.env.ELEVENLABS_VOICE_ID_MALE || process.env.ELEVENLABS_VOICE_ID_FEMALE)) || Boolean(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION),
     video: isVeoConfigured(),
+    transcription: isOpenAITranscriptionConfigured(),
+    translation: Boolean(process.env.OPENAI_API_KEY),
+  };
+  const languageApi = {
+    normalize:true,
+    pronounce:true,
+    captions:true,
+    transcribe:providers.transcription,
+    transcriptCorrection:Boolean(process.env.OPENAI_API_KEY),
+    translate:providers.translation,
+    unauthenticatedProviderAccess:process.env.HAY_ALLOW_UNAUTHENTICATED_LANGUAGE_API === "true",
   };
   const workers = {
     render: Boolean(process.env.RENDER_WORKER_URL && process.env.RENDER_WORKER_SECRET),
@@ -53,6 +65,7 @@ export async function GET() {
     commercialReady,
     persistence: { supabase, admin },
     providers,
+    languageApi,
     workers,
     social,
     commercial:{
@@ -69,6 +82,7 @@ export async function GET() {
       ...(commercialMigration&&!billingSync ? ["billing_sync_secret_required"] : []),
       ...(commercialMigration&&!planEnforcementEnabled() ? ["plan_enforcement_disabled"] : []),
       ...(!checkout.creator||!checkout.growth||!checkout.business ? ["paid_checkout_links_required"] : []),
+      ...(!providers.transcription ? ["openai_key_required_for_transcription"] : []),
     ],
   });
 }

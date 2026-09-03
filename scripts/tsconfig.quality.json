@@ -15,10 +15,12 @@
     "../lib/hay/quality-suite.ts",
     "../lib/hay/quality-benchmark.ts",
     "../lib/hay/quality-business-pack.ts",
+    "../lib/hay/quality-commerce-pack.ts",
     "../lib/hay/conversational.ts",
     "../lib/hay/normalize.ts",
     "../lib/hay/dictionary.ts",
     "../lib/hay/numbers.ts",
+    "../lib/hay/protected-values.ts",
     "../lib/hay/types.ts"
   ]
 }
