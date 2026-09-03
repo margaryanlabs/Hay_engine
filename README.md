@@ -10,6 +10,9 @@ HAY Engine is an Armenian-first AI language, creator and marketing operating sys
 - deterministic versioned Armenian pronunciation core
 - persistent pronunciation registry with precedence `business → account → HAY-reviewed system → curated core`
 - `/pronunciations` Dictionary Console for owner/business overrides, provenance and live testing
+- `/corrections` Teach HAY workflow for private-by-default Armenian corrections and explicit reuse consent
+- consent-aware correction review with separate product-improvement, benchmark and model-training permissions
+- provenance-tracked general dataset registry with withdrawal and append-only audit history
 - speech-safe normalization for commercial numbers, currencies, brands, suffixes and code-switching
 - Armenian file transcription through a replaceable STT provider adapter
 - HAY transcript correction with protected-value fail-safe
@@ -93,6 +96,8 @@ The app works without provider keys in demo mode. Persistent Studio becomes auth
 - `POST /api/normalize` — create speech-safe Armenian representation using the active persistent pronunciation layer when available
 - `GET/POST /api/pronounce` — inspect the curated core or pronounce arbitrary text through the active runtime registry
 - `GET/POST/DELETE /api/pronunciations` — owner-scoped persistent pronunciation management
+- `GET/POST/DELETE /api/language/corrections` — owner correction history, private/consented submission and withdrawal
+- `GET/POST /api/language/corrections/review` — reviewer-only consented correction queue and decisions
 - `POST /api/transcribe` — transcribe an uploaded audio/video file and run Armenian transcript correction
 - `POST /api/captions` — create caption cues plus SRT and WebVTT from text or provider alignment
 - `POST /api/translate` — translate HY / EN / RU with protected-value preservation
@@ -114,7 +119,7 @@ Use `Authorization: Bearer hay_live_...` or `x-hay-api-key: hay_live_...` from a
 - `POST /api/image` — generate a vertical scene visual when OpenAI is configured
 - `POST /api/video` — start a metered Veo scene generation
 - `GET /api/health` — inspect provider/runtime readiness
-- `GET /api/setup/status` — inspect provider, Language API/data, developer API, worker, social and commercial go-live readiness
+- `GET /api/setup/status` — inspect provider, Language API/data, consent flywheel, developer API, worker, social and commercial go-live readiness
 - `POST /api/marketing/plan` — create, persist and meter a marketing plan
 - `POST /api/marketing/autopilot` — create the HAY analyze→plan→create→approve→publish→learn run
 - `GET/PATCH /api/social/connections` — inspect connections and publishing policies
@@ -142,10 +147,15 @@ Apply SQL in this order:
 8. `supabase/vault.sql`
 9. `supabase/007_commercial_core.sql`
 10. `supabase/008_language_registry.sql`
+11. `supabase/009_language_corrections_and_dataset_registry.sql`
 
 Migration 007 contains the commercial schema: entitlements, Studio usage, developer API keys and developer API usage. Developer credentials/usage are intentionally not available to `anon` or normal `authenticated` Data API clients; owner-facing routes authenticate the user first and then use the server-only admin client.
 
 Migration 008 adds the persistent pronunciation registry and append-only audit snapshots. The in-code curated dictionary remains the fallback, so missing database state never turns HAY pronunciation into an empty registry. Private account/business pronunciation data is operational configuration and is not promoted into global system/training data by default.
+
+Migration 009 adds consent-aware human corrections, correction audit snapshots, the general `dataset_records` provenance registry and dataset audit snapshots. Corrections are private-by-default: product-improvement consent is required before a correction can enter the reviewer queue or reviewed HAY data. Benchmark and model-training permissions are separate flags and cannot bypass that requirement. Withdrawal revokes linked dataset eligibility.
+
+Configure reviewer access with server-only `HAY_LANGUAGE_REVIEWER_EMAILS`. Do not prefix it with `NEXT_PUBLIC_`.
 
 Do not set `HAY_ENFORCE_PLANS=true` until migration 007 is applied and the billing sync path has been verified. Do not set `HAY_DEVELOPER_API_ENABLED=true` until the developer tables exist, a positive hourly request limit is configured, and the API has been smoke-tested with a revocable key.
 
@@ -155,7 +165,7 @@ HAY does not hard-code one payment company. Configure HTTPS hosted checkout URLs
 
 ## Armenian quality
 
-`npm run quality` is a release gate. It covers natural Eastern Armenian, Yerevan-casual transformations, business domains, code-switching, currencies, exact commercial values, brand/suffix pronunciation and runtime pronunciation override behavior. `/quality` exposes the deterministic report.
+`npm run quality` is a release gate. It covers natural Eastern Armenian, Yerevan-casual transformations, business domains, code-switching, currencies, exact commercial values, brand/suffix pronunciation, runtime pronunciation override behavior and correction-consent policy invariants. `/quality` exposes the deterministic language report.
 
 Provider STT/translation output is not trusted blindly: HAY adds transcript/translation preservation checks around commercial values and code-switched brand tokens. `/benchmark` is the separate blinded native-speaker evidence layer.
 
@@ -167,6 +177,7 @@ Internal regression scores are not independent proof that HAY is the world's bes
 - [`docs/CREATOR_ENGINE.md`](docs/CREATOR_ENGINE.md)
 - [`docs/ARMENIAN_QUALITY.md`](docs/ARMENIAN_QUALITY.md)
 - [`docs/PRONUNCIATION_REGISTRY.md`](docs/PRONUNCIATION_REGISTRY.md)
+- [`docs/LANGUAGE_CORRECTIONS.md`](docs/LANGUAGE_CORRECTIONS.md)
 - [`docs/MARKETING_OS.md`](docs/MARKETING_OS.md)
 - [`docs/NATIVE_BENCHMARK.md`](docs/NATIVE_BENCHMARK.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
@@ -174,8 +185,8 @@ Internal regression scores are not independent proof that HAY is the world's bes
 
 ## Dataset strategy
 
-See [`docs/DATASET_SCHEMA.md`](docs/DATASET_SCHEMA.md). Proprietary datasets should only use licensed, curated, public-domain/compatible or explicitly consented material with clear provenance. Private customer content and private pronunciation overrides are not training data by default.
+See [`docs/DATASET_SCHEMA.md`](docs/DATASET_SCHEMA.md) and [`docs/LANGUAGE_CORRECTIONS.md`](docs/LANGUAGE_CORRECTIONS.md). Proprietary datasets should only use licensed, curated, public-domain/compatible or explicitly consented material with clear provenance. Private customer content, private pronunciation overrides and no-consent corrections are not training data by default.
 
 ## Philosophy
 
-We do **not** need to train an Armenian frontier model from scratch. HAY uses strong foundation models as interchangeable providers and owns the missing Armenian-specific layer around them: normalization, pronunciation, dialect handling, code-switching, proprietary reviewed language memory, typography, transcript correction, translation safeguards, evaluation, developer infrastructure, business context, workflow, outcome memory and eventually targeted fine-tuned components where measured benchmarks justify them.
+We do **not** need to train an Armenian frontier model from scratch. HAY uses strong foundation models as interchangeable providers and owns the missing Armenian-specific layer around them: normalization, pronunciation, dialect handling, code-switching, consented human correction, provenance, proprietary reviewed language memory, typography, transcript correction, translation safeguards, evaluation, developer infrastructure, business context, workflow, outcome memory and eventually targeted fine-tuned components where measured benchmarks and eligible consented data justify them.
