@@ -78,8 +78,10 @@ assert.deepEqual(
 );
 
 const meteredProviderRoutes = [
+  "app/api/business/analyze/route.ts",
   "app/api/marketing/autopilot/route.ts",
   "app/api/marketing/campaign/route.ts",
+  "app/api/marketing/experiment/route.ts",
 ];
 for (const route of meteredProviderRoutes) {
   const source = readFileSync(route, "utf8");
@@ -124,11 +126,20 @@ assert.match(
   "Provider operation ownership must be resolved from the authenticated owner's durable usage ledger",
 );
 
+const voiceRouteSource = readFileSync("app/api/voice/route.ts", "utf8");
+const voicePreflightCall = voiceRouteSource.indexOf("await checkUsageAllowance(\"voice_minutes\",preflightMinutes)");
+const voiceNaturalizerCall = voiceRouteSource.indexOf("await naturalizeArmenianText(text,style)");
+assert.ok(
+  voicePreflightCall >= 0 && voiceNaturalizerCall > voicePreflightCall,
+  "Voice allowance must be checked before the OpenAI-backed Armenian naturalizer can run",
+);
+
 console.log(JSON.stringify({
   securityPolicy: "passed",
-  cases: 14,
+  cases: 19,
   providerCostRoutes: meteredProviderRoutes,
   usageBusinessOwnership: true,
   productionProviderFailClosed: true,
   veoOperationOwnership: true,
+  voicePreProviderGate: true,
 }, null, 2));
