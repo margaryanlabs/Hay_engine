@@ -26,6 +26,7 @@ import "./native-benchmark.css";
 import "./developer.css";
 import "./pronunciation-console.css";
 import "./correction-lab.css";
+import "./correction-consent.css";
 import "./quality.css";
 import "./login.css";
 
