@@ -24,6 +24,7 @@ import "./voice-lab.css";
 import "./language-lab.css";
 import "./native-benchmark.css";
 import "./developer.css";
+import "./pronunciation-console.css";
 import "./quality.css";
 import "./login.css";
 
