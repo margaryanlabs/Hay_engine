@@ -6,6 +6,7 @@ export const runtime="nodejs";
 
 const plans=["free","creator","growth","business","agency"] as const;
 const statuses=["active","trialing","past_due","canceled","paused"] as const;
+const MAX_EVENT_FUTURE_SKEW_MS=10*60*1000;
 
 function secretMatches(header:string|null){
   const configured=process.env.HAY_BILLING_SYNC_SECRET||"";
@@ -25,6 +26,14 @@ function isoOrNull(value:unknown){
   return Number.isNaN(date.getTime())?null:date.toISOString();
 }
 
+function object(value:unknown):Record<string,unknown>{
+  return value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{};
+}
+
+function cleanText(value:unknown,max:number){
+  return typeof value==="string"?value.trim().slice(0,max):"";
+}
+
 export async function POST(request:Request){
   if(!secretMatches(request.headers.get("authorization")))return NextResponse.json({error:"unauthorized"},{status:401});
   if(!isSupabaseAdminConfigured())return NextResponse.json({error:"supabase_admin_required"},{status:503});
@@ -32,39 +41,67 @@ export async function POST(request:Request){
   const body=await request.json().catch(()=>({}));
   const ownerId=String(body.ownerId||"");
   const plan=String(body.plan||"");
-  const status=String(body.status||"active");
+  const status=String(body.status||"");
+  const provider=cleanText(body.provider,64);
+  const providerEventId=cleanText(body.providerEventId,255);
+  const providerEventCreatedAt=isoOrNull(body.providerEventCreatedAt);
+  const periodStart=isoOrNull(body.currentPeriodStart);
+  const periodEnd=isoOrNull(body.currentPeriodEnd);
+
   if(!validUuid(ownerId))return NextResponse.json({error:"invalid_owner_id"},{status:400});
   if(!plans.includes(plan as (typeof plans)[number]))return NextResponse.json({error:"invalid_plan"},{status:400});
   if(!statuses.includes(status as (typeof statuses)[number]))return NextResponse.json({error:"invalid_status"},{status:400});
-
-  const now=new Date();
-  const defaultStart=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1)).toISOString();
-  const defaultEnd=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,1)).toISOString();
-  const periodStart=isoOrNull(body.currentPeriodStart)||defaultStart;
-  const periodEnd=isoOrNull(body.currentPeriodEnd)||defaultEnd;
-  if(new Date(periodEnd)<=new Date(periodStart))return NextResponse.json({error:"invalid_billing_period"},{status:400});
+  if(!provider)return NextResponse.json({error:"provider_required"},{status:400});
+  if(!providerEventId)return NextResponse.json({error:"provider_event_id_required"},{status:400});
+  if(!providerEventCreatedAt)return NextResponse.json({error:"provider_event_created_at_required"},{status:400});
+  if(new Date(providerEventCreatedAt).getTime()>Date.now()+MAX_EVENT_FUTURE_SKEW_MS)return NextResponse.json({error:"provider_event_time_in_future"},{status:400});
+  if(!periodStart||!periodEnd||new Date(periodEnd)<=new Date(periodStart))return NextResponse.json({error:"invalid_billing_period"},{status:400});
 
   const overrides=body.overrides&&typeof body.overrides==="object"&&!Array.isArray(body.overrides)?body.overrides:{};
   const allowedOverrideKeys=["brands","channels","contentAssets","aiVideoCredits","voiceMinutes"];
   const cleanOverrides=Object.fromEntries(Object.entries(overrides).filter(([key,value])=>allowedOverrideKeys.includes(key)&&Number.isFinite(Number(value))&&Number(value)>=0).map(([key,value])=>[key,Number(value)]));
 
   const admin=createAdminClient();
-  const {data:user,error:userError}=await admin.auth.admin.getUserById(ownerId);
-  if(userError||!user?.user)return NextResponse.json({error:"owner_not_found"},{status:404});
+  const {data,error}=await admin.rpc("hay_apply_billing_entitlement",{
+    p_owner_id:ownerId,
+    p_plan_id:plan,
+    p_status:status,
+    p_provider:provider,
+    p_provider_customer_id:cleanText(body.providerCustomerId,255)||null,
+    p_provider_subscription_id:cleanText(body.providerSubscriptionId,255)||null,
+    p_current_period_start:periodStart,
+    p_current_period_end:periodEnd,
+    p_overrides:cleanOverrides,
+    p_event_id:providerEventId,
+    p_event_created_at:providerEventCreatedAt,
+  });
+  if(error){
+    console.error("Atomic billing sync RPC failed",error.message);
+    return NextResponse.json({error:"billing_sync_migration_required"},{status:503});
+  }
 
-  const {data,error}=await admin.from("account_entitlements").upsert({
-    owner_id:ownerId,
-    plan_id:plan,
-    status,
-    provider:typeof body.provider==="string"?body.provider.slice(0,64):null,
-    provider_customer_id:typeof body.providerCustomerId==="string"?body.providerCustomerId.slice(0,255):null,
-    provider_subscription_id:typeof body.providerSubscriptionId==="string"?body.providerSubscriptionId.slice(0,255):null,
-    current_period_start:periodStart,
-    current_period_end:periodEnd,
-    overrides:cleanOverrides,
-    updated_at:new Date().toISOString(),
-  },{onConflict:"owner_id"}).select("owner_id,plan_id,status,current_period_start,current_period_end,updated_at").single();
-  if(error)return NextResponse.json({error:"entitlement_sync_failed",detail:error.message},{status:500});
+  const result=object(data);
+  const reason=String(result.reason||"");
+  if(reason==="owner_not_found")return NextResponse.json({error:reason},{status:404});
+  if(reason&&!["duplicate_event","stale_event"].includes(reason)&&result.applied!==true){
+    return NextResponse.json({error:reason||"entitlement_sync_failed"},{status:400});
+  }
 
-  return NextResponse.json({ok:true,entitlement:data},{headers:{"Cache-Control":"no-store"}});
+  // Duplicate and stale verified events are acknowledged as successfully processed so
+  // billing providers do not retry forever. `applied` tells the adapter whether state moved.
+  return NextResponse.json({
+    ok:true,
+    applied:result.applied===true,
+    duplicate:result.duplicate===true,
+    stale:result.stale===true,
+    eventId:result.eventId||null,
+    entitlement:{
+      planId:result.planId||null,
+      status:result.status||null,
+      currentPeriodStart:result.currentPeriodStart||periodStart,
+      currentPeriodEnd:result.currentPeriodEnd||periodEnd,
+      billingEventCreatedAt:result.billingEventCreatedAt||null,
+      billingEventId:result.billingEventId||null,
+    },
+  },{headers:{"Cache-Control":"no-store"}});
 }
