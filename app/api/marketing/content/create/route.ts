@@ -19,6 +19,10 @@ function estimatedVoiceMinutes(text:string){
   return Math.max(0.1,Math.round((words/135)*1000)/1000);
 }
 
+function allowanceStatus(reason:string|undefined){
+  return reason==="unauthorized"?401:reason==="commercial_migration_required"?503:402;
+}
+
 async function uploadPrivateAsset(args: { supabase: Awaited<ReturnType<typeof createClient>>; userId: string; bytes: Uint8Array; contentType: string; extension: string }) {
   const objectPath = `${args.userId}/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${args.extension}`;
   const { error } = await args.supabase.storage.from("hay-assets").upload(objectPath, args.bytes, { contentType: args.contentType, upsert: false, cacheControl: "3600" });
@@ -75,8 +79,7 @@ export async function POST(request: Request) {
     if(force){
       const allowance=await checkUsageAllowance("content_assets",1);
       if(!allowance.allowed){
-        const status=allowance.reason==="unauthorized"?401:allowance.reason==="commercial_migration_required"?503:402;
-        return NextResponse.json({error:allowance.reason,meter:"content_assets",required:1,commercial:allowance.context},{status});
+        return NextResponse.json({error:allowance.reason,meter:"content_assets",required:1,commercial:allowance.context},{status:allowanceStatus(allowance.reason)});
       }
     }
 
@@ -106,41 +109,65 @@ export async function POST(request: Request) {
     let audioSrc: string | undefined;
     let voiceUsage:{recorded:boolean;reason?:string;duplicate?:boolean}|null=null;
     if(language==="hy"){
-      const style=(body.speechStyle==="standard"||body.speechStyle==="yerevan"?body.speechStyle:"natural") as ArmenianSpeechStyle;
-      const naturalized=await naturalizeArmenianText(project.voice.text,style);
-      const normalized=normalizeForSpeech(naturalized.text,"hy","eastern");
       const voice=resolveVoice(body.voiceId?String(body.voiceId):undefined);
-      const minutes=estimatedVoiceMinutes(normalized.spokenText);
       if(voice){
-        const allowance=await checkUsageAllowance("voice_minutes",minutes);
-        if(!allowance.allowed){
+        const preflightMinutes=estimatedVoiceMinutes(project.voice.text);
+        const preflight=await checkUsageAllowance("voice_minutes",preflightMinutes);
+        if(!preflight.allowed){
           await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
-          const status=allowance.reason==="unauthorized"?401:allowance.reason==="commercial_migration_required"?503:402;
-          return NextResponse.json({error:allowance.reason,meter:"voice_minutes",required:minutes,commercial:allowance.context,projectId:project.id},{status});
+          return NextResponse.json({error:preflight.reason,meter:"voice_minutes",required:preflightMinutes,commercial:preflight.context,projectId:project.id},{status:allowanceStatus(preflight.reason)});
         }
-      }
-      const speech=voice ? await createArmenianSpeech({text:normalized.spokenText,provider:voice.provider,providerVoiceId:voice.providerVoiceId}) : null;
-      if(speech?.audioBase64){
-        const aligned=buildAlignedCaptionCues(speech.alignment);
-        if(aligned?.length) project={...project,captions:aligned,voice:{...project.voice,text:normalized.spokenText}};
-        audioSrc=await uploadPrivateAsset({supabase,userId,bytes:Uint8Array.from(Buffer.from(speech.audioBase64,"base64")),contentType:speech.contentType,extension:"mp3"});
-        voiceUsage=await recordUsage({
-          meter:"voice_minutes",
-          quantity:minutes,
-          businessId:String(business.id),
-          source:"content_factory_voice",
-          idempotencyKey:`content-voice:${content.id}:${project.id}`,
-          metadata:{contentItemId:content.id,projectId:project.id,provider:voice?.provider||speech.provider,voiceId:voice?.id||null,style,duration},
-        });
+
+        const style=(body.speechStyle==="standard"||body.speechStyle==="yerevan"?body.speechStyle:"natural") as ArmenianSpeechStyle;
+        const naturalized=await naturalizeArmenianText(project.voice.text,style);
+        const normalized=normalizeForSpeech(naturalized.text,"hy","eastern");
+        const minutes=estimatedVoiceMinutes(normalized.spokenText);
+        if(minutes>preflightMinutes){
+          const allowance=await checkUsageAllowance("voice_minutes",minutes);
+          if(!allowance.allowed){
+            await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
+            return NextResponse.json({error:allowance.reason,meter:"voice_minutes",required:minutes,commercial:allowance.context,projectId:project.id},{status:allowanceStatus(allowance.reason)});
+          }
+        }
+
+        const speech=await createArmenianSpeech({text:normalized.spokenText,provider:voice.provider,providerVoiceId:voice.providerVoiceId});
+        if(speech?.audioBase64){
+          const aligned=buildAlignedCaptionCues(speech.alignment);
+          if(aligned?.length) project={...project,captions:aligned,voice:{...project.voice,text:normalized.spokenText}};
+          audioSrc=await uploadPrivateAsset({supabase,userId,bytes:Uint8Array.from(Buffer.from(speech.audioBase64,"base64")),contentType:speech.contentType,extension:"mp3"});
+          voiceUsage=await recordUsage({
+            meter:"voice_minutes",
+            quantity:minutes,
+            businessId:String(business.id),
+            source:"content_factory_voice",
+            idempotencyKey:`content-voice:${content.id}:${project.id}`,
+            metadata:{contentItemId:content.id,projectId:project.id,language,provider:voice.provider,voiceId:voice.id,style,duration},
+          });
+        }
       }
     } else {
       const voiceId=String(body.providerVoiceId||process.env.ELEVENLABS_VOICE_ID||"")||undefined;
       if(voiceId){
+        const minutes=estimatedVoiceMinutes(project.voice.text);
+        const allowance=await checkUsageAllowance("voice_minutes",minutes);
+        if(!allowance.allowed){
+          await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
+          return NextResponse.json({error:allowance.reason,meter:"voice_minutes",required:minutes,commercial:allowance.context,projectId:project.id},{status:allowanceStatus(allowance.reason)});
+        }
+
         const speech=await createElevenSpeech(project.voice.text,voiceId);
         if(speech?.audioBase64){
           const aligned=buildAlignedCaptionCues(speech.alignment);
           if(aligned?.length) project={...project,captions:aligned};
           audioSrc=await uploadPrivateAsset({supabase,userId,bytes:Uint8Array.from(Buffer.from(speech.audioBase64,"base64")),contentType:speech.contentType,extension:"mp3"});
+          voiceUsage=await recordUsage({
+            meter:"voice_minutes",
+            quantity:minutes,
+            businessId:String(business.id),
+            source:"content_factory_voice",
+            idempotencyKey:`content-voice:${content.id}:${project.id}`,
+            metadata:{contentItemId:content.id,projectId:project.id,language,provider:"elevenlabs",voiceId,duration},
+          });
         }
       }
     }
@@ -150,7 +177,7 @@ export async function POST(request: Request) {
     await Promise.all(visualScenes.map(async scene => {
       const image = await generateSceneImage(scene.asset.prompt);
       if (!image?.b64) return;
-      sceneImages[scene.id] = await uploadPrivateAsset({ supabase, userId, bytes: Uint8Array.from(Buffer.from(image.b64, "base64")), contentType: "image/png", extension: "png" });
+      sceneImages[scene.id] = await uploadPrivateAsset({ supabase, userId, bytes: Uint8Array.from(Buffer.from(image.b64,"base64")), contentType: "image/png", extension: "png" });
     }));
 
     await supabase.from("creator_projects").update({ manifest: project, status: "renderable", updated_at: new Date().toISOString() }).eq("id", project.id);
