@@ -42,7 +42,7 @@ export async function POST(request:Request){
   const ownerId=String(body.ownerId||"");
   const plan=String(body.plan||"");
   const status=String(body.status||"");
-  const provider=cleanText(body.provider,64);
+  const provider=cleanText(body.provider,64).toLowerCase();
   const providerEventId=cleanText(body.providerEventId,255);
   const providerEventCreatedAt=isoOrNull(body.providerEventCreatedAt);
   const periodStart=isoOrNull(body.currentPeriodStart);
