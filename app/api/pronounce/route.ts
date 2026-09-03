@@ -27,8 +27,6 @@ export async function POST(request: Request) {
   const version=result.registry.version!=="core"?`${HAY_PRONUNCIATION_VERSION}+${result.registry.version}`:HAY_PRONUNCIATION_VERSION;
   return NextResponse.json({
     version,
-    locale:"hy-AM",
-    dialect,
     ...result.normalized,
     registry:result.registry,
   });
