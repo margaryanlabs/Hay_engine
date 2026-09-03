@@ -3,6 +3,7 @@ export type UsageMeter = "content_assets" | "ai_video_credits" | "voice_minutes"
 export type UsagePolicyContext = {
   configured: boolean;
   authenticated: boolean;
+  allowUnauthenticatedProviderAccess: boolean;
   enforcementEnabled: boolean;
   migrationReady: boolean;
   status: string;
@@ -36,10 +37,13 @@ export function evaluateUsageAllowance(
   meter: UsageMeter,
   quantity = 1,
 ): UsageAllowanceDecision {
-  // Local/demo mode may run without Supabase. Once persistent identity is configured,
-  // provider-backed endpoints always require an authenticated account regardless of
-  // whether commercial plan enforcement has been switched on yet.
-  if (!context.configured) return { allowed: true };
+  // Local development may deliberately run without Supabase. Deployed builds fail
+  // closed unless the operator explicitly opts into unauthenticated provider access.
+  if (!context.configured) {
+    return context.allowUnauthenticatedProviderAccess
+      ? { allowed: true }
+      : { allowed: false, reason: "unauthorized" };
+  }
   if (!context.authenticated) return { allowed: false, reason: "unauthorized" };
 
   // HAY_ENFORCE_PLANS controls subscription/usage limits, not authentication.
