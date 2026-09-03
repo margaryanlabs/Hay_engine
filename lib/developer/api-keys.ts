@@ -17,6 +17,7 @@ function cleanScopes(value:unknown):HayDeveloperScope[]{
   return result.length?result:["language"];
 }
 function scopeAllows(scopes:string[],required:HayDeveloperScope){return scopes.includes("language")||scopes.includes(required);}
+function scopeOperation(scope:HayDeveloperScope){return scope.includes(":")?scope.split(":").at(-1)||scope:scope;}
 export function developerApiEnabled(){return process.env.HAY_DEVELOPER_API_ENABLED==="true";}
 export function developerApiHourlyLimit(){
   const value=Number(process.env.HAY_DEVELOPER_API_HOURLY_REQUEST_LIMIT||0);
@@ -31,11 +32,20 @@ export async function developerApiMigrationReady(){
   if(!isSupabaseAdminConfigured())return false;
   try{
     const admin=createAdminClient();
-    const [keys,usage]=await Promise.all([
+    const [keys,usage,atomic]=await Promise.all([
       admin.from("developer_api_keys").select("id",{head:true,count:"exact"}).limit(1),
       admin.from("developer_api_usage").select("id",{head:true,count:"exact"}).limit(1),
+      // Null IDs are a mutation-free capability probe: the RPC returns invalid_api_key
+      // when installed, while a missing migration returns an RPC error.
+      admin.rpc("hay_reserve_developer_api_request",{
+        p_owner_id:null,
+        p_api_key_id:null,
+        p_hourly_limit:1,
+        p_endpoint:"migration_probe",
+        p_operation:"probe",
+      }),
     ]);
-    return !keys.error&&!usage.error;
+    return !keys.error&&!usage.error&&!atomic.error;
   }catch{return false;}
 }
 
@@ -93,7 +103,7 @@ function requestKey(request:Request){
   return match?.[1]?.trim()||"";
 }
 
-export type DeveloperApiContext={keyId:string;ownerId:string;scopes:string[];planId:string;status:string};
+export type DeveloperApiContext={keyId:string;ownerId:string;scopes:string[];planId:string;status:string;usageId:string;hourlyCount:number};
 
 export async function authenticateDeveloperRequest(request:Request,requiredScope:HayDeveloperScope):Promise<{allowed:true;context:DeveloperApiContext}|{allowed:false;reason:string;status:number}>{
   if(!developerApiEnabled())return {allowed:false,reason:"developer_api_disabled",status:503};
@@ -110,34 +120,50 @@ export async function authenticateDeveloperRequest(request:Request,requiredScope
   const scopes=Array.isArray(key.scopes)?key.scopes.map(String):[];
   if(!scopeAllows(scopes,requiredScope))return {allowed:false,reason:"insufficient_scope",status:403};
 
-  const since=new Date(Date.now()-60*60*1000).toISOString();
-  const rate=await admin.from("developer_api_usage").select("id",{count:"exact",head:true}).eq("api_key_id",key.id).gte("created_at",since);
-  if(rate.error)return {allowed:false,reason:"developer_api_metering_unavailable",status:503};
-  if(Number(rate.count||0)>=hourlyLimit)return {allowed:false,reason:"developer_api_rate_limit_reached",status:429};
-
   const {data:entitlement,error:entitlementError}=await admin.from("account_entitlements").select("plan_id,status").eq("owner_id",key.owner_id).maybeSingle();
   if(entitlementError)return {allowed:false,reason:"commercial_entitlement_unavailable",status:503};
   const planId=String(entitlement?.plan_id||"free");
   const status=String(entitlement?.status||"active");
   if(planEnforcementEnabled()&&!["active","trialing"].includes(status))return {allowed:false,reason:"subscription_inactive",status:402};
-  await admin.from("developer_api_keys").update({last_used_at:new Date().toISOString()}).eq("id",key.id);
-  return {allowed:true,context:{keyId:String(key.id),ownerId:String(key.owner_id),scopes,planId,status}};
+
+  // This RPC is the authoritative rate-limit admission. It locks the API-key row,
+  // counts the rolling-hour ledger and inserts the accepted request in one transaction.
+  // Therefore provider routes cannot spend before a durable request slot exists.
+  const endpoint=new URL(request.url).pathname;
+  const operation=scopeOperation(requiredScope);
+  const {data:slot,error:slotError}=await admin.rpc("hay_reserve_developer_api_request",{
+    p_owner_id:String(key.owner_id),
+    p_api_key_id:String(key.id),
+    p_hourly_limit:hourlyLimit,
+    p_endpoint:endpoint,
+    p_operation:operation,
+  });
+  if(slotError)return {allowed:false,reason:"developer_api_atomic_rate_limit_migration_required",status:503};
+  const row=Array.isArray(slot)?slot[0]:slot;
+  if(!row?.allowed){
+    const reason=String(row?.reason||"developer_api_metering_unavailable");
+    const responseStatus=reason==="developer_api_rate_limit_reached"?429:reason==="invalid_api_key"||reason==="api_key_expired"?401:503;
+    return {allowed:false,reason,status:responseStatus};
+  }
+  const usageId=String(row.usage_id||"");
+  if(!usageId)return {allowed:false,reason:"developer_api_metering_unavailable",status:503};
+  return {allowed:true,context:{keyId:String(key.id),ownerId:String(key.owner_id),scopes,planId,status,usageId,hourlyCount:Number(row.current_count)||1}};
 }
 
 export async function recordDeveloperApiUsage(context:DeveloperApiContext,input:{endpoint:string;operation:string;inputChars?:number;audioBytes?:number;metadata?:Record<string,unknown>}){
-  if(!isSupabaseAdminConfigured())throw new Error("developer_api_metering_unconfigured");
-  const {error}=await createAdminClient().from("developer_api_usage").insert({
-    owner_id:context.ownerId,
-    api_key_id:context.keyId,
+  // The request_count slot already exists before route/provider work. This function only
+  // enriches that durable row with final request metrics. An enrichment failure must not
+  // pretend the provider call was unmetered or hide useful output behind a second 503.
+  if(!isSupabaseAdminConfigured())return {recorded:true,enriched:false,reason:"developer_api_usage_enrichment_unavailable"};
+  const {error}=await createAdminClient().from("developer_api_usage").update({
     endpoint:input.endpoint,
     operation:input.operation,
-    request_count:1,
     input_chars:Math.max(0,Math.round(Number(input.inputChars)||0)),
     audio_bytes:Math.max(0,Math.round(Number(input.audioBytes)||0)),
-    metadata:input.metadata||{},
-  });
-  if(error)throw new Error(`developer_api_usage_record_failed:${error.code||"unknown"}`);
-  return {recorded:true};
+    metadata:{...(input.metadata||{}),state:"completed"},
+  }).eq("id",context.usageId).eq("owner_id",context.ownerId).eq("api_key_id",context.keyId);
+  if(error)return {recorded:true,enriched:false,reason:`developer_api_usage_enrichment_failed:${error.code||"unknown"}`};
+  return {recorded:true,enriched:true};
 }
 
 export async function developerUsageSummary(ownerId:string){
