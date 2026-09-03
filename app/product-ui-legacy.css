@@ -1,0 +1,23 @@
+/* Compatibility bridge for older Studio modules that still declare local neon tokens. */
+:where(
+  .studioStatusRail,.studioCommandPalette,.studioOnboarding,.studioDecisionConsole,.studioTodayBrief,
+  .studioScheduleQueue,.studioPublishingPolicy,.studioContentMemory,.studioWorkspaceSwitcher,.studioContentSeries,
+  .studioCampaignBrain,.studioCampaignAnalytics,.studioExperimentRunner,.studioConversionBridge
+){
+  --green:var(--hay-accent)!important;
+  --accent:var(--hay-accent)!important;
+  --warm:var(--hay-accent)!important;
+}
+.accountLink{font-size:9px;color:#777b84;text-decoration:none;letter-spacing:.08em;transition:color .2s ease}
+.accountLink:hover{color:var(--hay-text)}
+
+/* Neon-era hover/glow literals that are not variable-driven. */
+.studioStatusCells a:hover,.todayMetric.signal:hover{background:rgba(218,141,128,.025)!important}
+.studioStatusIntro span i,.studioStatusCells a.ready i,.todayMove>span i{background:var(--hay-success)!important;box-shadow:0 0 12px rgba(145,181,141,.42)!important}
+.todayMove button,.todayMetric.signal strong{color:var(--hay-accent)!important}
+.campaignHead>div:first-child>span i,.campaignAnalyticsHead>div:first-child>span i{background:var(--hay-accent)!important;box-shadow:0 0 14px rgba(218,141,128,.40)!important}
+.campaignState{background:linear-gradient(135deg,rgba(118,143,194,.04),transparent)!important}
+.campaignForm input:focus,.campaignForm select:focus,.campaignForm textarea:focus{border-color:rgba(218,141,128,.38)!important;box-shadow:0 0 0 2px rgba(218,141,128,.035)!important}
+
+/* Keep semantic health states green, never the primary product chrome. */
+.connectionLed.ready,.connectionLed.connected{background:var(--hay-success)!important;box-shadow:0 0 13px rgba(145,181,141,.42)!important}
