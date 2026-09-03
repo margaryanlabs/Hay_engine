@@ -61,14 +61,37 @@ for(const path of ["app/api/marketing/autopilot/route.ts","app/api/marketing/cam
   assert.ok(persist>=0&&resize>persist&&commit>resize,`${path} must resize reserved quota to the actual persisted asset count before commit`);
 }
 
-const meteredLanguageRoutes=["app/api/translate/route.ts","app/api/transcribe/route.ts"];
-for(const path of meteredLanguageRoutes){
-  const value=source(path);
-  assert.match(value,/checkLanguageProviderAccess\s*\(/,`${path} must preserve the language-specific auth/demo policy`);
-  assert.match(value,/checkUsageAllowance\s*\(/,`${path} must enforce bounded authenticated Studio usage before provider calls`);
-  assert.match(value,/recordUsage\s*\(/,`${path} must meter successful provider-backed language work`);
-}
-assert.match(source("app/api/translate/route.ts"),/MAX_TRANSLATE_CHARS\s*=\s*20_000/,"Studio translation must keep a hard per-request text size bound");
+const translateRouteSource=source("app/api/translate/route.ts");
+assert.match(translateRouteSource,/checkLanguageProviderAccess\s*\(/,"Translation must preserve the language-specific auth/demo policy");
+assert.doesNotMatch(translateRouteSource,/checkUsageAllowance\s*\(/,"Translation must not regress to a non-atomic allowance check");
+assert.doesNotMatch(translateRouteSource,/recordUsage\s*\(/,"Translation must not regress to record-at-end accounting");
+assert.match(translateRouteSource,/MAX_TRANSLATE_CHARS\s*=\s*20_000/,"Studio translation must keep a hard per-request text size bound");
+const translateReserve=translateRouteSource.indexOf("await reserveUsage(");
+const translateDuplicate=translateRouteSource.indexOf("if(next.duplicate)",translateReserve);
+const translateProvider=translateRouteSource.indexOf("await translateHayText(");
+const translateCommit=translateRouteSource.indexOf("await commitUsageReservation(",translateProvider);
+assert.ok(translateReserve>=0&&translateProvider>translateReserve,"Translation must reserve quota before provider-backed translation");
+assert.ok(translateDuplicate>translateReserve&&translateDuplicate<translateProvider,"Translation idempotency duplicates must stop before provider work");
+assert.ok(translateCommit>translateProvider,"Translation must commit reserved usage only after provider output exists");
+assert.match(translateRouteSource,/pendingReservation[\s\S]*?releaseUsageReservation\(pendingReservation\)/,"Translation must release still-pending quota on provider failure");
+assert.match(translateRouteSource,/translation_usage_commit_failed[\s\S]*?status:503/,"Translation must fail closed if completed provider work cannot commit usage");
+
+const transcribeRouteSource=source("app/api/transcribe/route.ts");
+assert.match(transcribeRouteSource,/checkLanguageProviderAccess\s*\(/,"Transcription must preserve the language-specific auth/demo policy");
+assert.doesNotMatch(transcribeRouteSource,/checkUsageAllowance\s*\(/,"Transcription must not regress to a non-atomic allowance check");
+assert.doesNotMatch(transcribeRouteSource,/recordUsage\s*\(/,"Transcription must not regress to record-at-end accounting");
+const transcribeFileValidation=transcribeRouteSource.indexOf("if (file.size>maxBytes)");
+const transcribeReserve=transcribeRouteSource.indexOf("await reserveUsage(");
+const transcribeDuplicate=transcribeRouteSource.indexOf("if(reservation.duplicate)",transcribeReserve);
+const transcribeProvider=transcribeRouteSource.indexOf("await transcribeWithOpenAI(");
+const transcribeCommit=transcribeRouteSource.indexOf("await commitUsageReservation(",transcribeProvider);
+assert.ok(transcribeFileValidation>=0&&transcribeReserve>transcribeFileValidation,"Transcription must validate upload size before occupying quota");
+assert.ok(transcribeProvider>transcribeReserve,"Transcription must reserve quota before sending audio to OpenAI");
+assert.ok(transcribeDuplicate>transcribeReserve&&transcribeDuplicate<transcribeProvider,"Transcription idempotency duplicates must stop before OpenAI spend");
+assert.ok(transcribeCommit>transcribeProvider,"Transcription must commit usage only after provider output exists");
+assert.match(transcribeRouteSource,/pendingReservation[\s\S]*?releaseUsageReservation\(pendingReservation\)/,"Transcription must release still-pending quota when provider work fails before output");
+assert.match(transcribeRouteSource,/transcription_usage_commit_failed[\s\S]*?status:503/,"Transcription must fail closed if completed provider work cannot commit usage");
+assert.match(transcribeRouteSource,/Armenian transcript correction skipped after successful transcription/,"A correction-layer failure must preserve successful raw transcription output");
 
 const entitlementSource=source("lib/commercial/entitlements.ts");
 assert.match(entitlementSource,/\.from\("businesses"\)[\s\S]*?\.eq\("id", input\.businessId\)[\s\S]*?\.eq\("owner_id", userId\)/,"recordUsage must verify requested business ownership before attaching business_id to usage");
@@ -160,12 +183,16 @@ assert.match(contentFactorySource,/pendingVoiceReservation[\s\S]*?releaseUsageRe
 
 console.log(JSON.stringify({
   securityPolicy:"passed",
-  cases:72,
+  cases:84,
   providerCostRoutes:atomicMarketingRoutes.map(item=>item.path),
-  meteredLanguageRoutes,
+  languageCostRoutes:["app/api/translate/route.ts","app/api/transcribe/route.ts"],
   marketingPlanningAtomic:true,
   marketingPlanningPreProviderIdempotency:true,
   marketingPlanExactResize:true,
+  languageUsageAtomic:true,
+  languagePreProviderIdempotency:true,
+  transcriptionValidationBeforeReservation:true,
+  transcriptionRawFallback:true,
   atomicBusinessOwnership:true,
   productionProviderFailClosed:true,
   veoOperationOwnership:true,

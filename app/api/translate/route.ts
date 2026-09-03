@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkUsageAllowance, recordUsage } from "@/lib/commercial/entitlements";
+import { commitUsageReservation, releaseUsageReservation, reserveUsage, type UsageReservation } from "@/lib/commercial/usage-reservations";
 import { checkLanguageProviderAccess } from "@/lib/hay/api-access";
 import { translateHayText } from "@/lib/hay/translate";
 import type { Locale } from "@/lib/hay/types";
@@ -8,11 +8,15 @@ export const runtime="nodejs";
 const locales:Locale[]=["hy","en","ru"];
 const MAX_TRANSLATE_CHARS=20_000;
 
-function allowanceStatus(reason:string|undefined){
-  return reason==="unauthorized"?401:reason==="commercial_migration_required"?503:402;
+function usageStatus(reason:string|undefined){
+  if(reason==="unauthorized")return 401;
+  if(reason==="request_in_progress"||reason==="duplicate_request")return 409;
+  if(reason==="commercial_migration_required"||reason==="atomic_usage_admin_required"||reason==="atomic_usage_migration_required"||reason==="atomic_usage_reservation_failed")return 503;
+  return 402;
 }
 
 export async function POST(request:Request){
+  let pendingReservation:UsageReservation|null=null;
   try{
     const body=await request.json();
     const text=String(body.text??"").trim();
@@ -24,34 +28,50 @@ export async function POST(request:Request){
     const source=(sourceRaw==="auto"?"auto":sourceRaw) as Locale|"auto";
     if(source!=="auto"&&!locales.includes(source))return NextResponse.json({error:"unsupported_source_language"},{status:400});
 
+    let reservation:UsageReservation|null=null;
     if(source!==target){
       const access=await checkLanguageProviderAccess();
       if(!access.allowed)return NextResponse.json({error:access.reason},{status:access.reason==="unauthorized"?401:403});
-      if(process.env.OPENAI_API_KEY&&access.context.configured&&access.context.authenticated){
-        const allowance=await checkUsageAllowance("content_assets",1);
-        if(!allowance.allowed){
-          return NextResponse.json({error:allowance.reason,meter:"content_assets",required:1,commercial:allowance.context},{status:allowanceStatus(allowance.reason)});
-        }
-      }
-    }
-
-    const result=await translateHayText({text,source,target});
-    if(!result.configured)return NextResponse.json({...result,error:"translation_provider_unconfigured"},{status:503});
-
-    const usage=source!==target&&result.generatedBy!=="identity"
-      ? await recordUsage({
+      if(process.env.OPENAI_API_KEY){
+        const requestId=typeof body.requestId==="string"?body.requestId.trim().slice(0,200):"";
+        const next=await reserveUsage({
           meter:"content_assets",
           quantity:1,
           businessId:typeof body.businessId==="string"?body.businessId:null,
           source:"language_translate",
-          idempotencyKey:typeof body.requestId==="string"&&body.requestId?`translate:${body.requestId}`:undefined,
-          metadata:{source,target,characters:text.length,generatedBy:result.generatedBy},
-        })
-      : {recorded:false,reason:"identity_translation"};
+          idempotencyKey:requestId?`translate:${requestId}`:undefined,
+          metadata:{source,target,characters:text.length},
+        });
+        if(!next.allowed){
+          return NextResponse.json({error:next.reason,meter:"content_assets",required:1,commercial:next.context},{status:usageStatus(next.reason)});
+        }
+        if(next.duplicate){
+          return NextResponse.json({error:"duplicate_translation_request",commercialUsage:{recorded:true,duplicate:true,eventId:next.eventId,metadata:next.metadata}},{status:409});
+        }
+        reservation=next;pendingReservation=next;
+      }
+    }
+
+    const result=await translateHayText({text,source,target});
+    if(!result.configured){
+      if(reservation)await releaseUsageReservation(reservation).catch(()=>undefined);
+      pendingReservation=null;
+      return NextResponse.json({...result,error:"translation_provider_unconfigured"},{status:503});
+    }
+
+    let usage:{recorded:boolean;reason?:string;duplicate?:boolean;eventId?:string|null;metadata?:Record<string,unknown>}={recorded:false,reason:"identity_translation"};
+    if(reservation&&result.generatedBy!=="identity"){
+      pendingReservation=null;
+      usage=await commitUsageReservation(reservation,{source,target,characters:text.length,generatedBy:result.generatedBy});
+      if(!usage.recorded)return NextResponse.json({error:"translation_usage_commit_failed",commercialUsage:usage},{status:503});
+    }else if(reservation){
+      await releaseUsageReservation(reservation).catch(()=>undefined);pendingReservation=null;
+    }
 
     if(result.generatedBy==="rejected")return NextResponse.json({...result,commercialUsage:usage,error:"translation_preservation_failed"},{status:422});
     return NextResponse.json({...result,commercialUsage:usage});
   }catch(error){
+    if(pendingReservation)await releaseUsageReservation(pendingReservation).catch(()=>undefined);
     console.error("HAY translation failed",error);
     return NextResponse.json({error:"translation_failed",detail:error instanceof Error?error.message:String(error)},{status:500});
   }
