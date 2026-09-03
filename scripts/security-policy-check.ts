@@ -78,8 +78,10 @@ assert.deepEqual(
 );
 
 const meteredProviderRoutes = [
+  "app/api/business/analyze/route.ts",
   "app/api/marketing/autopilot/route.ts",
   "app/api/marketing/campaign/route.ts",
+  "app/api/marketing/experiment/route.ts",
 ];
 for (const route of meteredProviderRoutes) {
   const source = readFileSync(route, "utf8");
@@ -126,7 +128,7 @@ assert.match(
 
 console.log(JSON.stringify({
   securityPolicy: "passed",
-  cases: 14,
+  cases: 18,
   providerCostRoutes: meteredProviderRoutes,
   usageBusinessOwnership: true,
   productionProviderFailClosed: true,
