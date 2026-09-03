@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { checkUsageAllowance, recordUsage } from "@/lib/commercial/entitlements";
+import { commitUsageReservation, releaseUsageReservation, reserveUsage, type UsageReservation } from "@/lib/commercial/usage-reservations";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { generateSceneImage } from "@/lib/providers/openai-image";
 
 export const runtime = "nodejs";
+
+function usageStatus(reason:string|undefined){
+  if(reason==="unauthorized")return 401;
+  if(reason==="request_in_progress"||reason==="duplicate_request")return 409;
+  if(reason==="commercial_migration_required"||reason==="atomic_usage_admin_required"||reason==="atomic_usage_migration_required"||reason==="atomic_usage_reservation_failed")return 503;
+  return 402;
+}
 
 function escapeXml(value: string) {
   return value.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -55,6 +62,7 @@ async function imageBytes(prompt: string) {
 }
 
 export async function POST(request: Request) {
+  let pendingReservation:UsageReservation|null=null;
   try {
     if (!isSupabaseConfigured() || !isSupabaseAdminConfigured()) return NextResponse.json({configured:false,message:"Dedicated HAY Supabase is required for static publishing assets."});
     const body = await request.json();
@@ -77,16 +85,46 @@ export async function POST(request: Request) {
       return NextResponse.json({configured:true,reused:true,contentItemId,format:content.format,assetUrl:content.asset_url,assetUrls:existingUrls.length?existingUrls:[content.asset_url],count:existingUrls.length||1});
     }
 
+    let reservation:UsageReservation|null=null;
     if(force){
-      const allowance=await checkUsageAllowance("content_assets",1);
-      if(!allowance.allowed){
-        const status=allowance.reason==="unauthorized"?401:allowance.reason==="commercial_migration_required"?503:402;
-        return NextResponse.json({error:allowance.reason,meter:"content_assets",required:1,commercial:allowance.context},{status});
+      const requestId=typeof body.requestId==="string"?body.requestId.trim().slice(0,200):"";
+      const next=await reserveUsage({
+        meter:"content_assets",
+        quantity:1,
+        businessId:String(content.business_id),
+        source:"static_regeneration",
+        idempotencyKey:requestId?`static-regeneration:${requestId}`:undefined,
+        metadata:{contentItemId,format:content.format},
+      });
+      if(!next.allowed){
+        return NextResponse.json({error:next.reason,meter:"content_assets",required:1,commercial:next.context},{status:usageStatus(next.reason)});
       }
+      if(next.duplicate){
+        if(content.asset_url){
+          return NextResponse.json({configured:true,reused:true,duplicate:true,contentItemId,format:content.format,assetUrl:content.asset_url,assetUrls:existingUrls.length?existingUrls:[content.asset_url],count:existingUrls.length||1,commercialUsage:{recorded:true,duplicate:true,eventId:next.eventId,metadata:next.metadata}});
+        }
+        return NextResponse.json({error:"duplicate_static_regeneration_request",commercialUsage:{recorded:true,duplicate:true,eventId:next.eventId,metadata:next.metadata}},{status:409});
+      }
+      reservation=next;pendingReservation=next;
     }
 
     const base=await imageBytes(`${content.asset_brief}. Business: ${business.name}, ${business.category}. Location: ${business.location||"Armenia"}. Concept: ${content.concept}.`);
-    if(!base)return NextResponse.json({configured:true,error:"image_provider_unconfigured_or_failed"},{status:503});
+    if(!base){
+      if(reservation)await releaseUsageReservation(reservation).catch(()=>undefined);
+      pendingReservation=null;
+      return NextResponse.json({configured:true,error:"image_provider_unconfigured_or_failed"},{status:503});
+    }
+
+    // OpenAI image work has succeeded. Commit a force-regeneration credit before local
+    // compositing/storage so downstream infrastructure failures cannot create unmetered
+    // paid provider work. Initial generation remains included in the plan allocation.
+    let usage:{recorded:boolean;reason?:string;duplicate?:boolean;eventId?:string|null;metadata?:Record<string,unknown>}={recorded:false,reason:"included_in_plan"};
+    if(reservation){
+      pendingReservation=null;
+      usage=await commitUsageReservation(reservation,{contentItemId,format:content.format,provider:"openai_image"});
+      if(!usage.recorded)return NextResponse.json({error:"static_regeneration_usage_commit_failed",commercialUsage:usage},{status:503});
+    }
+
     const slideTexts=content.format==="carousel"
       ? [content.hook,content.concept,business.offer||business.description||content.caption,content.cta].filter((value):value is string=>Boolean(value&&String(value).trim())).slice(0,4)
       : [content.hook];
@@ -104,17 +142,9 @@ export async function POST(request: Request) {
     const {error:updateError}=await supabase.from("content_items").update({asset_url:urls[0],asset_urls:urls,status:"draft",updated_at:new Date().toISOString()}).eq("id",content.id);
     if(updateError)throw updateError;
 
-    const usage=force?await recordUsage({
-      meter:"content_assets",
-      quantity:1,
-      businessId:String(content.business_id),
-      source:"static_regeneration",
-      idempotencyKey:typeof body.requestId==="string"&&body.requestId?`static-regeneration:${body.requestId}`:undefined,
-      metadata:{contentItemId,format:content.format,slides:urls.length},
-    }):{recorded:false,reason:"included_in_plan"};
-
     return NextResponse.json({configured:true,reused:false,contentItemId,format:content.format,assetUrl:urls[0],assetUrls:urls,count:urls.length,commercialUsage:usage});
   }catch(error){
+    if(pendingReservation)await releaseUsageReservation(pendingReservation).catch(()=>undefined);
     console.error("Static content compositor failed",error);
     return NextResponse.json({error:"static_content_compositor_failed",detail:error instanceof Error?error.message:String(error)},{status:500});
   }

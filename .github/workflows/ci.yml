@@ -33,6 +33,7 @@ jobs:
       - run: npm run env:check
       - run: npm run security:policy
       - run: npm run security:regeneration
+      - run: npm run security:direct-providers
       - run: npm run ui:contract
       - run: npm run typecheck
       - run: npm run quality
