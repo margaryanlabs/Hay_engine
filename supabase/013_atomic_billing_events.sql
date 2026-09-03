@@ -57,7 +57,7 @@ as $$
 declare
   v_entitlement public.account_entitlements%rowtype;
   v_existing public.billing_events%rowtype;
-  v_provider text := left(btrim(coalesce(p_provider,'')),64);
+  v_provider text := lower(left(btrim(coalesce(p_provider,'')),64));
   v_event_id text := left(btrim(coalesce(p_event_id,'')),255);
   v_customer text := nullif(left(btrim(coalesce(p_provider_customer_id,'')),255),'');
   v_subscription text := nullif(left(btrim(coalesce(p_provider_subscription_id,'')),255),'');
@@ -80,6 +80,9 @@ begin
   end if;
   if p_event_created_at is null then
     return jsonb_build_object('applied',false,'reason','provider_event_created_at_required');
+  end if;
+  if p_event_created_at > now() + interval '10 minutes' then
+    return jsonb_build_object('applied',false,'reason','provider_event_time_in_future');
   end if;
   if p_current_period_start is null or p_current_period_end is null or p_current_period_end <= p_current_period_start then
     return jsonb_build_object('applied',false,'reason','invalid_billing_period');
