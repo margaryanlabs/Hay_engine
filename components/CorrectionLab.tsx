@@ -74,6 +74,20 @@ export default function CorrectionLab(){
     finally{setBusy(false);}
   }
 
+  async function updateConsent(item:Correction,field:"product"|"benchmark"|"training"){
+    const product=field==="product"?!item.consent_product_improvement:item.consent_product_improvement;
+    const benchmark=field==="benchmark"?!item.consent_benchmark:item.consent_benchmark;
+    const training=field==="training"?!item.consent_model_training:item.consent_model_training;
+    if(field==="product"&&item.consent_product_improvement&&!product&&!window.confirm("Turn off product-improvement consent? This removes the correction from reusable reviewed data, withdraws its linked dataset record and archives a matching promoted pronunciation."))return;
+    setBusy(true);setMessage("");
+    try{
+      const response=await fetch("/api/language/corrections",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:item.id,consentProductImprovement:product,consentBenchmark:benchmark,consentModelTraining:training})});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||"consent_update_failed");
+      setMessage("Consent settings updated. Reuse policy and linked provenance were synchronized.");await load();
+    }catch(error){setMessage(error instanceof Error?error.message:"Consent update failed");}
+    finally{setBusy(false);}
+  }
+
   async function withdraw(id:string){
     if(!window.confirm("Withdraw this correction and all reuse consent? Any dataset record sourced from it will be withdrawn too."))return;
     const response=await fetch("/api/language/corrections",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});
@@ -121,10 +135,10 @@ export default function CorrectionLab(){
           <button className="correctionSubmit" disabled={busy||!sourceText.trim()||!correctedText.trim()} onClick={submit}>{busy?"SAVING ···":"SAVE CORRECTION →"}</button>
         </div>
 
-        <aside className="correctionPolicy"><header><span>CONSENT POLICY / 02</span><b>EXPLICIT</b></header><h2>Private first.<br/>Reviewed only by permission.</h2><ol><li><b>01</b><p>Save a correction. It belongs to your account.</p></li><li><b>02</b><p>Without product-improvement consent, it never enters the reviewer queue.</p></li><li><b>03</b><p>A human reviewer may accept a consented correction into provenance-tracked HAY data.</p></li><li><b>04</b><p>You can withdraw later; linked dataset eligibility is withdrawn too.</p></li></ol></aside>
+        <aside className="correctionPolicy"><header><span>CONSENT POLICY / 02</span><b>EXPLICIT</b></header><h2>Private first.<br/>Reviewed only by permission.</h2><ol><li><b>01</b><p>Save a correction. It belongs to your account.</p></li><li><b>02</b><p>Without product-improvement consent, it never enters the reviewer queue.</p></li><li><b>03</b><p>A human reviewer may accept a consented correction into provenance-tracked HAY data.</p></li><li><b>04</b><p>You can change permissions or withdraw later; linked dataset eligibility follows your active consent.</p></li></ol></aside>
       </section>
 
-      <section className="correctionHistory"><header><span>03 / YOUR CORRECTIONS</span><h2>Every submission keeps its consent state.</h2></header><div>{corrections.length?corrections.map(item=><article key={item.id} className={item.status==="withdrawn"?"withdrawn":""}><div><span>{item.correction_type}</span><b>{item.status.toUpperCase()}</b></div><blockquote>{item.corrected_text}</blockquote><p>{item.source_text}</p><footer><small>PRODUCT {item.consent_product_improvement?"YES":"NO"}</small><small>BENCHMARK {item.consent_benchmark?"YES":"NO"}</small><small>TRAINING {item.consent_model_training?"YES":"NO"}</small><small>{new Date(item.created_at).toLocaleDateString()}</small>{item.status!=="withdrawn"&&<button onClick={()=>withdraw(item.id)}>WITHDRAW</button>}</footer></article>):<p className="correctionEmpty">No corrections submitted yet.</p>}</div></section>
+      <section className="correctionHistory"><header><span>03 / YOUR CORRECTIONS</span><h2>Consent stays editable after submission.</h2></header><div>{corrections.length?corrections.map(item=><article key={item.id} className={item.status==="withdrawn"?"withdrawn":""}><div><span>{item.correction_type}</span><b>{item.status.toUpperCase()}</b></div><blockquote>{item.corrected_text}</blockquote><p>{item.source_text}</p><footer>{item.status!=="withdrawn"?<div className="correctionConsentActions"><button className={item.consent_product_improvement?"on":""} disabled={busy} onClick={()=>updateConsent(item,"product")}>PRODUCT {item.consent_product_improvement?"YES":"NO"}</button><button className={item.consent_benchmark?"on":""} disabled={busy} onClick={()=>updateConsent(item,"benchmark")}>BENCHMARK {item.consent_benchmark?"YES":"NO"}</button><button className={item.consent_model_training?"on":""} disabled={busy} onClick={()=>updateConsent(item,"training")}>TRAINING {item.consent_model_training?"YES":"NO"}</button></div>:<small>ALL REUSE WITHDRAWN</small>}<small>{new Date(item.created_at).toLocaleDateString()}</small>{item.status!=="withdrawn"&&<button className="withdrawCorrection" onClick={()=>withdraw(item.id)}>WITHDRAW</button>}</footer></article>):<p className="correctionEmpty">No corrections submitted yet.</p>}</div></section>
 
       {reviewer&&<section className="correctionReview"><header><div><span>04 / REVIEWER QUEUE</span><h2>Only explicitly consented corrections appear here.</h2></div><b>{reviewQueue.length} PENDING</b></header><div>{reviewQueue.length?reviewQueue.map(item=><article key={item.id}><div><span>{item.correction_type} · {item.locale}</span><b>{item.status}</b></div><small>SOURCE</small><p>{item.source_text}</p>{item.system_text&&<><small>HAY OUTPUT</small><p>{item.system_text}</p></>}<small>CORRECTION</small><blockquote>{item.corrected_text}</blockquote><footer><button disabled={busy} onClick={()=>review(item.id,"reject")}>REJECT</button><button disabled={busy} onClick={()=>review(item.id,"accept",false)}>ACCEPT DATA</button>{item.correction_type==="pronunciation"&&<button className="promote" disabled={busy} onClick={()=>review(item.id,"accept",true)}>ACCEPT + PROMOTE</button>}</footer></article>):<p className="correctionEmpty">No consented corrections are waiting for review.</p>}</div></section>}
     </>}
