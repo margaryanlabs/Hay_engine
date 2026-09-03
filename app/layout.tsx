@@ -6,6 +6,7 @@ import "./marketing.css";
 import "./marketing-v2.css";
 import "./competitor-intel.css";
 import "./studio-status.css";
+import "./studio-commercial.css";
 import "./studio-command.css";
 import "./studio-onboarding.css";
 import "./studio-decisions.css";
