@@ -116,11 +116,15 @@ async function promotePronunciation(admin:ReturnType<typeof createAdminClient>,c
   const western=clean(context.spokenWestern,240)||eastern;
   const categories=["brand","acronym","finance","technology","social","place","person","product","general"];
   const category=categories.includes(String(context.category||""))?String(context.category):"general";
-  const existing=await admin.from("pronunciation_entries").select("id").eq("scope","system").eq("written_key",written.toLocaleUpperCase("en-US")).maybeSingle();
+  const correctionReference=`correction:${correction.id}`;
+  const existing=await admin.from("pronunciation_entries").select("id,source_type,source_reference,consent_reference,status").eq("scope","system").eq("written_key",written.toLocaleUpperCase("en-US")).maybeSingle();
   if(existing.error)return {promoted:false as const,error:existing.error.message};
-  const payload={written,spoken_hy_eastern:eastern,spoken_hy_western:western,category,source_type:"hay-reviewed",source_reference:`correction:${correction.id}`,consent_reference:`correction:${correction.id}`,status:"active",reviewed_by:reviewerId,reviewed_at:new Date().toISOString(),notes:`Promoted from consented correction ${correction.id}`,created_by:reviewerId};
+  const payload={written,spoken_hy_eastern:eastern,spoken_hy_western:western,category,source_type:"hay-reviewed",source_reference:correctionReference,consent_reference:correctionReference,status:"active",reviewed_by:reviewerId,reviewed_at:new Date().toISOString(),notes:`Promoted from consented correction ${correction.id}`,created_by:reviewerId};
   if(existing.data?.id){
-    const result=await admin.from("pronunciation_entries").update(payload).eq("id",existing.data.id).select("id").single();
+    if(String(existing.data.consent_reference||"")!==correctionReference){
+      return {promoted:false as const,error:"pronunciation_review_conflict" as const};
+    }
+    const result=await admin.from("pronunciation_entries").update(payload).eq("id",existing.data.id).eq("consent_reference",correctionReference).select("id").single();
     return result.error?{promoted:false as const,error:result.error.message}:{promoted:true as const,id:String(result.data.id)};
   }
   const result=await admin.from("pronunciation_entries").insert({...payload,scope:"system",owner_id:null,business_id:null}).select("id").single();
