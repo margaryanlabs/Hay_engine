@@ -133,15 +133,24 @@ export async function reviewLanguageCorrection(input:{reviewerId:string;id:strin
   const current=await admin.from("language_corrections").select(SELECT_FIELDS).eq("id",input.id).maybeSingle();
   if(current.error)return {configured:false,error:current.error.message};
   if(!current.data)return {configured:true,error:"correction_not_found" as const};
-  const correction=current.data as CorrectionRow;
+  let correction=current.data as CorrectionRow;
   if(correction.status==="withdrawn"||correction.consent_withdrawn_at)return {configured:true,error:"correction_withdrawn" as const};
+  if(!["submitted","reviewing"].includes(correction.status))return {configured:true,error:"correction_already_reviewed" as const};
+  if(correction.status==="reviewing"&&correction.reviewed_by&&correction.reviewed_by!==input.reviewerId)return {configured:true,error:"review_in_progress" as const};
+
+  if(correction.status==="submitted"){
+    const claim=await admin.from("language_corrections").update({status:"reviewing",reviewed_by:input.reviewerId}).eq("id",input.id).eq("status","submitted").is("consent_withdrawn_at",null).select(SELECT_FIELDS).maybeSingle();
+    if(claim.error)return {configured:false,error:claim.error.message};
+    if(!claim.data)return {configured:true,error:"review_conflict" as const};
+    correction=claim.data as CorrectionRow;
+  }
 
   const consent={productImprovement:Boolean(correction.consent_product_improvement),benchmark:Boolean(correction.consent_benchmark),modelTraining:Boolean(correction.consent_model_training),withdrawn:false};
   if(input.decision==="accept"&&!canPromoteCorrection(consent))return {configured:true,error:"product_improvement_consent_required" as const};
   const now=new Date().toISOString();
   if(input.decision==="reject"){
-    const {error}=await admin.from("language_corrections").update({status:"rejected",reviewed_by:input.reviewerId,reviewed_at:now,review_notes:clean(input.notes,2000)||null}).eq("id",input.id);
-    return error?{configured:false,error:error.message}:{configured:true,accepted:false};
+    const {data,error}=await admin.from("language_corrections").update({status:"rejected",reviewed_by:input.reviewerId,reviewed_at:now,review_notes:clean(input.notes,2000)||null}).eq("id",input.id).eq("status","reviewing").eq("reviewed_by",input.reviewerId).is("consent_withdrawn_at",null).select("id").maybeSingle();
+    return error?{configured:false,error:error.message}:data?.id?{configured:true,accepted:false}:{configured:true,error:"review_conflict" as const};
   }
 
   const datasetPayload={sourceText:correction.source_text,systemText:correction.system_text,correctedText:correction.corrected_text,context:correction.context,consent:{productImprovement:correction.consent_product_improvement,benchmark:correction.consent_benchmark,modelTraining:correction.consent_model_training,version:correction.consent_version}};
@@ -153,11 +162,30 @@ export async function reviewLanguageCorrection(input:{reviewerId:string;id:strin
   },{onConflict:"origin_correction_id"}).select("id").single();
   if(dataset.error)return {configured:false,error:dataset.error.message};
 
-  let pronunciation:{promoted:false}|{promoted:true;id:string}|{promoted:false;error:string}={promoted:false};
-  if(input.promotePronunciation&&correction.correction_type==="pronunciation")pronunciation=await promotePronunciation(admin,correction,input.reviewerId);
-  if("error" in pronunciation&&pronunciation.error)return {configured:false,error:pronunciation.error};
+  const accepted=await admin.from("language_corrections").update({status:"accepted",reviewed_by:input.reviewerId,reviewed_at:now,review_notes:clean(input.notes,2000)||null}).eq("id",input.id).eq("status","reviewing").eq("reviewed_by",input.reviewerId).is("consent_withdrawn_at",null).select(SELECT_FIELDS).maybeSingle();
+  if(accepted.error)return {configured:false,error:accepted.error.message};
+  if(!accepted.data){
+    await admin.from("dataset_records").update({status:"withdrawn"}).eq("origin_correction_id",input.id);
+    return {configured:true,error:"review_conflict" as const};
+  }
+  correction=accepted.data as CorrectionRow;
 
-  const update={status:"accepted",reviewed_by:input.reviewerId,reviewed_at:now,review_notes:clean(input.notes,2000)||null,promoted_pronunciation_id:pronunciation.promoted?pronunciation.id:null};
-  const accepted=await admin.from("language_corrections").update(update).eq("id",input.id).select("id,status,promoted_pronunciation_id").single();
-  return accepted.error?{configured:false,error:accepted.error.message}:{configured:true,accepted:true,datasetRecordId:String(dataset.data.id),pronunciation,policy:correctionReusePolicy(consent)};
+  let pronunciation:{promoted:false}|{promoted:true;id:string}|{promoted:false;error:string}={promoted:false};
+  if(input.promotePronunciation&&correction.correction_type==="pronunciation"){
+    const fresh=await admin.from("language_corrections").select(SELECT_FIELDS).eq("id",input.id).eq("status","accepted").is("consent_withdrawn_at",null).maybeSingle();
+    if(fresh.error)return {configured:false,error:fresh.error.message};
+    if(!fresh.data)return {configured:true,accepted:true,datasetRecordId:String(dataset.data.id),pronunciation:{promoted:false},policy:correctionReusePolicy({...consent,withdrawn:true})};
+    pronunciation=await promotePronunciation(admin,fresh.data as CorrectionRow,input.reviewerId);
+    if("error" in pronunciation&&pronunciation.error)return {configured:false,error:pronunciation.error};
+    if(pronunciation.promoted){
+      const linked=await admin.from("language_corrections").update({promoted_pronunciation_id:pronunciation.id}).eq("id",input.id).eq("status","accepted").is("consent_withdrawn_at",null).select("id").maybeSingle();
+      if(linked.error)return {configured:false,error:linked.error.message};
+      if(!linked.data){
+        await admin.from("pronunciation_entries").update({status:"archived"}).eq("id",pronunciation.id).eq("scope","system").eq("consent_reference",`correction:${input.id}`);
+        pronunciation={promoted:false};
+      }
+    }
+  }
+
+  return {configured:true,accepted:true,datasetRecordId:String(dataset.data.id),pronunciation,policy:correctionReusePolicy(consent)};
 }
