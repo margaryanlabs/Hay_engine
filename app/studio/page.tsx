@@ -21,13 +21,21 @@ export const metadata = {
   description: "Analyze, create, publish and learn with the HAY Armenian-first Marketing OS.",
 };
 
-export default async function StudioPage(){
+type StudioPageProps={searchParams:Promise<{plan?:string|string[]}>};
+const allowedPlans=new Set(["free","creator","growth","business","agency"]);
+
+export default async function StudioPage({searchParams}:StudioPageProps){
+  const params=await searchParams;
+  const rawPlan=Array.isArray(params.plan)?params.plan[0]:params.plan;
+  const selectedPlan=rawPlan&&allowedPlans.has(rawPlan)?rawPlan:null;
+  const nextPath=selectedPlan?`/studio?plan=${encodeURIComponent(selectedPlan)}`:"/studio";
+
   // Keep local/demo exploration possible when Supabase is intentionally absent,
   // but never expose a persistent production workspace without an authenticated owner.
   if(isSupabaseConfigured()){
     const supabase=await createClient();
     const {data,error}=await supabase.auth.getClaims();
-    if(error||!data?.claims?.sub)redirect("/login?next=%2Fstudio");
+    if(error||!data?.claims?.sub)redirect(`/login?next=${encodeURIComponent(nextPath)}`);
   }
 
   return <>
