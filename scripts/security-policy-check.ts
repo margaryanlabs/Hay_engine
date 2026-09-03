@@ -10,6 +10,7 @@ function context(overrides: Partial<UsagePolicyContext> = {}): UsagePolicyContex
   return {
     configured: true,
     authenticated: true,
+    allowUnauthenticatedProviderAccess: false,
     enforcementEnabled: true,
     migrationReady: true,
     status: "active",
@@ -44,9 +45,15 @@ assert.deepEqual(
 );
 
 assert.deepEqual(
-  decision({ configured: false, authenticated: false, enforcementEnabled: false }),
+  decision({ configured: false, authenticated: false, allowUnauthenticatedProviderAccess: false, enforcementEnabled: false }),
+  { allowed: false, reason: "unauthorized" },
+  "Deployed HAY without identity must fail provider-backed access closed by default",
+);
+
+assert.deepEqual(
+  decision({ configured: false, authenticated: false, allowUnauthenticatedProviderAccess: true, enforcementEnabled: false }),
   { allowed: true },
-  "Local/demo mode without Supabase remains usable for development",
+  "Local development or an explicit operator demo override may run provider-backed routes without Supabase",
 );
 
 assert.deepEqual(
@@ -91,5 +98,10 @@ assert.match(
   /business_id:\s*usageBusinessId/,
   "usage_events inserts must use the sanitized owned business id rather than raw request input",
 );
+assert.match(
+  entitlementSource,
+  /HAY_ALLOW_UNAUTHENTICATED_PROVIDER_API/,
+  "Unauthenticated provider access must be an explicit server-side operator override",
+);
 
-console.log(JSON.stringify({ securityPolicy: "passed", cases: 10, providerCostRoutes: meteredProviderRoutes, usageBusinessOwnership: true }, null, 2));
+console.log(JSON.stringify({ securityPolicy: "passed", cases: 11, providerCostRoutes: meteredProviderRoutes, usageBusinessOwnership: true, productionProviderFailClosed: true }, null, 2));
