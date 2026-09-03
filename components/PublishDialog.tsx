@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import SocialBrandIcon from "./SocialBrandIcon";
 import type { ContentItem, SocialConnection } from "@/lib/marketing/types";
 import type { Locale } from "@/lib/hay/types";
 
@@ -112,7 +113,7 @@ export default function PublishDialog({ item, connections, locale, onClose, onMe
   return <div className="publishBackdrop" role="presentation" onMouseDown={event=>{if(event.currentTarget===event.target)onClose();}}>
     <section className="publishDialog" role="dialog" aria-modal="true" aria-label={t.title}>
       <header><div><span>HAY / PUBLISH CONTROL</span><h2>{t.title}</h2></div><button onClick={onClose} aria-label={t.close}>×</button></header>
-      <div className="publishAccount"><span>{t.account}</span><strong>{connection?.accountName||connection?.accountId||item.platform}</strong><em>{item.platform.toUpperCase()}</em></div>
+      <div className="publishAccount"><span>{t.account}</span><strong className="publishPlatformMark"><SocialBrandIcon platform={item.platform} size={18}/><span>{connection?.accountName||connection?.accountId||item.platform}</span></strong><em>{item.platform.toUpperCase()}</em></div>
       {!connection?.id&&<div className="publishWarning">{t.noAccount}</div>}
       <label className="publishField">{t.caption}<textarea value={caption} onChange={e=>setCaption(e.target.value)} maxLength={5000}/></label>
       <label className="publishField">CTA<input value={cta} onChange={e=>setCta(e.target.value)} maxLength={1000}/></label>
@@ -122,7 +123,7 @@ export default function PublishDialog({ item, connections, locale, onClose, onMe
       {item.platform==="youtube"&&<div className="publishProvider"><label>{t.privacy}<select value={youtubePrivacy} onChange={e=>setYoutubePrivacy(e.target.value as typeof youtubePrivacy)}><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label><label>Title<input value={youtubeTitle} onChange={e=>setYoutubeTitle(e.target.value)} maxLength={100}/></label></div>}
 
       {item.platform==="tiktok"&&<div className="tiktokApproval">
-        <div className="providerHead"><span>TIKTOK DIRECT POST</span><em>{creator?"FRESH CREATOR INFO":"LOADING"}</em></div>
+        <div className="providerHead"><span className="publishPlatformMark"><SocialBrandIcon platform="tiktok" size={18} decorative/>TIKTOK DIRECT POST</span><em>{creator?"FRESH CREATOR INFO":"LOADING"}</em></div>
         {creator?.creator_nickname&&<p>Creator: <strong>{creator.creator_nickname}</strong></p>}
         <label>{t.privacy}<select value={privacy} onChange={e=>setPrivacy(e.target.value)}><option value="">— choose —</option>{privacyOptions.map(option=><option key={option} value={option} disabled={brandedContent&&option==="SELF_ONLY"}>{option}</option>)}</select></label>
         {brandedBlocksPrivate&&<div className="publishWarning">Branded content cannot use SELF_ONLY. Choose another privacy level.</div>}
