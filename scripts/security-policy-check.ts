@@ -127,8 +127,8 @@ assert.match(
 const videoRouteSource = readFileSync("app/api/video/route.ts", "utf8");
 assert.match(
   videoRouteSource,
-  /metadata:\s*\{[\s\S]*?operationName[\s\S]*?\}/,
-  "Veo generation must persist the normalized operation name in the owner usage ledger",
+  /commitUsageReservation\(reservation,\{operationName,[\s\S]*?\}\)/,
+  "Veo generation must commit its normalized operation name into the owner usage ledger",
 );
 const ownershipCall = videoRouteSource.indexOf("await checkOwnedProviderOperation(");
 const providerPollCall = videoRouteSource.indexOf("await getVeoOperation(operationName)");
@@ -136,12 +136,69 @@ assert.ok(
   ownershipCall >= 0 && providerPollCall > ownershipCall,
   "Veo polling must prove operation ownership before calling the Google provider",
 );
+const veoReserveCall=videoRouteSource.indexOf("reservation=await reserveUsage(");
+const veoDuplicateBranch=videoRouteSource.indexOf("if(reservation.duplicate)");
+const veoStartCall=videoRouteSource.indexOf("await startVeoVideo(");
+const veoCommitCall=videoRouteSource.indexOf("await commitUsageReservation(");
+assert.ok(
+  veoReserveCall>=0&&veoStartCall>veoReserveCall,
+  "Veo quota must be reserved before any paid Google generation call",
+);
+assert.ok(
+  veoDuplicateBranch>veoReserveCall&&veoDuplicateBranch<veoStartCall,
+  "Veo idempotency duplicates must return before the paid provider is called",
+);
+assert.ok(
+  veoCommitCall>veoStartCall,
+  "A successful Veo provider start must commit the reserved credit with provider metadata",
+);
+assert.match(
+  videoRouteSource,
+  /video_usage_commit_failed[\s\S]*?status:503/,
+  "Veo must fail closed when an already-started provider job cannot commit commercial usage",
+);
 
 const providerOperationSource = readFileSync("lib/commercial/provider-operations.ts", "utf8");
 assert.match(
   providerOperationSource,
   /\.from\("usage_events"\)[\s\S]*?\.eq\("owner_id", context\.userId\)[\s\S]*?\.eq\("source", input\.source\)[\s\S]*?\.contains\("metadata", \{ operationName: input\.operationName \}\)/,
   "Provider operation ownership must be resolved from the authenticated owner's durable usage ledger",
+);
+
+const reservationSource=readFileSync("lib/commercial/usage-reservations.ts","utf8");
+assert.match(
+  reservationSource,
+  /if \(!context\.enforcementEnabled\)[\s\S]*?if \(!preflight\.allowed\)[\s\S]*?atomic:false/,
+  "Legacy non-atomic usage may only remain while commercial enforcement is disabled",
+);
+assert.match(
+  reservationSource,
+  /createAdminClient\(\)[\s\S]*?\.rpc\("hay_reserve_usage"/,
+  "Enforced quota reservations must execute through the server-only Supabase admin client",
+);
+
+const atomicMigration=readFileSync("supabase/010_atomic_usage_reservations.sql","utf8");
+assert.match(atomicMigration,/security invoker/g,"Atomic quota RPCs must remain SECURITY INVOKER");
+assert.doesNotMatch(atomicMigration,/security definer/i,"Atomic quota migration must not introduce SECURITY DEFINER RPCs in public");
+assert.match(
+  atomicMigration,
+  /revoke all on function public\.hay_reserve_usage[\s\S]*?from public, anon, authenticated;[\s\S]*?grant execute on function public\.hay_reserve_usage[\s\S]*?to service_role;/,
+  "Atomic reservation RPC must be inaccessible to browser roles and executable only by service_role",
+);
+assert.match(
+  atomicMigration,
+  /where owner_id = p_owner_id[\s\S]*?for update;/,
+  "Atomic reservation must serialize concurrent account spending with an entitlement row lock",
+);
+assert.match(
+  atomicMigration,
+  /state = 'consumed'[\s\S]*?state = 'reserved' and reservation_expires_at > now\(\)/,
+  "Active reservations must count immediately toward the same quota as consumed usage",
+);
+assert.match(
+  atomicMigration,
+  /reservation_token_hash[\s\S]*?extensions\.digest\(p_release_token, 'sha256'\)/,
+  "Reservation release capability must be stored only as a SHA-256 hash",
 );
 
 const voiceRouteSource = readFileSync("app/api/voice/route.ts", "utf8");
@@ -173,12 +230,16 @@ assert.ok(
 
 console.log(JSON.stringify({
   securityPolicy: "passed",
-  cases: 30,
+  cases: 41,
   providerCostRoutes: meteredProviderRoutes,
   meteredLanguageRoutes,
   usageBusinessOwnership: true,
   productionProviderFailClosed: true,
   veoOperationOwnership: true,
+  veoAtomicPreProviderReservation: true,
+  veoPreProviderIdempotency: true,
+  atomicUsageServiceRoleOnly: true,
+  atomicUsageSerialized: true,
   voicePreProviderGate: true,
   contentFactoryVoicePreProviderGate: true,
   contentFactoryAllVoiceMetered: true,
