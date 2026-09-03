@@ -70,12 +70,14 @@ export async function POST(request: Request) {
     const jobs = run.jobs.map(job => ({ ...job, contentItemId: persisted.idMap[job.contentItemId] || job.contentItemId }));
 
     const actualAssets=persisted.plan.items.length;
-    const resized=actualAssets===minimumAssets?{resized:true}:{...(await resizeUsageReservation(reservation,actualAssets))};
-    if(!resized.resized){
-      // Generation and persistence already succeeded. Keep the original reservation
-      // occupied rather than making completed provider work free when exact resize fails.
-      pendingReservation=null;
-      return NextResponse.json({error:resized.reason,meter:"content_assets",required:actualAssets,commercial:reservation.context},{status:usageStatus(resized.reason)});
+    if(actualAssets!==minimumAssets){
+      const resized=await resizeUsageReservation(reservation,actualAssets);
+      if(!resized.resized){
+        // Generation and persistence already succeeded. Keep the original reservation
+        // occupied rather than making completed provider work free when exact resize fails.
+        pendingReservation=null;
+        return NextResponse.json({error:resized.reason,meter:"content_assets",required:actualAssets,commercial:reservation.context},{status:usageStatus(resized.reason)});
+      }
     }
 
     pendingReservation=null;
