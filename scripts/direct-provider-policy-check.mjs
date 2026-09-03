@@ -85,6 +85,20 @@ assert.ok(planResize>planPersist&&planCommit>planPersist,"Marketing plan must su
 assert.match(marketingPlan,/marketing_plan_usage_commit_failed[\s\S]*?status:503/,"Marketing plan must fail closed if completed work cannot commit usage");
 assert.match(marketingPlan,/pendingReservation[\s\S]*?releaseUsageReservation\(pendingReservation\)/,"Marketing plan must release only still-pending quota on aborted work");
 
+const reservationLayer=read("lib/commercial/usage-reservations.ts");
+assert.match(reservationLayer,/atomicUsageMigrationsReady[\s\S]*?select\("id,state,reservation_expires_at"[\s\S]*?rpc\("hay_reserve_usage"[\s\S]*?rpc\("hay_resize_usage_reservation"/,"Atomic Studio readiness must probe the reservation ledger plus 010/011 RPC capabilities");
+const setupStatus=read("app/api/setup/status/route.ts");
+assert.match(setupStatus,/commercialReady\s*=\s*supabase\s*&&\s*admin\s*&&\s*commercialMigration\s*&&\s*atomicUsageMigration/,"Commercial readiness must require atomic Studio migrations");
+assert.match(setupStatus,/atomic_usage_migrations_010_011_required/,"Setup diagnostics must expose missing 010/011 as an explicit blocker");
+assert.match(setupStatus,/developer_api_migration_012_required/,"Setup diagnostics must expose missing Developer API migration 012 as an explicit blocker");
+
+const readme=read("README.md");
+for(const migration of ["010_atomic_usage_reservations.sql","011_atomic_usage_resize.sql","012_atomic_developer_api_requests.sql"]){
+  assert.match(readme,new RegExp(migration.replaceAll(".","\\.")),`README deployment order must include ${migration}`);
+}
+assert.match(readme,/Do not set `HAY_ENFORCE_PLANS=true` until migrations `007`, `010` and `011` are applied/,"Plan enforcement runbook must require atomic Studio migrations");
+assert.match(readme,/Do not set `HAY_DEVELOPER_API_ENABLED=true` until migrations `007` and `012` are applied/,"Developer API runbook must require atomic request-admission migration");
+
 console.log(JSON.stringify({
   directProviderPolicy:"passed",
   scannedApiFiles:apiFiles.length,
@@ -95,5 +109,7 @@ console.log(JSON.stringify({
   staticProviderCommitBeforeStorage:true,
   staticNoOutputRelease:true,
   marketingPlanExactResize:true,
+  atomicMigrationReadinessProtected:true,
+  migrationRunbookProtected:true,
   initialStaticIncludedInPlan:true,
 },null,2));
