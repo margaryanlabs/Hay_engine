@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { updateLanguageCorrectionConsent } from "@/lib/hay/correction-consent-store";
 import { correctionFlywheelReady, currentCorrectionActor, listOwnerCorrections, submitLanguageCorrection, withdrawLanguageCorrection } from "@/lib/hay/correction-store";
 
 export const runtime="nodejs";
@@ -37,6 +38,21 @@ export async function POST(request:Request){
     return NextResponse.json(result,{status});
   }
   return NextResponse.json(result,{status:201});
+}
+
+export async function PATCH(request:Request){
+  const actor=await currentCorrectionActor();
+  if(!actor)return NextResponse.json({error:"unauthorized"},{status:401});
+  if(!(await correctionFlywheelReady()))return NextResponse.json({error:"language_correction_migration_required"},{status:503});
+  const body=await request.json();
+  const id=String(body.id||"").trim();
+  if(!id)return NextResponse.json({error:"correction_id_required"},{status:400});
+  const result=await updateLanguageCorrectionConsent(actor.ownerId,id,{productImprovement:body.consentProductImprovement,benchmark:body.consentBenchmark,modelTraining:body.consentModelTraining});
+  if("error" in result&&result.error){
+    const conflict=["correction_not_found","correction_withdrawn","consent_update_conflict"];
+    return NextResponse.json(result,{status:conflict.includes(String(result.error))?409:503});
+  }
+  return NextResponse.json(result);
 }
 
 export async function DELETE(request:Request){
