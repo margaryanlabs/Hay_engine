@@ -4,14 +4,14 @@ import { Audio } from "@remotion/media";
 import type { RenderInput, RenderScene } from "./types";
 
 const fontStack = '"Noto Sans Armenian", "DejaVu Sans", Arial, sans-serif';
-const accent = "#d9ff63";
+const accent = "#b27a62";
 
 const gradients = [
-  "radial-gradient(circle at 70% 18%, rgba(217,255,99,.18), transparent 28%), linear-gradient(145deg,#15191b,#080a0b 62%)",
-  "radial-gradient(circle at 18% 30%, rgba(75,120,180,.28), transparent 32%), linear-gradient(155deg,#10161e,#08090a 62%)",
-  "radial-gradient(circle at 74% 66%, rgba(125,88,173,.26), transparent 30%), linear-gradient(155deg,#17111c,#09090b 62%)",
-  "radial-gradient(circle at 25% 75%, rgba(172,124,70,.27), transparent 32%), linear-gradient(155deg,#19140e,#090a0b 62%)",
-  "radial-gradient(circle at 50% 32%, rgba(217,255,99,.2), transparent 27%), linear-gradient(155deg,#121811,#080a09 62%)",
+  "radial-gradient(circle at 70% 18%, rgba(178,122,98,.20), transparent 28%), linear-gradient(145deg,#171516,#080a0b 62%)",
+  "radial-gradient(circle at 18% 30%, rgba(112,139,157,.24), transparent 32%), linear-gradient(155deg,#10161c,#08090a 62%)",
+  "radial-gradient(circle at 74% 66%, rgba(139,111,99,.20), transparent 30%), linear-gradient(155deg,#171315,#09090b 62%)",
+  "radial-gradient(circle at 25% 75%, rgba(166,119,86,.22), transparent 32%), linear-gradient(155deg,#18140f,#090a0b 62%)",
+  "radial-gradient(circle at 50% 32%, rgba(105,132,149,.22), transparent 27%), linear-gradient(155deg,#11171a,#080a0a 62%)",
 ];
 
 function SceneLayer({ scene, image, video, index }: { scene: RenderScene; image?: string; video?: string; index: number }) {
@@ -31,7 +31,7 @@ function SceneLayer({ scene, image, video, index }: { scene: RenderScene; image?
       </div>
       <div style={{ position:"absolute", left:68, right:68, top:"35%", opacity, translate:`0 ${translateY}px` }}>
         <div style={{ color:accent, fontFamily:fontStack, fontSize:18, letterSpacing:4, textTransform:"uppercase", marginBottom:24 }}>NATURALLY ARMENIAN</div>
-        <div style={{ fontFamily:fontStack, fontSize:76, fontWeight:600, lineHeight:1.06, letterSpacing:-3, color:"#f5f6f7", textWrap:"balance" }}>{scene.screenText}</div>
+        <div style={{ fontFamily:fontStack, fontSize:76, fontWeight:600, lineHeight:1.06, letterSpacing:-3, color:"#f5f1ed", textWrap:"balance" }}>{scene.screenText}</div>
         {!image && !video ? <div style={{ fontFamily:fontStack, fontSize:25, lineHeight:1.55, color:"#92999f", marginTop:28, maxWidth:820 }}>{scene.visual}</div> : null}
       </div>
     </AbsoluteFill>

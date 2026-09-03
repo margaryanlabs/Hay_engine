@@ -34,7 +34,7 @@ This file tracks what is actually missing in the current repository. Completed i
 - [x] campaign analytics and controlled Experiment Runner
 - [x] first-party Conversion Bridge attribution
 - [x] secure multi-business Studio workspaces
-- [ ] stock-media search adapter
+- [x] Pexels stock-media adapter with portrait video → photo fallback, attribution metadata and render integration
 - [ ] additional video provider adapters (Kling / Seedance class) for cost/quality routing
 - [ ] larger production Armenian typography template library
 
@@ -117,7 +117,7 @@ This file tracks what is actually missing in the current repository. Completed i
 2. Apply the canonical HAY Supabase migrations through `009_language_corrections_and_dataset_registry.sql`.
 3. Verify `/api/setup/status` reports the commercial/developer schemas, pronunciation registry and correction flywheel correctly.
 4. Configure at least one server-only `HAY_LANGUAGE_REVIEWER_EMAILS` reviewer before operating the correction review queue.
-5. Configure provider keys and workers required by the launch package.
+5. Configure provider keys and workers required by the launch package; add `PEXELS_API_KEY` if Creator should resolve stock scenes automatically.
 6. Configure Creator / Growth / Business hosted checkout URLs and `HAY_BILLING_SYNC_SECRET`.
 7. Verify the chosen payment provider's signed webhook, then call HAY `/api/billing/sync` from that trusted adapter.
 8. Set `HAY_ENFORCE_PLANS=true` only after migration + billing sync are verified.
@@ -125,9 +125,10 @@ This file tracks what is actually missing in the current repository. Completed i
 10. In `/pronunciations`, create/update/archive an account override and one owned-business override; confirm versions increment and runtime precedence falls back correctly.
 11. In `/corrections`, verify a private no-consent correction never appears in the reviewer queue; verify a product-improvement-consented correction can be accepted; then withdraw it and confirm linked dataset eligibility is withdrawn.
 12. Verify a consented pronunciation correction can be promoted to `hay-reviewed`, then withdraw it and confirm only the matching consent-sourced pronunciation is archived.
-13. Run `npm run typecheck`, `npm run quality`, `npm run build`, render-worker check and publish-worker check.
-14. Onboard the first real businesses in managed mode and measure time-to-first-useful-plan, publish success and attributed outcomes.
-15. Collect independent blind native-speaker benchmark reviews before making comparative "best Armenian" claims.
+13. Generate a Creator project containing at least one stock scene and verify Pexels credit/source survives preview, save and render.
+14. Run `npm run typecheck`, `npm run quality`, `npm run build`, render-worker check and publish-worker check.
+15. Onboard the first real businesses in managed mode and measure time-to-first-useful-plan, publish success and attributed outcomes.
+16. Collect independent blind native-speaker benchmark reviews before making comparative "best Armenian" claims.
 
 ## Non-goal
 

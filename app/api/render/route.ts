@@ -5,6 +5,18 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
+function resolvedStockMedia(project:CreatorProject){
+  const sceneImages:Record<string,string>={};
+  const sceneVideos:Record<string,string>={};
+  for(const scene of project.scenes){
+    const stock=scene.asset.stock;
+    if(!stock||stock.provider!=="pexels")continue;
+    if(stock.mediaType==="video")sceneVideos[scene.id]=stock.url;
+    else sceneImages[scene.id]=stock.url;
+  }
+  return {sceneImages,sceneVideos};
+}
+
 export async function POST(request: Request) {
   try {
     if(isSupabaseConfigured()){
@@ -18,10 +30,11 @@ export async function POST(request: Request) {
     if (!project?.id || project.format !== "9:16" || !Array.isArray(project.scenes)) {
       return NextResponse.json({ error: "invalid_creator_project" }, { status: 400 });
     }
+    const stock=resolvedStockMedia(project);
     const result = await dispatchRender({
       project,
-      sceneImages: body.sceneImages ?? {},
-      sceneVideos: body.sceneVideos ?? {},
+      sceneImages: { ...stock.sceneImages, ...(body.sceneImages ?? {}) },
+      sceneVideos: { ...stock.sceneVideos, ...(body.sceneVideos ?? {}) },
       audioSrc: body.audioSrc ? String(body.audioSrc) : undefined,
     });
     return NextResponse.json(result);

@@ -2,9 +2,11 @@ import { normalizeWithPronunciationRegistry } from "@/lib/hay/pronunciation-stor
 import { buildDemoStoryboard } from "@/lib/hay/storyboard";
 import type { ContentStyle, Dialect, Locale } from "@/lib/hay/types";
 import { generateStoryboardWithOpenAI } from "@/lib/providers/openai";
+import { isPexelsConfigured } from "@/lib/providers/pexels";
 import { isVeoConfigured } from "@/lib/providers/veo";
 import { buildCreatorScenes } from "./assets";
 import { buildCaptionCues } from "./captions";
+import { resolveCreatorStockMedia } from "./stock";
 import type { CreatorProject } from "./types";
 
 export async function createCreatorProject(args: {
@@ -33,7 +35,7 @@ export async function createCreatorProject(args: {
   });
   const speech = speechRuntime.normalized;
   const captions = buildCaptionCues(storyboard.voiceover, args.duration);
-  const scenes = buildCreatorScenes(storyboard.scenes);
+  const scenes = await resolveCreatorStockMedia(buildCreatorScenes(storyboard.scenes), args.language);
   const voiceConfigured = Boolean(process.env.ELEVENLABS_API_KEY && (process.env.ELEVENLABS_VOICE_ID || process.env.ELEVENLABS_VOICE_ID_MALE || process.env.ELEVENLABS_VOICE_ID_FEMALE));
   const imageConfigured = Boolean(process.env.OPENAI_API_KEY);
 
@@ -68,6 +70,7 @@ export async function createCreatorProject(args: {
       planner: storyboard.generatedBy,
       image: imageConfigured ? "openai" : "unconfigured",
       video: isVeoConfigured() ? "google-veo" : "unconfigured",
+      stock: isPexelsConfigured() ? "pexels" : "unconfigured",
       voice: voiceConfigured ? "elevenlabs" : "unconfigured",
     },
   };

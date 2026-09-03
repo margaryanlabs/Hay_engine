@@ -33,6 +33,8 @@ export default function ReelPreview({
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
+    // Playback origin is intentionally captured only when play/duration changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, project.duration]);
 
   const activeScene = useMemo(() => {
@@ -42,20 +44,25 @@ export default function ReelPreview({
     return project.scenes.find((scene) => time >= scene.start && time < scene.end) ?? project.scenes.at(-1)!;
   }, [project.scenes, selectedSceneId, playing, time]);
 
-  const image = sceneImages[activeScene.id];
+  const manualImage = sceneImages[activeScene.id];
+  const stock = activeScene.asset.stock;
+  const stockVideo = !manualImage && stock?.mediaType === "video" ? stock.url : null;
+  const image = manualImage || (stock?.mediaType === "image" ? stock.url : stockVideo ? stock?.previewUrl || undefined : undefined);
   const activeCaption = project.captions.find((cue) => time >= cue.start && time < cue.end);
 
   return (
     <div className="reelPreviewWrap">
       <div
         className={`reelPreview scene-${project.scenes.findIndex((scene) => scene.id === activeScene.id) % 5}`}
-        style={image ? { backgroundImage: `linear-gradient(180deg, rgba(4,6,8,.08), rgba(4,6,8,.72)), url(${image})` } : undefined}
+        style={!stockVideo && image ? { backgroundImage: `linear-gradient(180deg, rgba(4,6,8,.08), rgba(4,6,8,.72)), url(${image})` } : undefined}
       >
+        {stockVideo ? <video key={`${activeScene.id}:${stockVideo}`} src={stockVideo} poster={stock?.previewUrl || undefined} muted autoPlay loop playsInline style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",opacity:.82}}/> : null}
+        {stockVideo ? <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg, rgba(4,6,8,.08), rgba(4,6,8,.72))"}}/> : null}
         <div className="previewTop"><span>HAY / CREATOR</span><span>{project.format}</span></div>
         <div className="previewCenter">
           <div className="previewKicker">{activeScene.asset.kind.replace("-", " ").toUpperCase()}</div>
           <h3>{activeScene.screenText}</h3>
-          {!image && <p>{activeScene.visual}</p>}
+          {!image && !stockVideo && <p>{activeScene.visual}</p>}
         </div>
         <div className="previewBottom">
           <div className="captionMock">{activeCaption?.text || activeScene.voiceover}</div>
@@ -67,6 +74,12 @@ export default function ReelPreview({
         <button onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play preview"}</button>
         <span>{time.toFixed(1)} / {project.duration}s</span>
       </div>
+
+      {stock ? <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap",marginTop:10,fontSize:10,color:"#7f878d"}}>
+        <a href={stock.sourcePage} target="_blank" rel="noreferrer" style={{color:"#a77762",textDecoration:"none"}}>{stock.attribution}</a>
+        <span>·</span>
+        <a href={stock.providerUrl} target="_blank" rel="noreferrer" style={{color:"#8398a5",textDecoration:"none"}}>Media provided by Pexels</a>
+      </div> : null}
 
       <div className="miniTimeline">
         {project.scenes.map((scene) => (

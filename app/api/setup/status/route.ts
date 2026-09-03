@@ -6,6 +6,7 @@ import { pronunciationRegistryReady } from "@/lib/hay/pronunciation-store";
 import { getConnectorReadiness } from "@/lib/marketing/connectors";
 import { isPublishWorkerConfigured } from "@/lib/publish/client";
 import { isOpenAITranscriptionConfigured } from "@/lib/providers/openai-transcription";
+import { isPexelsConfigured } from "@/lib/providers/pexels";
 import { isVeoConfigured } from "@/lib/providers/veo";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
@@ -18,6 +19,7 @@ export async function GET() {
   const providers = {
     strategy: Boolean(process.env.OPENAI_API_KEY),
     image: Boolean(process.env.OPENAI_API_KEY),
+    stock: isPexelsConfigured(),
     voice: Boolean(process.env.ELEVENLABS_API_KEY && (process.env.ELEVENLABS_VOICE_ID || process.env.ELEVENLABS_VOICE_ID_MALE || process.env.ELEVENLABS_VOICE_ID_FEMALE)) || Boolean(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION),
     video: isVeoConfigured(),
     transcription: isOpenAITranscriptionConfigured(),
@@ -78,6 +80,7 @@ export async function GET() {
     developerApiReady,
     persistence: { supabase, admin },
     providers,
+    creatorMedia:{stock:{provider:"pexels",configured:providers.stock,portraitFirst:true,maxSearchesPerProject:3,attributionPreserved:true}},
     languageApi,
     languageData:{
       pronunciationRegistry,
