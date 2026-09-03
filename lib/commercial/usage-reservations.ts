@@ -154,6 +154,35 @@ export async function reserveUsage(input: ReservationInput): Promise<UsageReserv
   };
 }
 
+export async function resizeUsageReservation(reservation: UsageReservation, quantity: number) {
+  const nextQuantity=Math.max(0,Number(quantity)||0);
+  if(nextQuantity<=0)return {resized:false,reason:"invalid_quantity"};
+  if(reservation.duplicate)return {resized:false,reason:"duplicate_request"};
+
+  if(!reservation.atomic){
+    const allowance=await checkUsageAllowance(reservation.input.meter,nextQuantity);
+    if(!allowance.allowed)return {resized:false,reason:allowance.reason,context:allowance.context};
+    reservation.input.quantity=nextQuantity;
+    return {resized:true,atomic:false,quantity:nextQuantity};
+  }
+
+  const admin=createAdminClient();
+  const {data,error}=await admin.rpc("hay_resize_usage_reservation",{
+    p_owner_id:reservation.ownerId,
+    p_event_id:reservation.eventId,
+    p_release_token:reservation.releaseToken,
+    p_quantity:nextQuantity,
+  });
+  if(error){
+    console.error("Atomic usage resize RPC failed",error.message);
+    return {resized:false,reason:"atomic_usage_resize_migration_required",detail:error.message};
+  }
+  const result=object(data);
+  if(result.resized!==true)return {resized:false,reason:text(result.reason)||"reservation_resize_failed"};
+  reservation.input.quantity=nextQuantity;
+  return {resized:true,atomic:true,quantity:nextQuantity,eventId:reservation.eventId};
+}
+
 export async function commitUsageReservation(
   reservation: UsageReservation,
   metadataPatch: Record<string, unknown> = {},
