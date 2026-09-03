@@ -75,6 +75,35 @@ function makeReleaseToken() {
   return `${crypto.randomUUID()}${crypto.randomUUID()}${crypto.randomUUID()}`;
 }
 
+export async function atomicUsageMigrationsReady(){
+  if(!isSupabaseAdminConfigured())return false;
+  try{
+    const admin=createAdminClient();
+    const [ledger,reserve,resize]=await Promise.all([
+      admin.from("usage_events").select("id,state,reservation_expires_at",{head:true,count:"exact"}).limit(1),
+      // Mutation-free capability probes. Null owner IDs return owner_required when the
+      // RPCs exist; a missing 010/011 migration returns a PostgREST RPC error instead.
+      admin.rpc("hay_reserve_usage",{
+        p_owner_id:null,
+        p_meter:"content_assets",
+        p_quantity:1,
+        p_business_id:null,
+        p_source:"migration_probe",
+        p_idempotency_key:null,
+        p_metadata:{},
+        p_release_token:"migration-probe-release-token-0000000000000000",
+      }),
+      admin.rpc("hay_resize_usage_reservation",{
+        p_owner_id:null,
+        p_event_id:null,
+        p_release_token:"migration-probe-release-token-0000000000000000",
+        p_quantity:1,
+      }),
+    ]);
+    return !ledger.error&&!reserve.error&&!resize.error;
+  }catch{return false;}
+}
+
 export async function reserveUsage(input: ReservationInput): Promise<UsageReservation | UsageReservationFailure> {
   const preflight = await checkUsageAllowance(input.meter, input.quantity);
   const context = preflight.context;
