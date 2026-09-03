@@ -15,6 +15,7 @@
     "security:regeneration": "node scripts/regeneration-policy-check.mjs",
     "security:direct-providers": "node scripts/direct-provider-policy-check.mjs",
     "security:developer-api": "node scripts/developer-api-policy-check.mjs",
+    "security:billing": "node scripts/billing-policy-check.mjs",
     "ui:contract": "node scripts/ui-contract-check.mjs",
     "env:check": "node scripts/env-contract.mjs",
     "smoke": "node scripts/runtime-smoke.mjs"

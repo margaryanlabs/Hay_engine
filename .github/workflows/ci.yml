@@ -35,6 +35,7 @@ jobs:
       - run: npm run security:regeneration
       - run: npm run security:direct-providers
       - run: npm run security:developer-api
+      - run: npm run security:billing
       - run: npm run ui:contract
       - run: npm run typecheck
       - run: npm run quality

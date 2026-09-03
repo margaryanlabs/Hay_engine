@@ -93,10 +93,10 @@ assert.match(setupStatus,/atomic_usage_migrations_010_011_required/,"Setup diagn
 assert.match(setupStatus,/developer_api_migration_012_required/,"Setup diagnostics must expose missing Developer API migration 012 as an explicit blocker");
 
 const readme=read("README.md");
-for(const migration of ["010_atomic_usage_reservations.sql","011_atomic_usage_resize.sql","012_atomic_developer_api_requests.sql"]){
+for(const migration of ["010_atomic_usage_reservations.sql","011_atomic_usage_resize.sql","012_atomic_developer_api_requests.sql","013_atomic_billing_events.sql"]){
   assert.match(readme,new RegExp(migration.replaceAll(".","\\.")),`README deployment order must include ${migration}`);
 }
-assert.match(readme,/Do not set `HAY_ENFORCE_PLANS=true` until migrations `007`, `010` and `011` are applied/,"Plan enforcement runbook must require atomic Studio migrations");
+assert.match(readme,/Do not set `HAY_ENFORCE_PLANS=true` until migrations `007`, `010`, `011` and `013` are applied/,"Plan enforcement runbook must require atomic Studio and billing migrations");
 assert.match(readme,/Do not set `HAY_DEVELOPER_API_ENABLED=true` until migrations `007` and `012` are applied/,"Developer API runbook must require atomic request-admission migration");
 
 console.log(JSON.stringify({
