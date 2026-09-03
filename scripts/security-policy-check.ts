@@ -176,6 +176,11 @@ assert.match(
   /createAdminClient\(\)[\s\S]*?\.rpc\("hay_reserve_usage"/,
   "Enforced quota reservations must execute through the server-only Supabase admin client",
 );
+assert.match(
+  reservationSource,
+  /resizeUsageReservation[\s\S]*?\.rpc\("hay_resize_usage_reservation"/,
+  "Exact billable quantities must be resized through the server-only atomic RPC",
+);
 
 const atomicMigration=readFileSync("supabase/010_atomic_usage_reservations.sql","utf8");
 assert.match(atomicMigration,/security invoker/g,"Atomic quota RPCs must remain SECURITY INVOKER");
@@ -201,12 +206,59 @@ assert.match(
   "Reservation release capability must be stored only as a SHA-256 hash",
 );
 
+const resizeMigration=readFileSync("supabase/011_atomic_usage_resize.sql","utf8");
+assert.match(resizeMigration,/security invoker/i,"Reservation resize RPC must remain SECURITY INVOKER");
+assert.doesNotMatch(resizeMigration,/security definer/i,"Reservation resize must not introduce a SECURITY DEFINER public RPC");
+assert.match(
+  resizeMigration,
+  /revoke all on function public\.hay_resize_usage_reservation[\s\S]*?from public, anon, authenticated;[\s\S]*?grant execute on function public\.hay_resize_usage_reservation[\s\S]*?to service_role;/,
+  "Reservation resize RPC must be service-role only",
+);
+assert.match(
+  resizeMigration,
+  /where owner_id = p_owner_id[\s\S]*?for update;/,
+  "Reservation resize must hold the same entitlement row lock while recomputing capacity",
+);
+assert.match(
+  resizeMigration,
+  /id <> v_event\.id[\s\S]*?state = 'consumed'[\s\S]*?state = 'reserved'/,
+  "Reservation resize must exclude its own prior quantity while counting all other consumed and active reserved usage",
+);
+
 const voiceRouteSource = readFileSync("app/api/voice/route.ts", "utf8");
-const voicePreflightCall = voiceRouteSource.indexOf("await checkUsageAllowance(\"voice_minutes\",preflightMinutes)");
-const voiceNaturalizerCall = voiceRouteSource.indexOf("await naturalizeArmenianText(text,style)");
+assert.match(voiceRouteSource,/MAX_VOICE_CHARS\s*=\s*8_000/,"Direct Voice API must keep a hard text-size bound");
+assert.match(voiceRouteSource,/value\.length\/780/,"Voice minute estimation must include a character floor against no-space token abuse");
+const voiceProviderCheck=voiceRouteSource.indexOf("if(!voice?.available)");
+const voiceReserveCall=voiceRouteSource.indexOf("reservation=await reserveUsage(");
+const voiceDuplicateBranch=voiceRouteSource.indexOf("if(reservation.duplicate)");
+const voiceNaturalizerCall=voiceRouteSource.indexOf("await naturalizeArmenianText(text,style)");
+const voiceResizeCall=voiceRouteSource.indexOf("await resizeUsageReservation(reservation,minutes)");
+const voiceTtsCall=voiceRouteSource.indexOf("await createArmenianSpeech(");
+const voiceCommitCall=voiceRouteSource.indexOf("await commitUsageReservation(");
 assert.ok(
-  voicePreflightCall >= 0 && voiceNaturalizerCall > voicePreflightCall,
-  "Voice allowance must be checked before the OpenAI-backed Armenian naturalizer can run",
+  voiceProviderCheck>=0&&voiceProviderCheck<voiceReserveCall,
+  "Direct Voice API must reject an unavailable TTS provider before reserving quota or spending OpenAI naturalization tokens",
+);
+assert.ok(
+  voiceReserveCall>=0&&voiceReserveCall<voiceNaturalizerCall,
+  "Direct Voice API must reserve voice quota before the OpenAI-backed Armenian naturalizer can run",
+);
+assert.ok(
+  voiceDuplicateBranch>voiceReserveCall&&voiceDuplicateBranch<voiceNaturalizerCall,
+  "Direct Voice idempotency duplicates must return before OpenAI naturalization or TTS",
+);
+assert.ok(
+  voiceResizeCall>voiceNaturalizerCall&&voiceResizeCall<voiceTtsCall,
+  "Direct Voice must atomically resize the reservation to final normalized minutes before TTS",
+);
+assert.ok(
+  voiceTtsCall>=0&&voiceCommitCall>voiceTtsCall,
+  "Direct Voice must commit its exact reserved usage only after a successful TTS provider call",
+);
+assert.match(
+  voiceRouteSource,
+  /voice_usage_commit_failed[\s\S]*?status:503/,
+  "Direct Voice must fail closed without releasing capacity after paid TTS succeeds but usage commit fails",
 );
 
 const contentFactorySource = readFileSync("app/api/marketing/content/create/route.ts", "utf8");
@@ -230,7 +282,7 @@ assert.ok(
 
 console.log(JSON.stringify({
   securityPolicy: "passed",
-  cases: 41,
+  cases: 49,
   providerCostRoutes: meteredProviderRoutes,
   meteredLanguageRoutes,
   usageBusinessOwnership: true,
@@ -240,7 +292,11 @@ console.log(JSON.stringify({
   veoPreProviderIdempotency: true,
   atomicUsageServiceRoleOnly: true,
   atomicUsageSerialized: true,
-  voicePreProviderGate: true,
+  atomicUsageResizeServiceRoleOnly: true,
+  voiceAtomicPreProviderReservation: true,
+  voiceAtomicResizeBeforeTts: true,
+  voicePreProviderIdempotency: true,
+  voiceRequestSizeBound: true,
   contentFactoryVoicePreProviderGate: true,
   contentFactoryAllVoiceMetered: true,
   translationSizeBound: true,
