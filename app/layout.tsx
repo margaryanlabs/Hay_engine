@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "./landing-v4.css";
+import "./landing-v5.css";
 import "./creator.css";
 import "./marketing.css";
 import "./marketing-v2.css";
@@ -31,8 +31,8 @@ import "./quality.css";
 import "./login.css";
 
 export const metadata: Metadata = {
-  title: "HAY Engine — Armenian-First AI Marketing OS",
-  description: "An Armenian-first AI marketing operating system for business intelligence, strategy, natural Armenian content, voice, publishing, experimentation and first-party attribution.",
+  title: "HAY Engine — AI Marketing Autopilot for Armenia",
+  description: "Connect your business once. HAY plans, creates and operates Armenian-first marketing with content, voice, publishing, memory and outcome learning.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
