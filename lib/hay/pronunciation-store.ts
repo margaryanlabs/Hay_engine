@@ -3,7 +3,8 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import type { Dialect } from "./types";
+import { normalizeForSpeech } from "./normalize";
+import type { Dialect, Locale } from "./types";
 
 export type PronunciationScope="system"|"account"|"business";
 export type PronunciationCategory="brand"|"acronym"|"finance"|"technology"|"social"|"place"|"person"|"product"|"general";
@@ -38,6 +39,7 @@ const CATEGORIES:PronunciationCategory[]=["brand","acronym","finance","technolog
 function clean(value:unknown,max=240){return String(value||"").trim().replace(/\s+/g," ").slice(0,max);}
 function writtenKey(value:string){return value.trim().toLocaleUpperCase("en-US");}
 function category(value:unknown):PronunciationCategory{const item=String(value||"general") as PronunciationCategory;return CATEGORIES.includes(item)?item:"general";}
+function rows(value:unknown):StoredPronunciationEntry[]{return Array.isArray(value)?value as StoredPronunciationEntry[]:[];}
 
 export async function currentPronunciationOwner(){
   if(!isSupabaseConfigured())return null;
@@ -67,22 +69,30 @@ export async function pronunciationRegistryReady(){
 
 export async function loadPersistentPronunciations(input:{ownerId?:string|null;businessId?:string|null;dialect?:Dialect}){
   const dialect=input.dialect||"eastern";
-  if(!isSupabaseAdminConfigured())return {configured:false,entries:[] as StoredPronunciationEntry[],overrides:{} as Record<string,string>,version:"core"};
-  const admin=createAdminClient();
-  const queries:PromiseLike<{data:unknown;error:unknown}>[]=[];
-  queries.push(admin.from("pronunciation_entries").select(SELECT_FIELDS).eq("scope","system").eq("status","active").eq("source_type","hay-reviewed"));
-  if(input.ownerId)queries.push(admin.from("pronunciation_entries").select(SELECT_FIELDS).eq("scope","account").eq("owner_id",input.ownerId).eq("status","active"));
-  const validBusiness=Boolean(input.ownerId&&input.businessId&&await ownsBusiness(input.ownerId,input.businessId));
-  if(validBusiness)queries.push(admin.from("pronunciation_entries").select(SELECT_FIELDS).eq("scope","business").eq("owner_id",input.ownerId!).eq("business_id",input.businessId!).eq("status","active"));
+  const empty={configured:false,entries:[] as StoredPronunciationEntry[],overrides:{} as Record<string,string>,version:"core",validBusiness:false};
+  if(!isSupabaseAdminConfigured())return empty;
 
-  const results=await Promise.all(queries);
-  if(results.some(result=>result.error))return {configured:false,entries:[] as StoredPronunciationEntry[],overrides:{} as Record<string,string>,version:"core"};
+  const admin=createAdminClient();
+  const system=await admin.from("pronunciation_entries").select(SELECT_FIELDS).eq("scope","system").eq("status","active").eq("source_type","hay-reviewed");
+  if(system.error)return empty;
+
+  const layers:StoredPronunciationEntry[][]=[rows(system.data)];
+  if(input.ownerId){
+    const account=await admin.from("pronunciation_entries").select(SELECT_FIELDS).eq("scope","account").eq("owner_id",input.ownerId).eq("status","active");
+    if(account.error)return empty;
+    layers.push(rows(account.data));
+  }
+
+  const validBusiness=Boolean(input.ownerId&&input.businessId&&await ownsBusiness(input.ownerId,input.businessId));
+  if(validBusiness){
+    const business=await admin.from("pronunciation_entries").select(SELECT_FIELDS).eq("scope","business").eq("owner_id",input.ownerId!).eq("business_id",input.businessId!).eq("status","active");
+    if(business.error)return empty;
+    layers.push(rows(business.data));
+  }
+
   const merged=new Map<string,StoredPronunciationEntry>();
-  for(const result of results){
-    for(const raw of (Array.isArray(result.data)?result.data:[])){
-      const row=raw as StoredPronunciationEntry;
-      merged.set(String(row.written_key||writtenKey(row.written)),row);
-    }
+  for(const layer of layers){
+    for(const row of layer)merged.set(String(row.written_key||writtenKey(row.written)),row);
   }
   const entries=[...merged.values()];
   const overrides=Object.fromEntries(entries.map(row=>[row.written,dialect==="western"?row.spoken_hy_western:row.spoken_hy_eastern]));
@@ -91,18 +101,35 @@ export async function loadPersistentPronunciations(input:{ownerId?:string|null;b
   return {configured:true,entries,overrides,version,validBusiness};
 }
 
+export async function normalizeWithPronunciationRegistry(input:{text:string;locale?:Locale;dialect?:Dialect;ownerId?:string|null;businessId?:string|null}){
+  const locale=input.locale||"hy";
+  const dialect=input.dialect||"eastern";
+  const registry=locale==="hy"?await loadPersistentPronunciations({ownerId:input.ownerId,businessId:input.businessId,dialect}):{configured:false,entries:[] as StoredPronunciationEntry[],overrides:{} as Record<string,string>,version:"core",validBusiness:false};
+  const normalized=normalizeForSpeech(input.text,locale,dialect,registry.overrides);
+  return {
+    normalized,
+    registry:{version:registry.version,persistent:registry.configured,appliedEntries:registry.entries.length,businessApplied:registry.validBusiness},
+  };
+}
+
 export async function listOwnerPronunciations(ownerId:string,businessId?:string|null){
-  if(!isSupabaseAdminConfigured())return {configured:false,entries:[] as StoredPronunciationEntry[]};
+  if(!isSupabaseAdminConfigured())return {configured:false,entries:[] as StoredPronunciationEntry[],reviewedCount:0,businessValid:false};
   const admin=createAdminClient();
-  const queries=[
-    admin.from("pronunciation_entries").select(SELECT_FIELDS).eq("scope","system").eq("status","active").eq("source_type","hay-reviewed").order("written"),
-    admin.from("pronunciation_entries").select(SELECT_FIELDS).eq("scope","account").eq("owner_id",ownerId).neq("status","archived").order("updated_at",{ascending:false}),
-  ];
+  const reviewed=await admin.from("pronunciation_entries").select("id",{head:true,count:"exact"}).eq("scope","system").eq("status","active").eq("source_type","hay-reviewed");
+  const account=await admin.from("pronunciation_entries").select(SELECT_FIELDS).eq("scope","account").eq("owner_id",ownerId).neq("status","archived").order("updated_at",{ascending:false});
+  if(reviewed.error||account.error)return {configured:false,error:reviewed.error?.message||account.error?.message,entries:[] as StoredPronunciationEntry[],reviewedCount:0,businessValid:false};
+
+  const entries=rows(account.data);
   let businessValid=false;
-  if(businessId){businessValid=await ownsBusiness(ownerId,businessId);if(businessValid)queries.push(admin.from("pronunciation_entries").select(SELECT_FIELDS).eq("scope","business").eq("owner_id",ownerId).eq("business_id",businessId).neq("status","archived").order("updated_at",{ascending:false}));}
-  const results=await Promise.all(queries);
-  if(results.some(result=>result.error))return {configured:false,error:results.find(result=>result.error)?.error,entries:[] as StoredPronunciationEntry[]};
-  return {configured:true,businessValid,entries:results.flatMap(result=>(result.data||[]) as StoredPronunciationEntry[])};
+  if(businessId){
+    businessValid=await ownsBusiness(ownerId,businessId);
+    if(businessValid){
+      const business=await admin.from("pronunciation_entries").select(SELECT_FIELDS).eq("scope","business").eq("owner_id",ownerId).eq("business_id",businessId).neq("status","archived").order("updated_at",{ascending:false});
+      if(business.error)return {configured:false,error:business.error.message,entries:[] as StoredPronunciationEntry[],reviewedCount:Number(reviewed.count||0),businessValid};
+      entries.push(...rows(business.data));
+    }
+  }
+  return {configured:true,businessValid,reviewedCount:Number(reviewed.count||0),entries};
 }
 
 export async function upsertOwnerPronunciation(input:{ownerId:string;scope:"account"|"business";businessId?:string|null;written:string;spokenEastern:string;spokenWestern?:string;category?:unknown;notes?:unknown;sourceReference?:unknown;consentReference?:unknown}){
@@ -112,11 +139,13 @@ export async function upsertOwnerPronunciation(input:{ownerId:string;scope:"acco
   if(!spokenEastern)return {configured:true,error:"spoken_eastern_required" as const};
   const businessId=input.scope==="business"?clean(input.businessId,80):"";
   if(input.scope==="business"&&(!businessId||!(await ownsBusiness(input.ownerId,businessId))))return {configured:true,error:"business_not_found" as const};
+
   const admin=createAdminClient();
   let existing=admin.from("pronunciation_entries").select("id").eq("scope",input.scope).eq("owner_id",input.ownerId).eq("written_key",writtenKey(written));
   existing=input.scope==="business"?existing.eq("business_id",businessId):existing.is("business_id",null);
   const current=await existing.maybeSingle();
   if(current.error)return {configured:false,error:current.error.message};
+
   const payload={
     written,
     spoken_hy_eastern:spokenEastern,
