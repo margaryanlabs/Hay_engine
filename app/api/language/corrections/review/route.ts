@@ -24,7 +24,7 @@ export async function POST(request:Request){
   if(!decision)return NextResponse.json({error:"review_decision_required"},{status:400});
   const result=await reviewLanguageCorrection({reviewerId:actor.ownerId,id,decision,notes:body.notes,promotePronunciation:body.promotePronunciation===true});
   if("error" in result&&result.error){
-    const conflictErrors=["correction_not_found","correction_withdrawn","correction_already_reviewed","review_in_progress","review_conflict","product_improvement_consent_required"];
+    const conflictErrors=["correction_not_found","correction_withdrawn","correction_already_reviewed","review_in_progress","review_conflict","product_improvement_consent_required","pronunciation_review_conflict"];
     return NextResponse.json(result,{status:conflictErrors.includes(String(result.error))?409:503});
   }
   return NextResponse.json(result);
