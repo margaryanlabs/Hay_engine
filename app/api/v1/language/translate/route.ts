@@ -22,6 +22,7 @@ export async function POST(request:Request){
   const result=await translateHayText({text,source,target});
   if(!result.configured)return NextResponse.json({...result,error:"translation_provider_unconfigured"},{status:503});
   if(result.generatedBy==="rejected")return NextResponse.json({...result,error:"translation_preservation_failed"},{status:422});
-  await recordDeveloperApiUsage(auth.context,{endpoint:"/api/v1/language/translate",operation:"translate",inputChars:text.length,metadata:{source,target}});
+  const usage=await recordDeveloperApiUsage(auth.context,{endpoint:"/api/v1/language/translate",operation:"translate",inputChars:text.length,metadata:{source,target}});
+  if(!usage.recorded)return NextResponse.json({error:"developer_api_metering_failed"},{status:503});
   return NextResponse.json({apiVersion:"v1",...result});
 }
