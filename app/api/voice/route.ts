@@ -21,10 +21,23 @@ function estimatedVoiceMinutes(text:string){
   return Math.max(0.1,Math.round((words/135)*1000)/1000);
 }
 
+function allowanceStatus(reason:string|undefined){
+  return reason==="unauthorized"?401:reason==="commercial_migration_required"?503:402;
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
   const text = String(body.text ?? "").trim();
   if (!text) return NextResponse.json({ error: "text_required" }, { status: 400 });
+
+  // Gate before conversational naturalization because naturalizeArmenianText may itself
+  // invoke OpenAI. This prevents unauthenticated, inactive or exhausted accounts from
+  // spending provider tokens before the route reaches the TTS allowance check.
+  const preflightMinutes=estimatedVoiceMinutes(text);
+  const preflight=await checkUsageAllowance("voice_minutes",preflightMinutes);
+  if(!preflight.allowed){
+    return NextResponse.json({error:preflight.reason,meter:"voice_minutes",required:preflightMinutes,commercial:preflight.context},{status:allowanceStatus(preflight.reason)});
+  }
 
   const dialect=body.dialect === "western" ? "western" : "eastern";
   const style=(body.style==="standard"||body.style==="yerevan"?body.style:"natural") as ArmenianSpeechStyle;
@@ -36,10 +49,11 @@ export async function POST(request: Request) {
   const voice = resolveVoice(body.voiceId ? String(body.voiceId) : undefined);
   const minutes=estimatedVoiceMinutes(normalized.spokenText);
 
-  const allowance=await checkUsageAllowance("voice_minutes",minutes);
-  if(!allowance.allowed){
-    const status=allowance.reason==="unauthorized"?401:allowance.reason==="commercial_migration_required"?503:402;
-    return NextResponse.json({error:allowance.reason,meter:"voice_minutes",required:minutes,commercial:allowance.context},{status});
+  if(minutes>preflightMinutes){
+    const allowance=await checkUsageAllowance("voice_minutes",minutes);
+    if(!allowance.allowed){
+      return NextResponse.json({error:allowance.reason,meter:"voice_minutes",required:minutes,commercial:allowance.context},{status:allowanceStatus(allowance.reason)});
+    }
   }
 
   const speech = voice ? await createArmenianSpeech({text:normalized.spokenText,provider:voice.provider,providerVoiceId:voice.providerVoiceId}) : null;
