@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateDeveloperRequest, developerApiMaxTextChars, recordDeveloperApiUsage } from "@/lib/developer/api-keys";
-import { pronounceArmenian } from "@/lib/hay/pronunciation-registry";
-import { loadPersistentPronunciations } from "@/lib/hay/pronunciation-store";
+import { HAY_PRONUNCIATION_VERSION } from "@/lib/hay/pronunciation-registry";
+import { normalizeWithPronunciationRegistry } from "@/lib/hay/pronunciation-store";
 import type { Dialect } from "@/lib/hay/types";
 
 export const runtime="nodejs";
@@ -16,8 +16,9 @@ export async function POST(request:Request){
   if(text.length>maxTextChars)return NextResponse.json({error:"text_too_large",maxTextChars},{status:413});
   const dialect=(body.dialect==="western"?"western":"eastern") as Dialect;
   const businessId=typeof body.businessId==="string"?body.businessId:null;
-  const layer=await loadPersistentPronunciations({ownerId:auth.context.ownerId,businessId,dialect});
-  const result=pronounceArmenian(text,dialect,layer.overrides,layer.version);
-  await recordDeveloperApiUsage(auth.context,{endpoint:"/api/v1/language/pronounce",operation:"pronounce",inputChars:text.length,metadata:{dialect,registryVersion:layer.version,businessApplied:Boolean(layer.validBusiness)}});
-  return NextResponse.json({apiVersion:"v1",...result,registry:{persistent:layer.configured,appliedEntries:layer.entries.length,businessApplied:Boolean(layer.validBusiness)}});
+  const result=await normalizeWithPronunciationRegistry({text,locale:"hy",dialect,ownerId:auth.context.ownerId,businessId});
+  const version=result.registry.version!=="core"?`${HAY_PRONUNCIATION_VERSION}+${result.registry.version}`:HAY_PRONUNCIATION_VERSION;
+  const usage=await recordDeveloperApiUsage(auth.context,{endpoint:"/api/v1/language/pronounce",operation:"pronounce",inputChars:text.length,metadata:{dialect,registryVersion:result.registry.version,businessApplied:result.registry.businessApplied}});
+  if(!usage.recorded)return NextResponse.json({error:"developer_api_metering_failed"},{status:503});
+  return NextResponse.json({apiVersion:"v1",version,locale:"hy-AM",dialect,...result.normalized,registry:result.registry});
 }
