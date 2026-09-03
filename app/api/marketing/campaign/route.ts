@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkUsageAllowance, recordUsage } from "@/lib/commercial/entitlements";
+import { commitUsageReservation, releaseUsageReservation, reserveUsage, resizeUsageReservation, type UsageReservation } from "@/lib/commercial/usage-reservations";
 import { analyzeCompetitorEvidence, collectCompetitorEvidence, competitorContextForPlan } from "@/lib/marketing/competitor-intelligence";
 import { applyCampaignWindowSchedule, buildCampaignBlueprint, campaignPlanningContext, normalizeCampaignBrief, remapCampaignBlueprint } from "@/lib/marketing/campaign";
 import { contentMemoryForPlan, loadContentMemory } from "@/lib/marketing/content-memory";
@@ -12,7 +12,15 @@ export const runtime="nodejs";
 const DAY=24*60*60*1000;
 const YEREVAN_OFFSET="+04:00";
 
+function usageStatus(reason:string|undefined){
+  if(reason==="unauthorized")return 401;
+  if(reason==="request_in_progress"||reason==="duplicate_request")return 409;
+  if(reason==="commercial_migration_required"||reason==="atomic_usage_admin_required"||reason==="atomic_usage_migration_required"||reason==="atomic_usage_reservation_failed"||reason==="atomic_usage_resize_migration_required"||reason==="reservation_resize_failed")return 503;
+  return 402;
+}
+
 export async function POST(request:Request){
+  let pendingReservation:UsageReservation|null=null;
   try{
     const body=await request.json();
     const business=body.business as BusinessProfile|undefined;
@@ -28,13 +36,24 @@ export async function POST(request:Request){
     if(brief.eventDate&&(Date.parse(brief.eventDate)<start||Date.parse(brief.eventDate)>end))return NextResponse.json({error:"event_date_outside_campaign_window"},{status:400});
 
     const planningDays=Math.min(30,Math.max(7,durationDays));
-    const allowance=await checkUsageAllowance("content_assets",planningDays);
-    if(!allowance.allowed){
-      const status=allowance.reason==="unauthorized"?401:allowance.reason==="commercial_migration_required"?503:402;
-      return NextResponse.json({error:allowance.reason,meter:"content_assets",required:planningDays,commercial:allowance.context},{status});
-    }
-
     const requestedBusinessId=typeof body.businessId==="string"?body.businessId:undefined;
+    const requestId=typeof body.requestId==="string"?body.requestId.trim().slice(0,200):"";
+    const reservation=await reserveUsage({
+      meter:"content_assets",
+      quantity:planningDays,
+      businessId:requestedBusinessId||null,
+      source:"marketing_campaign",
+      idempotencyKey:requestId?`marketing-campaign:${requestId}`:undefined,
+      metadata:{durationDays,planningDays,businessName:business.name,startDate:brief.startDate,endDate:brief.endDate},
+    });
+    if(!reservation.allowed){
+      return NextResponse.json({error:reservation.reason,meter:"content_assets",required:planningDays,commercial:reservation.context},{status:usageStatus(reservation.reason)});
+    }
+    if(reservation.duplicate){
+      return NextResponse.json({error:"duplicate_marketing_campaign_request",commercialUsage:{recorded:true,duplicate:true,eventId:reservation.eventId,metadata:reservation.metadata}},{status:409});
+    }
+    pendingReservation=reservation;
+
     const competitors=(body.competitors??[]) as CompetitorInput[];
     const [performance,competitorEvidence,contentMemory]=await Promise.all([
       loadMarketingPerformance(requestedBusinessId,business.name),
@@ -53,14 +72,28 @@ export async function POST(request:Request){
     const campaign=buildCampaignBlueprint(brief,scheduled);
     const persisted=await persistMarketingPlan(scheduled,requestedBusinessId,{campaign});
     const durableCampaign=remapCampaignBlueprint(campaign,persisted.idMap);
-    const usage=await recordUsage({
-      meter:"content_assets",
-      quantity:persisted.plan.items.length,
-      businessId:persisted.businessId||requestedBusinessId||null,
-      source:"marketing_campaign",
-      idempotencyKey:typeof body.requestId==="string"&&body.requestId?`marketing-campaign:${body.requestId}`:undefined,
-      metadata:{durationDays,planningDays,generatedBy:persisted.plan.generatedBy,planId:persisted.planId||persisted.plan.id,campaignId:durableCampaign.id},
+
+    const actualAssets=persisted.plan.items.length;
+    if(actualAssets!==planningDays){
+      const resized=await resizeUsageReservation(reservation,actualAssets);
+      if(!resized.resized){
+        pendingReservation=null;
+        return NextResponse.json({error:resized.reason,meter:"content_assets",required:actualAssets,commercial:reservation.context},{status:usageStatus(resized.reason)});
+      }
+    }
+
+    pendingReservation=null;
+    const usage=await commitUsageReservation(reservation,{
+      durationDays,
+      planningDays,
+      actualAssets,
+      generatedBy:persisted.plan.generatedBy,
+      planId:persisted.planId||persisted.plan.id,
+      campaignId:durableCampaign.id,
     });
+    if(!usage.recorded){
+      return NextResponse.json({error:"marketing_campaign_usage_commit_failed",commercialUsage:usage},{status:503});
+    }
 
     return NextResponse.json({
       plan:persisted.plan,
@@ -72,6 +105,7 @@ export async function POST(request:Request){
       commercialUsage:usage,
     });
   }catch(error){
+    if(pendingReservation)await releaseUsageReservation(pendingReservation).catch(()=>undefined);
     console.error("Campaign Brain failed",error);
     return NextResponse.json({error:"campaign_generation_failed",detail:error instanceof Error?error.message:String(error)},{status:500});
   }
