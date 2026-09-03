@@ -23,6 +23,7 @@ import "./studio-conversion.css";
 import "./voice-lab.css";
 import "./language-lab.css";
 import "./native-benchmark.css";
+import "./developer.css";
 import "./quality.css";
 import "./login.css";
 
