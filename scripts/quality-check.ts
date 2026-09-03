@@ -1,3 +1,4 @@
+import { correctionReusePolicy } from "../lib/hay/correction-policy";
 import { normalizeForSpeech } from "../lib/hay/normalize";
 import { protectedValueReport } from "../lib/hay/protected-values";
 import { runArmenianQualityBenchmark } from "../lib/hay/quality-suite";
@@ -54,6 +55,21 @@ for(const test of runtimePronunciationCases){
 }
 console.log(`Runtime pronunciation layer: ${runtimePronunciationCases.length-runtimePronunciationFailures}/${runtimePronunciationCases.length} cases`);
 
-if(report.failedCases>0||protectedFailures>0||runtimePronunciationFailures>0){
+const correctionPolicyCases=[
+  {id:"cp-001",consent:{productImprovement:false,benchmark:false,modelTraining:false,withdrawn:false},expect:{review:false,promote:false,benchmark:false,training:false}},
+  {id:"cp-002",consent:{productImprovement:false,benchmark:true,modelTraining:true,withdrawn:false},expect:{review:false,promote:false,benchmark:false,training:false}},
+  {id:"cp-003",consent:{productImprovement:true,benchmark:false,modelTraining:false,withdrawn:false},expect:{review:true,promote:true,benchmark:false,training:false}},
+  {id:"cp-004",consent:{productImprovement:true,benchmark:true,modelTraining:true,withdrawn:false},expect:{review:true,promote:true,benchmark:true,training:true}},
+  {id:"cp-005",consent:{productImprovement:true,benchmark:true,modelTraining:true,withdrawn:true},expect:{review:false,promote:false,benchmark:false,training:false}},
+] as const;
+let correctionPolicyFailures=0;
+for(const test of correctionPolicyCases){
+  const policy=correctionReusePolicy(test.consent);
+  const passed=policy.canStorePrivately&&policy.canEnterReviewQueue===test.expect.review&&policy.canPromoteToReviewedData===test.expect.promote&&policy.canUseInBenchmark===test.expect.benchmark&&policy.canUseForModelTraining===test.expect.training;
+  if(!passed){correctionPolicyFailures+=1;console.error(`FAIL ${test.id} [correction-consent-policy] ${JSON.stringify(policy)}`);}
+}
+console.log(`Correction consent policy: ${correctionPolicyCases.length-correctionPolicyFailures}/${correctionPolicyCases.length} cases`);
+
+if(report.failedCases>0||protectedFailures>0||runtimePronunciationFailures>0||correctionPolicyFailures>0){
   process.exitCode=1;
 }

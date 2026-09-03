@@ -51,14 +51,19 @@ This file tracks what is actually missing in the current repository. Completed i
 - [x] pronunciation management UI with provenance fields and business scoping
 - [x] runtime precedence: business → account → HAY-reviewed system → curated core
 - [x] runtime pronunciation override regression gate
+- [x] consent-aware human correction capture with private-by-default storage
+- [x] separate product-improvement / benchmark / model-training consent controls
+- [x] reviewer queue gated by server-only email allowlist
+- [x] correction withdrawal that revokes linked dataset eligibility
+- [x] correction and dataset append-only provenance snapshots
+- [x] deterministic correction-consent policy release gate
 - [x] Language Lab for pronunciation / transcription / captions / translation testing
 - [x] blind native-speaker benchmark protocol + `/benchmark` review harness
 - [ ] collect enough independent native-speaker reviews to publish statistically useful provider comparisons
 - [ ] STT provider benchmark and quality/cost routing (OpenAI adapter is live; Chirp 3 is the next benchmark adapter)
 - [ ] reviewed Western Armenian evaluation set
 - [ ] larger Armenian/Russian/English code-switch benchmark
-- [ ] reviewed Armenia names / brands / places pronunciation graph
-- [ ] human correction capture workflow with explicit consent (schema fields exist; capture/promotion workflow is not complete)
+- [ ] reviewed Armenia names / brands / places pronunciation graph at useful scale
 
 ## Phase 3 — commercial core
 
@@ -93,30 +98,37 @@ This file tracks what is actually missing in the current repository. Completed i
 - [x] model/quality dashboard via `/quality` and `/api/quality`
 - [x] interactive `/language` Language Lab surface
 - [x] `/pronunciations` owner/business Dictionary Console
+- [x] `/corrections` consent-aware Teach HAY surface
+- [x] owner correction capture/history/withdrawal API
+- [x] reviewer-only correction decision API
+- [x] general `dataset_records` provenance / license / consent registry
+- [x] append-only dataset provenance history
 - [x] revocable developer authentication / API keys
 - [x] stable `/api/v1/language/*` developer surface
 - [x] `/developers` key + usage console
 - [x] API usage metering distinct from Studio subscriptions
 - [x] persistent versioned pronunciation dictionary management
 - [x] pronunciation provenance + consent/license fields with append-only history
-- [ ] general dataset provenance and license registry beyond pronunciation data
-- [ ] fine-tuned Armenian speech/language components only where blind benchmarks justify them
+- [ ] fine-tuned Armenian speech/language components only where blind benchmarks justify them and eligible consented data exists
 
 ## Go-live checklist
 
 1. Create a dedicated HAY Supabase project; do not reuse Meqena or the old shared Margaryan Labs database.
-2. Apply the canonical HAY Supabase migrations through `008_language_registry.sql`.
-3. Verify `/api/setup/status` reports the commercial/developer schemas and `languageData.pronunciationRegistry` correctly.
-4. Configure provider keys and workers required by the launch package.
-5. Configure Creator / Growth / Business hosted checkout URLs and `HAY_BILLING_SYNC_SECRET`.
-6. Verify the chosen payment provider's signed webhook, then call HAY `/api/billing/sync` from that trusted adapter.
-7. Set `HAY_ENFORCE_PLANS=true` only after migration + billing sync are verified.
-8. For Developer API launch, choose a positive `HAY_DEVELOPER_API_HOURLY_REQUEST_LIMIT`, create a test `hay_live_*` key, verify success + `429` behavior + usage recording + revoke, then set `HAY_DEVELOPER_API_ENABLED=true`.
-9. In `/pronunciations`, create/update/archive an account override and one owned-business override; confirm versions increment and runtime precedence falls back correctly.
-10. Run `npm run typecheck`, `npm run quality`, `npm run build`, render-worker check and publish-worker check.
-11. Onboard the first real businesses in managed mode and measure time-to-first-useful-plan, publish success and attributed outcomes.
-12. Collect independent blind native-speaker benchmark reviews before making comparative "best Armenian" claims.
+2. Apply the canonical HAY Supabase migrations through `009_language_corrections_and_dataset_registry.sql`.
+3. Verify `/api/setup/status` reports the commercial/developer schemas, pronunciation registry and correction flywheel correctly.
+4. Configure at least one server-only `HAY_LANGUAGE_REVIEWER_EMAILS` reviewer before operating the correction review queue.
+5. Configure provider keys and workers required by the launch package.
+6. Configure Creator / Growth / Business hosted checkout URLs and `HAY_BILLING_SYNC_SECRET`.
+7. Verify the chosen payment provider's signed webhook, then call HAY `/api/billing/sync` from that trusted adapter.
+8. Set `HAY_ENFORCE_PLANS=true` only after migration + billing sync are verified.
+9. For Developer API launch, choose a positive `HAY_DEVELOPER_API_HOURLY_REQUEST_LIMIT`, create a test `hay_live_*` key, verify success + `429` behavior + usage recording + revoke, then set `HAY_DEVELOPER_API_ENABLED=true`.
+10. In `/pronunciations`, create/update/archive an account override and one owned-business override; confirm versions increment and runtime precedence falls back correctly.
+11. In `/corrections`, verify a private no-consent correction never appears in the reviewer queue; verify a product-improvement-consented correction can be accepted; then withdraw it and confirm linked dataset eligibility is withdrawn.
+12. Verify a consented pronunciation correction can be promoted to `hay-reviewed`, then withdraw it and confirm only the matching consent-sourced pronunciation is archived.
+13. Run `npm run typecheck`, `npm run quality`, `npm run build`, render-worker check and publish-worker check.
+14. Onboard the first real businesses in managed mode and measure time-to-first-useful-plan, publish success and attributed outcomes.
+15. Collect independent blind native-speaker benchmark reviews before making comparative "best Armenian" claims.
 
 ## Non-goal
 
-Do not train a frontier LLM or video foundation model from scratch. HAY wins by owning the Armenian-specific normalization, pronunciation, evaluation, workflow, developer infrastructure, business context, outcome memory and proprietary reviewed data around interchangeable foundation providers.
+Do not train a frontier LLM or video foundation model from scratch. HAY wins by owning the Armenian-specific normalization, pronunciation, evaluation, consented correction flywheel, provenance, workflow, developer infrastructure, business context, outcome memory and proprietary reviewed data around interchangeable foundation providers.

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { planEnforcementEnabled } from "@/lib/commercial/entitlements";
 import { developerApiEnabled, developerApiHourlyLimit, developerApiMaxTextChars, developerApiMigrationReady } from "@/lib/developer/api-keys";
+import { correctionFlywheelReady } from "@/lib/hay/correction-store";
 import { pronunciationRegistryReady } from "@/lib/hay/pronunciation-store";
 import { getConnectorReadiness } from "@/lib/marketing/connectors";
 import { isPublishWorkerConfigured } from "@/lib/publish/client";
@@ -49,6 +50,8 @@ export async function GET() {
   }
   const developerMigration=admin ? await developerApiMigrationReady() : false;
   const pronunciationRegistry=admin ? await pronunciationRegistryReady() : false;
+  const correctionFlywheel=admin ? await correctionFlywheelReady() : false;
+  const reviewerAllowlist=String(process.env.HAY_LANGUAGE_REVIEWER_EMAILS||"").split(",").some(item=>item.trim().includes("@"));
   const developerEnabled=developerApiEnabled();
   const hourlyRequestLimit=developerApiHourlyLimit();
   const maxTextChars=developerApiMaxTextChars();
@@ -78,10 +81,14 @@ export async function GET() {
     languageApi,
     languageData:{
       pronunciationRegistry,
-      migration:"008_language_registry.sql",
+      correctionFlywheel,
+      reviewerAllowlist,
+      migrations:{pronunciation:"008_language_registry.sql",corrections:"009_language_corrections_and_dataset_registry.sql"},
       fallback:"curated-core",
       precedence:["business","account","hay-reviewed-system","curated-core"],
+      correctionConsent:{privateByDefault:true,productImprovementRequiredForReuse:true,benchmarkSeparate:true,modelTrainingSeparate:true,withdrawalSupported:true},
       audit:"append-only-snapshots",
+      datasetProvenance:true,
     },
     developerApi:{
       enabled:developerEnabled,
@@ -108,6 +115,8 @@ export async function GET() {
       ...(!workers.publish ? ["publish_worker_required_for_automatic_posting"] : []),
       ...(supabase&&!commercialMigration ? ["commercial_migration_007_required"] : []),
       ...(admin&&!pronunciationRegistry ? ["language_registry_migration_008_required"] : []),
+      ...(admin&&!correctionFlywheel ? ["language_correction_migration_009_required"] : []),
+      ...(correctionFlywheel&&!reviewerAllowlist ? ["language_reviewer_allowlist_required"] : []),
       ...(admin&&!developerMigration ? ["developer_api_schema_required"] : []),
       ...(developerMigration&&!developerEnabled ? ["developer_api_disabled"] : []),
       ...(developerEnabled&&!developerRateLimitReady ? ["developer_api_hourly_rate_limit_required"] : []),
