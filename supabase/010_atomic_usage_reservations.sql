@@ -3,8 +3,14 @@
 -- provider calls per account so concurrent requests cannot both spend the same
 -- remaining plan capacity. Reservations count immediately and are committed on
 -- provider success or released on provider failure.
+--
+-- Security model: these RPCs are SECURITY INVOKER and executable only by
+-- service_role. The Next.js server authenticates the end user first, then its
+-- server-only admin client supplies that authenticated owner UUID to these RPCs.
 
+create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
+alter extension pgcrypto set schema extensions;
 
 alter table public.usage_events
   add column if not exists state text not null default 'consumed',
@@ -43,6 +49,7 @@ create index if not exists usage_events_active_reservation_idx
   where state = 'reserved';
 
 create or replace function public.hay_reserve_usage(
+  p_owner_id uuid,
   p_meter text,
   p_quantity numeric,
   p_business_id uuid default null,
@@ -53,11 +60,10 @@ create or replace function public.hay_reserve_usage(
 )
 returns jsonb
 language plpgsql
-security definer
-set search_path = pg_catalog, public, extensions
+security invoker
+set search_path = ''
 as $$
 declare
-  v_user_id uuid := auth.uid();
   v_entitlement public.account_entitlements%rowtype;
   v_existing public.usage_events%rowtype;
   v_business_id uuid;
@@ -71,8 +77,8 @@ declare
   v_key text := nullif(left(trim(coalesce(p_idempotency_key,'')), 240), '');
   v_source text := left(coalesce(nullif(trim(p_source),''),'app'), 120);
 begin
-  if v_user_id is null then
-    return jsonb_build_object('allowed', false, 'reason', 'unauthorized');
+  if p_owner_id is null then
+    return jsonb_build_object('allowed', false, 'reason', 'owner_required');
   end if;
   if p_meter not in ('content_assets','ai_video_credits','voice_minutes') then
     return jsonb_build_object('allowed', false, 'reason', 'invalid_meter');
@@ -87,7 +93,7 @@ begin
   insert into public.account_entitlements(
     owner_id, plan_id, status, current_period_start, current_period_end
   ) values (
-    v_user_id,
+    p_owner_id,
     'free',
     'active',
     date_trunc('month', now()),
@@ -96,7 +102,7 @@ begin
 
   select * into v_entitlement
   from public.account_entitlements
-  where owner_id = v_user_id
+  where owner_id = p_owner_id
   for update;
 
   if not found then
@@ -107,17 +113,15 @@ begin
   end if;
 
   -- The entitlement row lock serializes every reservation for this account.
-  -- Once the lock is held, expired reservations can be safely removed before
-  -- checking duplicate request IDs and computing remaining quota.
   delete from public.usage_events
-  where owner_id = v_user_id
+  where owner_id = p_owner_id
     and state = 'reserved'
     and reservation_expires_at <= now();
 
   if v_key is not null then
     select * into v_existing
     from public.usage_events
-    where owner_id = v_user_id
+    where owner_id = p_owner_id
       and idempotency_key = v_key
     limit 1;
 
@@ -144,7 +148,7 @@ begin
   if p_business_id is not null then
     select id into v_business_id
     from public.businesses
-    where id = p_business_id and owner_id = v_user_id
+    where id = p_business_id and owner_id = p_owner_id
     limit 1;
   end if;
 
@@ -171,7 +175,7 @@ begin
 
   select coalesce(sum(quantity),0) into v_used
   from public.usage_events
-  where owner_id = v_user_id
+  where owner_id = p_owner_id
     and meter = p_meter
     and created_at >= v_entitlement.current_period_start
     and (
@@ -203,7 +207,7 @@ begin
     reservation_token_hash,
     reservation_expires_at
   ) values (
-    v_user_id,
+    p_owner_id,
     v_business_id,
     p_meter,
     p_quantity,
@@ -226,12 +230,10 @@ begin
   );
 exception
   when unique_violation then
-    -- Defensive fallback for an idempotency race. The entitlement lock should
-    -- serialize normal requests, but the unique index remains authoritative.
     if v_key is not null then
       select * into v_existing
       from public.usage_events
-      where owner_id = v_user_id and idempotency_key = v_key
+      where owner_id = p_owner_id and idempotency_key = v_key
       limit 1;
       if found and v_existing.state = 'consumed' then
         return jsonb_build_object('allowed', true, 'duplicate', true, 'state', 'consumed', 'eventId', v_existing.id, 'metadata', coalesce(v_existing.metadata,'{}'::jsonb));
@@ -242,22 +244,22 @@ end;
 $$;
 
 create or replace function public.hay_commit_usage_reservation(
+  p_owner_id uuid,
   p_event_id uuid,
   p_release_token text,
   p_metadata_patch jsonb default '{}'::jsonb
 )
 returns jsonb
 language plpgsql
-security definer
-set search_path = pg_catalog, public, extensions
+security invoker
+set search_path = ''
 as $$
 declare
-  v_user_id uuid := auth.uid();
   v_event public.usage_events%rowtype;
   v_token_hash text;
 begin
-  if v_user_id is null then
-    return jsonb_build_object('committed', false, 'reason', 'unauthorized');
+  if p_owner_id is null then
+    return jsonb_build_object('committed', false, 'reason', 'owner_required');
   end if;
   if p_release_token is null then
     return jsonb_build_object('committed', false, 'reason', 'release_token_required');
@@ -270,7 +272,7 @@ begin
       reservation_expires_at = null,
       metadata = coalesce(metadata, '{}'::jsonb) || coalesce(p_metadata_patch, '{}'::jsonb)
   where id = p_event_id
-    and owner_id = v_user_id
+    and owner_id = p_owner_id
     and state = 'reserved'
     and reservation_token_hash = v_token_hash
   returning * into v_event;
@@ -278,7 +280,7 @@ begin
   if not found then
     select * into v_event
     from public.usage_events
-    where id = p_event_id and owner_id = v_user_id
+    where id = p_event_id and owner_id = p_owner_id
     limit 1;
     if found and v_event.state = 'consumed' then
       return jsonb_build_object('committed', true, 'duplicate', true, 'eventId', v_event.id, 'metadata', coalesce(v_event.metadata,'{}'::jsonb));
@@ -291,21 +293,21 @@ end;
 $$;
 
 create or replace function public.hay_release_usage_reservation(
+  p_owner_id uuid,
   p_event_id uuid,
   p_release_token text
 )
 returns jsonb
 language plpgsql
-security definer
-set search_path = pg_catalog, public, extensions
+security invoker
+set search_path = ''
 as $$
 declare
-  v_user_id uuid := auth.uid();
   v_token_hash text;
   v_deleted uuid;
 begin
-  if v_user_id is null then
-    return jsonb_build_object('released', false, 'reason', 'unauthorized');
+  if p_owner_id is null then
+    return jsonb_build_object('released', false, 'reason', 'owner_required');
   end if;
   if p_release_token is null then
     return jsonb_build_object('released', false, 'reason', 'release_token_required');
@@ -314,7 +316,7 @@ begin
 
   delete from public.usage_events
   where id = p_event_id
-    and owner_id = v_user_id
+    and owner_id = p_owner_id
     and state = 'reserved'
     and reservation_token_hash = v_token_hash
   returning id into v_deleted;
@@ -326,17 +328,17 @@ begin
 end;
 $$;
 
-revoke all on function public.hay_reserve_usage(text,numeric,uuid,text,text,jsonb,text) from public, anon, authenticated;
-revoke all on function public.hay_commit_usage_reservation(uuid,text,jsonb) from public, anon, authenticated;
-revoke all on function public.hay_release_usage_reservation(uuid,text) from public, anon, authenticated;
+revoke all on function public.hay_reserve_usage(uuid,text,numeric,uuid,text,text,jsonb,text) from public, anon, authenticated;
+revoke all on function public.hay_commit_usage_reservation(uuid,uuid,text,jsonb) from public, anon, authenticated;
+revoke all on function public.hay_release_usage_reservation(uuid,uuid,text) from public, anon, authenticated;
 
-grant execute on function public.hay_reserve_usage(text,numeric,uuid,text,text,jsonb,text) to authenticated;
-grant execute on function public.hay_commit_usage_reservation(uuid,text,jsonb) to authenticated;
-grant execute on function public.hay_release_usage_reservation(uuid,text) to authenticated;
+grant execute on function public.hay_reserve_usage(uuid,text,numeric,uuid,text,text,jsonb,text) to service_role;
+grant execute on function public.hay_commit_usage_reservation(uuid,uuid,text,jsonb) to service_role;
+grant execute on function public.hay_release_usage_reservation(uuid,uuid,text) to service_role;
 
-comment on function public.hay_reserve_usage(text,numeric,uuid,text,text,jsonb,text) is
-  'Atomically reserves HAY plan usage under an entitlement row lock; active reservations count toward quota.';
-comment on function public.hay_commit_usage_reservation(uuid,text,jsonb) is
-  'Commits an authenticated user usage reservation after provider success.';
-comment on function public.hay_release_usage_reservation(uuid,text) is
-  'Releases a provider usage reservation on failure; requires the server-held raw release token.';
+comment on function public.hay_reserve_usage(uuid,text,numeric,uuid,text,text,jsonb,text) is
+  'Server-only atomic HAY quota reservation. service_role supplies an already-authenticated owner UUID.';
+comment on function public.hay_commit_usage_reservation(uuid,uuid,text,jsonb) is
+  'Server-only commit of a provider usage reservation after successful provider work.';
+comment on function public.hay_release_usage_reservation(uuid,uuid,text) is
+  'Server-only release of a failed provider usage reservation; raw release token is never persisted.';
