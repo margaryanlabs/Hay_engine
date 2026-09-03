@@ -80,4 +80,16 @@ for (const route of meteredProviderRoutes) {
   assert.match(source, /recordUsage\s*\(/, `${route} must meter generated content after successful persistence`);
 }
 
-console.log(JSON.stringify({ securityPolicy: "passed", cases: 9, providerCostRoutes: meteredProviderRoutes }, null, 2));
+const entitlementSource = readFileSync("lib/commercial/entitlements.ts", "utf8");
+assert.match(
+  entitlementSource,
+  /\.from\("businesses"\)[\s\S]*?\.eq\("id", input\.businessId\)[\s\S]*?\.eq\("owner_id", userId\)/,
+  "recordUsage must verify requested business ownership before attaching business_id to usage",
+);
+assert.match(
+  entitlementSource,
+  /business_id:\s*usageBusinessId/,
+  "usage_events inserts must use the sanitized owned business id rather than raw request input",
+);
+
+console.log(JSON.stringify({ securityPolicy: "passed", cases: 10, providerCostRoutes: meteredProviderRoutes, usageBusinessOwnership: true }, null, 2));
