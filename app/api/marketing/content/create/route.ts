@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { checkUsageAllowance, recordUsage } from "@/lib/commercial/entitlements";
 import { commitUsageReservation, releaseUsageReservation, reserveUsage, resizeUsageReservation, type UsageReservation } from "@/lib/commercial/usage-reservations";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createCreatorProject } from "@/lib/creator/project";
@@ -39,6 +38,15 @@ async function uploadPrivateAsset(args: { supabase: Awaited<ReturnType<typeof cr
 
 export async function POST(request: Request) {
   let pendingVoiceReservation:UsageReservation|null=null;
+  let pendingRegenerationReservation:UsageReservation|null=null;
+
+  async function releasePendingRegeneration(){
+    if(!pendingRegenerationReservation)return;
+    const current=pendingRegenerationReservation;
+    pendingRegenerationReservation=null;
+    await releaseUsageReservation(current).catch(()=>undefined);
+  }
+
   try {
     if (!isSupabaseConfigured()) return NextResponse.json({ configured: false, message: "Dedicated HAY Supabase is required for the automated content factory." });
     const body = await request.json();
@@ -84,10 +92,32 @@ export async function POST(request: Request) {
     }
 
     if(force){
-      const allowance=await checkUsageAllowance("content_assets",1);
-      if(!allowance.allowed){
-        return NextResponse.json({error:allowance.reason,meter:"content_assets",required:1,commercial:allowance.context},{status:usageStatus(allowance.reason)});
+      const reservation=await reserveUsage({
+        meter:"content_assets",
+        quantity:1,
+        businessId:String(business.id),
+        source:"video_regeneration",
+        idempotencyKey:requestId?`video-regeneration:${requestId}`:undefined,
+        metadata:{contentItemId:content.id,format:content.format,phase:"force_regeneration"},
+      });
+      if(!reservation.allowed){
+        return NextResponse.json({error:reservation.reason,meter:"content_assets",required:1,commercial:reservation.context},{status:usageStatus(reservation.reason)});
       }
+      if(reservation.duplicate){
+        const duplicateStatus=String(existingProject?.status||"processed");
+        return NextResponse.json({
+          configured:true,
+          reused:true,
+          duplicate:true,
+          contentItemId,
+          project:existingProject?.manifest||null,
+          outputUrl:existingProject?.output_url||content.asset_url||null,
+          status:duplicateStatus,
+          commercialUsage:{regeneration:{recorded:true,duplicate:true,eventId:reservation.eventId},voice:null},
+          next:existingProject?duplicateStatus:"already_processed",
+        });
+      }
+      pendingRegenerationReservation=reservation;
     }
 
     const duration = content.format === "story" ? 10 : Number(body.duration) || 15;
@@ -133,10 +163,12 @@ export async function POST(request: Request) {
           metadata:{contentItemId:content.id,projectId:project.id,language,provider:voice.provider,voiceId:voice.id,style,duration},
         });
         if(!reservation.allowed){
+          await releasePendingRegeneration();
           await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
           return NextResponse.json({error:reservation.reason,meter:"voice_minutes",required:preflightMinutes,commercial:reservation.context,projectId:project.id},{status:usageStatus(reservation.reason)});
         }
         if(reservation.duplicate){
+          await releasePendingRegeneration();
           await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
           return NextResponse.json({error:"duplicate_content_voice_request",projectId:project.id,commercialUsage:{recorded:true,duplicate:true,eventId:reservation.eventId}},{status:409});
         }
@@ -149,6 +181,7 @@ export async function POST(request: Request) {
         if(!resized.resized){
           await releaseUsageReservation(reservation);
           pendingVoiceReservation=null;
+          await releasePendingRegeneration();
           await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
           return NextResponse.json({error:resized.reason,meter:"voice_minutes",required:minutes,commercial:reservation.context,projectId:project.id},{status:usageStatus(resized.reason)});
         }
@@ -162,6 +195,7 @@ export async function POST(request: Request) {
           // commit failure; keeping it occupied is safer than creating unmetered speech.
           pendingVoiceReservation=null;
           if(!voiceUsage.recorded){
+            await releasePendingRegeneration();
             return NextResponse.json({error:"content_voice_usage_commit_failed",projectId:project.id,commercialUsage:voiceUsage},{status:503});
           }
           const aligned=buildAlignedCaptionCues(speech.alignment);
@@ -186,10 +220,12 @@ export async function POST(request: Request) {
           metadata:{contentItemId:content.id,projectId:project.id,language,provider:"elevenlabs",voiceId:providerVoiceId,duration},
         });
         if(!reservation.allowed){
+          await releasePendingRegeneration();
           await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
           return NextResponse.json({error:reservation.reason,meter:"voice_minutes",required:minutes,commercial:reservation.context,projectId:project.id},{status:usageStatus(reservation.reason)});
         }
         if(reservation.duplicate){
+          await releasePendingRegeneration();
           await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
           return NextResponse.json({error:"duplicate_content_voice_request",projectId:project.id,commercialUsage:{recorded:true,duplicate:true,eventId:reservation.eventId}},{status:409});
         }
@@ -200,6 +236,7 @@ export async function POST(request: Request) {
           voiceUsage=await commitUsageReservation(reservation,{contentItemId:content.id,projectId:project.id,language,provider:"elevenlabs",voiceId:providerVoiceId,duration,characters:project.voice.text.length,minutes});
           pendingVoiceReservation=null;
           if(!voiceUsage.recorded){
+            await releasePendingRegeneration();
             return NextResponse.json({error:"content_voice_usage_commit_failed",projectId:project.id,commercialUsage:voiceUsage},{status:503});
           }
           const aligned=buildAlignedCaptionCues(speech.alignment);
@@ -224,14 +261,22 @@ export async function POST(request: Request) {
     await supabase.from("content_items").update({ status: "draft", updated_at: new Date().toISOString() }).eq("id", content.id);
 
     const render = await dispatchRender({ project, sceneImages, audioSrc });
-    const regenerationUsage=force?await recordUsage({
-      meter:"content_assets",
-      quantity:1,
-      businessId:String(business.id),
-      source:"video_regeneration",
-      idempotencyKey:requestId?`video-regeneration:${requestId}`:undefined,
-      metadata:{contentItemId:content.id,projectId:project.id,format:content.format},
-    }):{recorded:false,reason:"included_in_plan"};
+    let regenerationUsage:{recorded:boolean;reason?:string;duplicate?:boolean;eventId?:string|null}={recorded:false,reason:"included_in_plan"};
+    if(force&&pendingRegenerationReservation){
+      const reservation=pendingRegenerationReservation;
+      regenerationUsage=await commitUsageReservation(reservation,{
+        contentItemId:content.id,
+        projectId:project.id,
+        format:content.format,
+        renderConfigured:Boolean(render.configured),
+      });
+      // Generation work is complete. If accounting cannot commit, keep the reservation
+      // occupied rather than turning a completed regeneration into free provider work.
+      pendingRegenerationReservation=null;
+      if(!regenerationUsage.recorded){
+        return NextResponse.json({error:"regeneration_usage_commit_failed",projectId:project.id,commercialUsage:{regeneration:regenerationUsage,voice:voiceUsage}},{status:503});
+      }
+    }
 
     return NextResponse.json({
       configured: true,
@@ -245,6 +290,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if(pendingVoiceReservation)await releaseUsageReservation(pendingVoiceReservation).catch(()=>undefined);
+    if(pendingRegenerationReservation)await releaseUsageReservation(pendingRegenerationReservation).catch(()=>undefined);
     console.error("Marketing content factory failed", error);
     return NextResponse.json({ error: "marketing_content_factory_failed", detail: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
