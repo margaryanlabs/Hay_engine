@@ -19,12 +19,15 @@
     "openai": "7.5.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "sharp": "0.34.4"
+    "sharp": "0.35.3"
   },
   "devDependencies": {
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "typescript": "7.0.2"
+  },
+  "overrides": {
+    "sharp": "$sharp"
   }
 }
