@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const layout = readFileSync("app/layout.tsx", "utf8");
+const home = readFileSync("app/page.tsx", "utf8");
+const landing = readFileSync("components/LandingPageV6.tsx", "utf8");
+const landingCss = readFileSync("app/landing-v6.css", "utf8");
 const theme = readFileSync("app/product-ui.css", "utf8");
 const legacyTheme = readFileSync("app/product-ui-legacy.css", "utf8");
 const marketing = readFileSync("components/MarketingOS.tsx", "utf8");
@@ -21,6 +24,8 @@ assert.ok(
   loginIndex >= 0 && productThemeIndex > loginIndex && legacyBridgeIndex > productThemeIndex,
   "Unified HAY product themes must load after legacy page styles",
 );
+assert.match(layout,/import "\.\/landing-v6\.css"/,"Landing V6 styles must remain loaded");
+assert.match(home,/LandingPageV6/,"The public home page must render Landing V6");
 
 assert.match(theme, /--hay-bg:#08090b/, "Unified HAY theme must expose the graphite background token");
 assert.match(theme, /--hay-accent:#da8d80/, "Unified HAY theme must expose the coral product accent");
@@ -41,6 +46,16 @@ assert.match(
   "Connected channel state must remain semantic green rather than product-accent green",
 );
 
+assert.match(landing,/import SocialBrandIcon from "\.\/SocialBrandIcon"/,"Landing V6 must share the same platform marks as Studio");
+for(const platform of ["instagram","tiktok","youtube","facebook"]){
+  assert.match(landing,new RegExp(`platform:\\"${platform}\\"`),`Landing V6 must visibly include ${platform}`);
+}
+assert.match(landing,/className="hv6ProductWindow"/,"Landing hero must show the Studio-like product window rather than an abstract-only hero");
+assert.match(landing,/href="\/studio" className="hv6Open"/,"Landing shell must hand off directly into Studio");
+assert.match(landing,/href="\/voice"/,"Landing Armenian layer must connect directly to Voice Lab");
+assert.match(landingCss,/--hay-success/,"Landing V6 must use semantic product success color for connected states");
+assert.doesNotMatch(landingCss,/#9fff57|#d9ff63/i,"Landing V6 must not contain the retired neon product accent");
+
 assert.match(marketing, /import SocialBrandIcon from "\.\/SocialBrandIcon"/, "Marketing OS must use shared social brand icons");
 assert.doesNotMatch(marketing, /code:\s*"(?:IG|TT|YT|FB)"/, "Social channel buttons must not regress to letter abbreviations");
 assert.match(marketing, /<SocialBrandIcon platform=\{platform\}/, "Channel connector rows must render official platform marks");
@@ -59,8 +74,10 @@ assert.match(socialIcon, /socialBrandTikTokLayer pink/, "TikTok mark must preser
 
 console.log(JSON.stringify({
   uiContract: "passed",
+  landingVersion: "v6",
   neonMarketingSkinLoaded: false,
   unifiedSurfaces: ["landing", "login", "studio", "creator", "publish"],
   socialBrandIcons: ["instagram", "tiktok", "youtube", "facebook", "linkedin"],
   semanticGreenOnly: true,
+  landingStudioContinuity: true,
 }, null, 2));
