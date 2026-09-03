@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import HayLogo from "./HayLogo";
 
 type Business={id:string;name:string};
-type Entry={id:string;scope:"system"|"account"|"business";business_id:string|null;written:string;spoken_hy_eastern:string;spoken_hy_western:string;category:string;source_type:string;source_reference:string|null;consent_reference:string|null;status:string;version:number;notes:string|null;updated_at:string};
+type Entry={id:string;scope:"account"|"business";business_id:string|null;written:string;spoken_hy_eastern:string;spoken_hy_western:string;category:string;source_type:string;source_reference:string|null;consent_reference:string|null;status:string;version:number;notes:string|null;updated_at:string};
 type CoreEntry={written:string;spokenHyEastern:string;spokenHyWestern:string;category:string;source:string;status:string};
 
 const categories=["brand","acronym","finance","technology","social","place","person","product","general"];
@@ -14,6 +14,7 @@ export default function PronunciationConsole(){
   const [businessId,setBusinessId]=useState("");
   const [scope,setScope]=useState<"account"|"business">("account");
   const [entries,setEntries]=useState<Entry[]>([]);
+  const [reviewedCount,setReviewedCount]=useState(0);
   const [core,setCore]=useState<CoreEntry[]>([]);
   const [coreVersion,setCoreVersion]=useState("");
   const [configured,setConfigured]=useState<boolean|null>(null);
@@ -42,7 +43,7 @@ export default function PronunciationConsole(){
       const response=await fetch(`/api/pronunciations${query}`,{cache:"no-store"});
       if(response.status===401){setConfigured(true);setMessage("Sign in to manage your pronunciation registry.");return;}
       const data=await response.json();
-      setConfigured(data.configured!==false&&data.migrationReady!==false);setEntries(data.entries||[]);setCore(data.core||[]);setCoreVersion(data.coreVersion||"");
+      setConfigured(data.configured!==false&&data.migrationReady!==false);setEntries(data.entries||[]);setReviewedCount(Number(data.reviewedCount)||0);setCore(data.core||[]);setCoreVersion(data.coreVersion||"");
     }catch{setConfigured(false);setMessage("Pronunciation registry diagnostics are unavailable.");}
   }
 
@@ -72,8 +73,7 @@ export default function PronunciationConsole(){
     try{const response=await fetch("/api/pronounce",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:testText,dialect:"eastern",businessId:businessId||null})});const data=await response.json();if(!response.ok)throw new Error(data.error||"pronunciation_test_failed");setTestResult(String(data.spokenText||""));setMessage(`Registry ${data.version||"core"} · ${data.registry?.appliedEntries||0} persistent entries applied.`);}catch(error){setMessage(error instanceof Error?error.message:"Pronunciation test failed");}finally{setBusy(false);}
   }
 
-  const customEntries=useMemo(()=>entries.filter(item=>item.scope!=="system"),[entries]);
-  const reviewedEntries=useMemo(()=>entries.filter(item=>item.scope==="system"),[entries]);
+  const customEntries=useMemo(()=>entries.filter(item=>item.status!=="archived"),[entries]);
   const selectedBusiness=businesses.find(item=>item.id===businessId)?.name||"No business selected";
 
   return <main className="pronunciationPage">
@@ -83,7 +83,7 @@ export default function PronunciationConsole(){
 
     {configured===false?<section className="pronunciationBlocker"><span>REGISTRY MIGRATION REQUIRED</span><h2>Apply `008_language_registry.sql` only to the dedicated HAY Supabase project.</h2><p>The current in-code Armenian dictionary remains active until that migration exists; no existing pronunciation behavior is lost.</p></section>:
     <>
-      <section className="pronunciationStats"><article><span>CORE</span><b>{core.length}</b><small>{coreVersion||"curated fallback"}</small></article><article><span>HAY REVIEWED</span><b>{reviewedEntries.length}</b><small>persistent system layer</small></article><article><span>CUSTOM</span><b>{customEntries.length}</b><small>account + selected business</small></article><article><span>BUSINESS</span><b>{businessId?selectedBusiness:"—"}</b><small>{businessId?"override layer active":"account layer only"}</small></article></section>
+      <section className="pronunciationStats"><article><span>CORE</span><b>{core.length}</b><small>{coreVersion||"curated fallback"}</small></article><article><span>HAY REVIEWED</span><b>{reviewedCount}</b><small>server-side persistent layer</small></article><article><span>CUSTOM</span><b>{customEntries.length}</b><small>account + selected business</small></article><article><span>BUSINESS</span><b>{businessId?selectedBusiness:"—"}</b><small>{businessId?"override layer active":"account layer only"}</small></article></section>
 
       <section className="pronunciationGrid">
         <div className="pronunciationComposer"><header><span>ADD / UPDATE ENTRY</span><b>VERSIONED</b></header><div className="pronunciationScope"><button className={scope==="account"?"active":""} onClick={()=>setScope("account")}>ACCOUNT</button><button className={scope==="business"?"active":""} onClick={()=>setScope("business")}>BUSINESS</button></div>{scope==="business"&&<label><span>BUSINESS</span><select value={businessId} onChange={event=>setBusinessId(event.target.value)}><option value="">Choose business</option>{businesses.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}<div className="pronunciationPair"><label><span>WRITTEN FORM</span><input value={written} onChange={event=>setWritten(event.target.value)} placeholder="Acme Pro" maxLength={160}/></label><label><span>CATEGORY</span><select value={category} onChange={event=>setCategory(event.target.value)}>{categories.map(item=><option key={item} value={item}>{item}</option>)}</select></label></div><label><span>EASTERN ARMENIAN / HY-AM</span><input value={eastern} onChange={event=>setEastern(event.target.value)} placeholder="Աքմե Փրո" maxLength={240}/></label><label><span>WESTERN ARMENIAN</span><input value={western} onChange={event=>setWestern(event.target.value)} placeholder="Optional — defaults to Eastern" maxLength={240}/></label><label><span>NOTES</span><textarea value={notes} onChange={event=>setNotes(event.target.value)} placeholder="Pronunciation context, suffix behavior, exceptions…" maxLength={1000}/></label><div className="pronunciationPair"><label><span>SOURCE REFERENCE</span><input value={sourceReference} onChange={event=>setSourceReference(event.target.value)} placeholder="Brand guide / URL / internal source" maxLength={500}/></label><label><span>CONSENT REFERENCE</span><input value={consentReference} onChange={event=>setConsentReference(event.target.value)} placeholder="Optional consent record" maxLength={500}/></label></div><button className="pronunciationSave" disabled={busy} onClick={save}>{busy?"SAVING ···":"SAVE PRONUNCIATION →"}</button></div>
