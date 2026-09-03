@@ -33,7 +33,9 @@ export default function ReelPreview({
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [playing, project.duration, time]);
+    // Playback origin is intentionally captured only when play/duration changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, project.duration]);
 
   const activeScene = useMemo(() => {
     if (selectedSceneId && !playing) {
