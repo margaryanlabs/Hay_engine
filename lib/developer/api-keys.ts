@@ -22,6 +22,10 @@ export function developerApiHourlyLimit(){
   const value=Number(process.env.HAY_DEVELOPER_API_HOURLY_REQUEST_LIMIT||0);
   return Number.isFinite(value)&&value>0?Math.floor(value):0;
 }
+export function developerApiMaxTextChars(){
+  const value=Number(process.env.HAY_DEVELOPER_API_MAX_TEXT_CHARS||20000);
+  return Number.isFinite(value)&&value>0?Math.floor(value):20000;
+}
 
 export async function developerApiMigrationReady(){
   if(!isSupabaseAdminConfigured())return false;
