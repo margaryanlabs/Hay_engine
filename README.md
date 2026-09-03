@@ -70,6 +70,7 @@ HAY Engine is an Armenian-first AI language, creator and marketing operating sys
 - append-only Studio usage metering for content assets, AI video credits and Armenian voice minutes
 - atomic reserve → resize → commit accounting for provider-backed Studio work
 - separate developer API usage ledger with atomic request-slot admission
+- replay-safe, stale-event-safe verified billing sync with append-only billing event audit
 - Studio plan/usage visibility
 - provider-neutral hosted checkout contract
 - trusted server-to-server entitlement sync endpoint
@@ -153,6 +154,7 @@ Apply SQL in this order:
 12. `supabase/010_atomic_usage_reservations.sql`
 13. `supabase/011_atomic_usage_resize.sql`
 14. `supabase/012_atomic_developer_api_requests.sql`
+15. `supabase/013_atomic_billing_events.sql`
 
 Migration 007 contains the commercial schema: entitlements, Studio usage, developer API keys and developer API usage. Developer credentials/usage are intentionally not available to `anon` or normal `authenticated` Data API clients; owner-facing routes authenticate the user first and then use the server-only admin client.
 
@@ -164,13 +166,17 @@ Migration 010 adds atomic Studio usage reservations and service-role-only reserv
 
 Migration 012 adds atomic Developer API request admission. It locks the exact API-key row, checks the rolling-hour request limit and inserts the durable request slot before route/provider work can begin.
 
+Migration 013 adds append-only verified billing events and an atomic entitlement-application RPC. `provider + providerEventId` is replay-protected, older provider events are recorded but cannot overwrite a newer entitlement, and provider event timestamps that are unreasonably far in the future are rejected.
+
 Configure reviewer access with server-only `HAY_LANGUAGE_REVIEWER_EMAILS`. Do not prefix it with `NEXT_PUBLIC_`.
 
-Do not set `HAY_ENFORCE_PLANS=true` until migrations `007`, `010` and `011` are applied, `/api/setup/status` reports `commercial.atomicUsageMigration: true`, and the billing sync path has been verified. Do not set `HAY_DEVELOPER_API_ENABLED=true` until migrations `007` and `012` are applied, `/api/setup/status` reports `developerApi.migration: true`, a positive hourly request limit is configured, and the API has been smoke-tested with a revocable key.
+Do not set `HAY_ENFORCE_PLANS=true` until migrations `007`, `010`, `011` and `013` are applied, `/api/setup/status` reports `commercial.atomicUsageMigration: true` and `commercial.billingEventMigration: true`, and the verified billing sync path has been smoke-tested. Do not set `HAY_DEVELOPER_API_ENABLED=true` until migrations `007` and `012` are applied, `/api/setup/status` reports `developerApi.migration: true`, a positive hourly request limit is configured, and the API has been smoke-tested with a revocable key.
 
 ## Billing rollout
 
-HAY does not hard-code one payment company. Configure HTTPS hosted checkout URLs in `HAY_CHECKOUT_*_URL`. Your payment-provider adapter must verify that provider's signed webhook first, then call `POST /api/billing/sync` using the server-only `HAY_BILLING_SYNC_SECRET`. The browser success redirect is never treated as proof of payment.
+HAY does not hard-code one payment company. Configure HTTPS hosted checkout URLs in `HAY_CHECKOUT_*_URL`. The browser success redirect and checkout metadata are correlation hints only and are never proof of payment.
+
+Your payment-provider adapter must first verify that provider's signed webhook. Only after verification may it call `POST /api/billing/sync` with `HAY_BILLING_SYNC_SECRET`. Every sync request must include the verified `provider`, `providerEventId`, `providerEventCreatedAt`, exact `currentPeriodStart`, exact `currentPeriodEnd`, owner, plan and status. Replayed events are acknowledged without reapplying them; stale older events are acknowledged and audited without rolling entitlement state backward.
 
 ## Armenian quality
 
