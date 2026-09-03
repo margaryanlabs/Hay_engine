@@ -7,7 +7,9 @@ HAY Engine is an Armenian-first AI language, creator and marketing operating sys
 ## Current product layers
 
 ### HAY Language API
-- versioned Armenian pronunciation registry
+- deterministic versioned Armenian pronunciation core
+- persistent pronunciation registry with precedence `business → account → HAY-reviewed system → curated core`
+- `/pronunciations` Dictionary Console for owner/business overrides, provenance and live testing
 - speech-safe normalization for commercial numbers, currencies, brands, suffixes and code-switching
 - Armenian file transcription through a replaceable STT provider adapter
 - HAY transcript correction with protected-value fail-safe
@@ -22,6 +24,8 @@ HAY Engine is an Armenian-first AI language, creator and marketing operating sys
 - raw developer keys are displayed once; only SHA-256 hashes are stored
 - coarse `language` scope or endpoint-specific language scopes
 - dedicated request / character / audio-byte usage ledger, separate from Studio subscriptions
+- mandatory operator-configured per-key hourly request limit before the API becomes ready
+- bounded developer text payloads (20k characters by default, configurable)
 - owner console at `/developers` for key creation, revocation and current-month usage
 - developer key tables are server-only: `anon` and normal `authenticated` Data API access is explicitly revoked
 - API activation is an explicit production switch via `HAY_DEVELOPER_API_ENABLED=true`
@@ -86,15 +90,16 @@ The app works without provider keys in demo mode. Persistent Studio becomes auth
 ## Core APIs
 
 ### Product language routes
-- `POST /api/normalize` — create speech-safe Armenian representation
-- `GET/POST /api/pronounce` — inspect the versioned pronunciation registry or pronounce arbitrary text
+- `POST /api/normalize` — create speech-safe Armenian representation using the active persistent pronunciation layer when available
+- `GET/POST /api/pronounce` — inspect the curated core or pronounce arbitrary text through the active runtime registry
+- `GET/POST/DELETE /api/pronunciations` — owner-scoped persistent pronunciation management
 - `POST /api/transcribe` — transcribe an uploaded audio/video file and run Armenian transcript correction
 - `POST /api/captions` — create caption cues plus SRT and WebVTT from text or provider alignment
 - `POST /api/translate` — translate HY / EN / RU with protected-value preservation
-- `POST /api/voice` — generate and meter Armenian voice when a provider is configured
+- `POST /api/voice` — generate and meter Armenian voice using the same active pronunciation registry
 
 ### Developer Language API V1
-- `GET /api/v1/language` — machine-readable API manifest
+- `GET /api/v1/language` — machine-readable API manifest and safety limits
 - `POST /api/v1/language/normalize`
 - `POST /api/v1/language/pronounce`
 - `POST /api/v1/language/captions`
@@ -109,7 +114,7 @@ Use `Authorization: Bearer hay_live_...` or `x-hay-api-key: hay_live_...` from a
 - `POST /api/image` — generate a vertical scene visual when OpenAI is configured
 - `POST /api/video` — start a metered Veo scene generation
 - `GET /api/health` — inspect provider/runtime readiness
-- `GET /api/setup/status` — inspect provider, Language API, developer API, worker, social and commercial go-live readiness
+- `GET /api/setup/status` — inspect provider, Language API/data, developer API, worker, social and commercial go-live readiness
 - `POST /api/marketing/plan` — create, persist and meter a marketing plan
 - `POST /api/marketing/autopilot` — create the HAY analyze→plan→create→approve→publish→learn run
 - `GET/PATCH /api/social/connections` — inspect connections and publishing policies
@@ -136,10 +141,13 @@ Apply SQL in this order:
 7. `supabase/storage.sql`
 8. `supabase/vault.sql`
 9. `supabase/007_commercial_core.sql`
+10. `supabase/008_language_registry.sql`
 
-Migration 007 contains the canonical pre-launch commercial schema: entitlements, Studio usage, developer API keys and developer API usage. Developer credentials/usage are intentionally not available to `anon` or normal `authenticated` Data API clients; owner-facing routes authenticate the user first and then use the server-only admin client.
+Migration 007 contains the commercial schema: entitlements, Studio usage, developer API keys and developer API usage. Developer credentials/usage are intentionally not available to `anon` or normal `authenticated` Data API clients; owner-facing routes authenticate the user first and then use the server-only admin client.
 
-Do not set `HAY_ENFORCE_PLANS=true` until migration 007 is applied and the billing sync path has been verified. Do not set `HAY_DEVELOPER_API_ENABLED=true` until the developer tables exist and the API has been smoke-tested with a revocable key.
+Migration 008 adds the persistent pronunciation registry and append-only audit snapshots. The in-code curated dictionary remains the fallback, so missing database state never turns HAY pronunciation into an empty registry. Private account/business pronunciation data is operational configuration and is not promoted into global system/training data by default.
+
+Do not set `HAY_ENFORCE_PLANS=true` until migration 007 is applied and the billing sync path has been verified. Do not set `HAY_DEVELOPER_API_ENABLED=true` until the developer tables exist, a positive hourly request limit is configured, and the API has been smoke-tested with a revocable key.
 
 ## Billing rollout
 
@@ -147,7 +155,7 @@ HAY does not hard-code one payment company. Configure HTTPS hosted checkout URLs
 
 ## Armenian quality
 
-`npm run quality` is a release gate. It covers natural Eastern Armenian, Yerevan-casual transformations, business domains, code-switching, currencies, exact commercial values and brand/suffix pronunciation. `/quality` exposes the deterministic report.
+`npm run quality` is a release gate. It covers natural Eastern Armenian, Yerevan-casual transformations, business domains, code-switching, currencies, exact commercial values, brand/suffix pronunciation and runtime pronunciation override behavior. `/quality` exposes the deterministic report.
 
 Provider STT/translation output is not trusted blindly: HAY adds transcript/translation preservation checks around commercial values and code-switched brand tokens. `/benchmark` is the separate blinded native-speaker evidence layer.
 
@@ -158,6 +166,7 @@ Internal regression scores are not independent proof that HAY is the world's bes
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/CREATOR_ENGINE.md`](docs/CREATOR_ENGINE.md)
 - [`docs/ARMENIAN_QUALITY.md`](docs/ARMENIAN_QUALITY.md)
+- [`docs/PRONUNCIATION_REGISTRY.md`](docs/PRONUNCIATION_REGISTRY.md)
 - [`docs/MARKETING_OS.md`](docs/MARKETING_OS.md)
 - [`docs/NATIVE_BENCHMARK.md`](docs/NATIVE_BENCHMARK.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
@@ -165,8 +174,8 @@ Internal regression scores are not independent proof that HAY is the world's bes
 
 ## Dataset strategy
 
-See [`docs/DATASET_SCHEMA.md`](docs/DATASET_SCHEMA.md). Proprietary datasets should only use licensed, curated, public-domain/compatible or explicitly consented material with clear provenance. Private customer content is not training data by default.
+See [`docs/DATASET_SCHEMA.md`](docs/DATASET_SCHEMA.md). Proprietary datasets should only use licensed, curated, public-domain/compatible or explicitly consented material with clear provenance. Private customer content and private pronunciation overrides are not training data by default.
 
 ## Philosophy
 
-We do **not** need to train an Armenian frontier model from scratch. HAY uses strong foundation models as interchangeable providers and owns the missing Armenian-specific layer around them: normalization, pronunciation, dialect handling, code-switching, typography, transcript correction, translation safeguards, evaluation, developer infrastructure, business context, workflow, outcome memory and eventually targeted fine-tuned components where measured benchmarks justify them.
+We do **not** need to train an Armenian frontier model from scratch. HAY uses strong foundation models as interchangeable providers and owns the missing Armenian-specific layer around them: normalization, pronunciation, dialect handling, code-switching, proprietary reviewed language memory, typography, transcript correction, translation safeguards, evaluation, developer infrastructure, business context, workflow, outcome memory and eventually targeted fine-tuned components where measured benchmarks justify them.
