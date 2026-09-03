@@ -1,4 +1,4 @@
-import { normalizeForSpeech } from "@/lib/hay/normalize";
+import { normalizeWithPronunciationRegistry } from "@/lib/hay/pronunciation-store";
 import { buildDemoStoryboard } from "@/lib/hay/storyboard";
 import type { ContentStyle, Dialect, Locale } from "@/lib/hay/types";
 import { generateStoryboardWithOpenAI } from "@/lib/providers/openai";
@@ -13,6 +13,8 @@ export async function createCreatorProject(args: {
   dialect: Dialect;
   style: ContentStyle;
   duration: number;
+  ownerId?:string|null;
+  businessId?:string|null;
 }): Promise<CreatorProject> {
   const storyboard =
     (await generateStoryboardWithOpenAI({
@@ -22,7 +24,14 @@ export async function createCreatorProject(args: {
       style: args.style,
     })) ?? buildDemoStoryboard(args.prompt, args.language, args.duration, args.style);
 
-  const speech = normalizeForSpeech(storyboard.voiceover, args.language, args.dialect);
+  const speechRuntime=await normalizeWithPronunciationRegistry({
+    text:storyboard.voiceover,
+    locale:args.language,
+    dialect:args.dialect,
+    ownerId:args.ownerId,
+    businessId:args.businessId,
+  });
+  const speech = speechRuntime.normalized;
   const captions = buildCaptionCues(storyboard.voiceover, args.duration);
   const scenes = buildCreatorScenes(storyboard.scenes);
   const voiceConfigured = Boolean(process.env.ELEVENLABS_API_KEY && (process.env.ELEVENLABS_VOICE_ID || process.env.ELEVENLABS_VOICE_ID_MALE || process.env.ELEVENLABS_VOICE_ID_FEMALE));
