@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authenticatedOwner, createDeveloperKey, developerApiMigrationReady, HAY_DEVELOPER_SCOPES, listDeveloperKeys, revokeDeveloperKey } from "@/lib/developer/api-keys";
+import { authenticatedOwner, createDeveloperKey, developerApiEnabled, developerApiHourlyLimit, developerApiMigrationReady, HAY_DEVELOPER_SCOPES, listDeveloperKeys, revokeDeveloperKey } from "@/lib/developer/api-keys";
 
 export const runtime="nodejs";
 
@@ -7,9 +7,10 @@ export async function GET(){
   const owner=await authenticatedOwner();
   if(!owner)return NextResponse.json({error:"unauthorized"},{status:401});
   const migrationReady=await developerApiMigrationReady();
-  if(!migrationReady)return NextResponse.json({configured:false,migrationReady:false,keys:[],scopes:HAY_DEVELOPER_SCOPES});
+  const hourlyRequestLimit=developerApiHourlyLimit();
+  if(!migrationReady)return NextResponse.json({configured:false,migrationReady:false,keys:[],scopes:HAY_DEVELOPER_SCOPES,developerApiEnabled:developerApiEnabled(),hourlyRequestLimit});
   const result=await listDeveloperKeys(owner.ownerId);
-  return NextResponse.json({...result,migrationReady:true,scopes:HAY_DEVELOPER_SCOPES,developerApiEnabled:process.env.HAY_DEVELOPER_API_ENABLED==="true"});
+  return NextResponse.json({...result,migrationReady:true,scopes:HAY_DEVELOPER_SCOPES,developerApiEnabled:developerApiEnabled(),hourlyRequestLimit,developerApiReady:developerApiEnabled()&&hourlyRequestLimit>0});
 }
 
 export async function POST(request:Request){
