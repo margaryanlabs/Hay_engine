@@ -68,8 +68,9 @@ create table if not exists public.dataset_records (
   updated_at timestamptz not null default now()
 );
 
-create unique index if not exists dataset_record_hash_uq
-on public.dataset_records(dataset_key, content_hash) where status in ('candidate','approved');
+drop index if exists public.dataset_record_hash_uq;
+create index if not exists dataset_record_hash_idx
+on public.dataset_records(dataset_key, content_hash, status);
 
 create index if not exists dataset_records_provenance_idx
 on public.dataset_records(dataset_key, source_type, status, created_at desc);
@@ -199,5 +200,5 @@ grant select, insert, update on public.dataset_records to service_role;
 grant select, insert on public.dataset_record_audit to service_role;
 
 comment on table public.language_corrections is 'Consent-aware user corrections. Private submission is allowed without reuse consent; promotion requires explicit product-improvement consent.';
-comment on table public.dataset_records is 'General HAY dataset provenance/license/consent registry. Approved records are eligible for reviewed datasets; model-training consent remains a separate flag on the originating correction.';
+comment on table public.dataset_records is 'General HAY dataset provenance/license/consent registry. Identical content may retain multiple source/consent chains; model-training consent remains a separate flag on the originating correction.';
 comment on table public.dataset_record_audit is 'Append-only provenance snapshots for dataset approval, withdrawal and archival changes.';
