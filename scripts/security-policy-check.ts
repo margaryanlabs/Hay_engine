@@ -104,4 +104,31 @@ assert.match(
   "Unauthenticated provider access must be an explicit server-side operator override",
 );
 
-console.log(JSON.stringify({ securityPolicy: "passed", cases: 11, providerCostRoutes: meteredProviderRoutes, usageBusinessOwnership: true, productionProviderFailClosed: true }, null, 2));
+const videoRouteSource = readFileSync("app/api/video/route.ts", "utf8");
+assert.match(
+  videoRouteSource,
+  /metadata:\s*\{[\s\S]*?operationName[\s\S]*?\}/,
+  "Veo generation must persist the normalized operation name in the owner usage ledger",
+);
+const ownershipCall = videoRouteSource.indexOf("await checkOwnedProviderOperation(");
+const providerPollCall = videoRouteSource.indexOf("await getVeoOperation(operationName)");
+assert.ok(
+  ownershipCall >= 0 && providerPollCall > ownershipCall,
+  "Veo polling must prove operation ownership before calling the Google provider",
+);
+
+const providerOperationSource = readFileSync("lib/commercial/provider-operations.ts", "utf8");
+assert.match(
+  providerOperationSource,
+  /\.from\("usage_events"\)[\s\S]*?\.eq\("owner_id", context\.userId\)[\s\S]*?\.eq\("source", input\.source\)[\s\S]*?\.contains\("metadata", \{ operationName: input\.operationName \}\)/,
+  "Provider operation ownership must be resolved from the authenticated owner's durable usage ledger",
+);
+
+console.log(JSON.stringify({
+  securityPolicy: "passed",
+  cases: 14,
+  providerCostRoutes: meteredProviderRoutes,
+  usageBusinessOwnership: true,
+  productionProviderFailClosed: true,
+  veoOperationOwnership: true,
+}, null, 2));
