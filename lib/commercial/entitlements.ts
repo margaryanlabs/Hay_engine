@@ -2,8 +2,9 @@ import "server-only";
 
 import { HAY_PLANS, type HayPlan } from "@/lib/pricing";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { evaluateUsageAllowance, type UsageMeter } from "@/lib/commercial/usage-policy";
 
-export type UsageMeter = "content_assets" | "ai_video_credits" | "voice_minutes";
+export type { UsageMeter } from "@/lib/commercial/usage-policy";
 export type CommercialPlanId = HayPlan["id"] | "agency";
 
 const ZERO_USAGE: Record<UsageMeter, number> = {
@@ -23,13 +24,6 @@ const AGENCY_LIMITS = {
 function planLimits(planId: CommercialPlanId) {
   if (planId === "agency") return AGENCY_LIMITS;
   return HAY_PLANS.find((plan) => plan.id === planId)?.limits ?? HAY_PLANS[0].limits;
-}
-
-function limitForMeter(planId: CommercialPlanId, meter: UsageMeter) {
-  const limits = planLimits(planId);
-  if (meter === "content_assets") return limits.contentAssets;
-  if (meter === "ai_video_credits") return limits.aiVideoCredits;
-  return limits.voiceMinutes;
 }
 
 export function planEnforcementEnabled() {
@@ -158,14 +152,10 @@ export async function getCommercialContext() {
 
 export async function checkUsageAllowance(meter: UsageMeter, quantity = 1) {
   const context = await getCommercialContext();
-  if (!context.configured || !context.enforcementEnabled) return { allowed: true, context };
-  if (!context.authenticated) return { allowed: false, reason: "unauthorized", context };
-  if (!context.migrationReady) return { allowed: false, reason: "commercial_migration_required", context };
-  if (!["active", "trialing"].includes(context.status)) return { allowed: false, reason: "subscription_inactive", context };
-  const limit = limitForMeter(context.planId, meter);
-  const used = context.usage[meter];
-  if (used + quantity > limit) return { allowed: false, reason: "plan_limit_reached", context };
-  return { allowed: true, context };
+  const decision = evaluateUsageAllowance(context, meter, quantity);
+  return decision.allowed
+    ? { allowed: true as const, context }
+    : { allowed: false as const, reason: decision.reason, context };
 }
 
 export async function recordUsage(input: {
