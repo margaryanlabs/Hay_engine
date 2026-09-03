@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkUsageAllowance, recordUsage } from "@/lib/commercial/entitlements";
+import { commitUsageReservation, releaseUsageReservation, reserveUsage, resizeUsageReservation, type UsageReservation } from "@/lib/commercial/usage-reservations";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createCreatorProject } from "@/lib/creator/project";
 import { buildAlignedCaptionCues } from "@/lib/creator/aligned-captions";
@@ -15,12 +16,16 @@ import type { Locale } from "@/lib/hay/types";
 export const runtime = "nodejs";
 
 function estimatedVoiceMinutes(text:string){
-  const words=text.trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(0.1,Math.round((words/135)*1000)/1000);
+  const value=text.trim();
+  const words=value.split(/\s+/).filter(Boolean).length;
+  return Math.max(0.1,Math.round(Math.max(words/135,value.length/780)*1000)/1000);
 }
 
-function allowanceStatus(reason:string|undefined){
-  return reason==="unauthorized"?401:reason==="commercial_migration_required"?503:402;
+function usageStatus(reason:string|undefined){
+  if(reason==="unauthorized")return 401;
+  if(reason==="request_in_progress"||reason==="duplicate_request")return 409;
+  if(reason==="commercial_migration_required"||reason==="atomic_usage_admin_required"||reason==="atomic_usage_migration_required"||reason==="atomic_usage_resize_migration_required"||reason==="atomic_usage_reservation_failed"||reason==="reservation_resize_failed")return 503;
+  return 402;
 }
 
 async function uploadPrivateAsset(args: { supabase: Awaited<ReturnType<typeof createClient>>; userId: string; bytes: Uint8Array; contentType: string; extension: string }) {
@@ -33,11 +38,13 @@ async function uploadPrivateAsset(args: { supabase: Awaited<ReturnType<typeof cr
 }
 
 export async function POST(request: Request) {
+  let pendingVoiceReservation:UsageReservation|null=null;
   try {
     if (!isSupabaseConfigured()) return NextResponse.json({ configured: false, message: "Dedicated HAY Supabase is required for the automated content factory." });
     const body = await request.json();
     const contentItemId = String(body.contentItemId || "");
     const force=body.force===true;
+    const requestId=typeof body.requestId==="string"?body.requestId.trim().slice(0,200):"";
     if (!contentItemId) return NextResponse.json({ error: "content_item_id_required" }, { status: 400 });
 
     const supabase = await createClient();
@@ -79,7 +86,7 @@ export async function POST(request: Request) {
     if(force){
       const allowance=await checkUsageAllowance("content_assets",1);
       if(!allowance.allowed){
-        return NextResponse.json({error:allowance.reason,meter:"content_assets",required:1,commercial:allowance.context},{status:allowanceStatus(allowance.reason)});
+        return NextResponse.json({error:allowance.reason,meter:"content_assets",required:1,commercial:allowance.context},{status:usageStatus(allowance.reason)});
       }
     }
 
@@ -107,67 +114,100 @@ export async function POST(request: Request) {
     if (projectError) throw projectError;
 
     let audioSrc: string | undefined;
-    let voiceUsage:{recorded:boolean;reason?:string;duplicate?:boolean}|null=null;
+    let voiceUsage:{recorded:boolean;reason?:string;duplicate?:boolean;eventId?:string|null}|null=null;
+    const voiceIdempotencyKey=requestId?`content-voice:${content.id}:${requestId}`:`content-voice:${content.id}:${project.id}`;
+
     if(language==="hy"){
       const voice=resolveVoice(body.voiceId?String(body.voiceId):undefined);
-      if(voice){
-        const preflightMinutes=estimatedVoiceMinutes(project.voice.text);
-        const preflight=await checkUsageAllowance("voice_minutes",preflightMinutes);
-        if(!preflight.allowed){
-          await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
-          return NextResponse.json({error:preflight.reason,meter:"voice_minutes",required:preflightMinutes,commercial:preflight.context,projectId:project.id},{status:allowanceStatus(preflight.reason)});
-        }
-
+      // resolveVoice can return a catalog fallback for UI continuity. Only an actually
+      // configured provider may trigger naturalization, reservation or paid synthesis.
+      if(voice?.available){
         const style=(body.speechStyle==="standard"||body.speechStyle==="yerevan"?body.speechStyle:"natural") as ArmenianSpeechStyle;
+        const preflightMinutes=estimatedVoiceMinutes(project.voice.text);
+        const reservation=await reserveUsage({
+          meter:"voice_minutes",
+          quantity:preflightMinutes,
+          businessId:String(business.id),
+          source:"content_factory_voice",
+          idempotencyKey:voiceIdempotencyKey,
+          metadata:{contentItemId:content.id,projectId:project.id,language,provider:voice.provider,voiceId:voice.id,style,duration},
+        });
+        if(!reservation.allowed){
+          await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
+          return NextResponse.json({error:reservation.reason,meter:"voice_minutes",required:preflightMinutes,commercial:reservation.context,projectId:project.id},{status:usageStatus(reservation.reason)});
+        }
+        if(reservation.duplicate){
+          await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
+          return NextResponse.json({error:"duplicate_content_voice_request",projectId:project.id,commercialUsage:{recorded:true,duplicate:true,eventId:reservation.eventId}},{status:409});
+        }
+        pendingVoiceReservation=reservation;
+
         const naturalized=await naturalizeArmenianText(project.voice.text,style);
         const normalized=normalizeForSpeech(naturalized.text,"hy","eastern");
         const minutes=estimatedVoiceMinutes(normalized.spokenText);
-        if(minutes>preflightMinutes){
-          const allowance=await checkUsageAllowance("voice_minutes",minutes);
-          if(!allowance.allowed){
-            await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
-            return NextResponse.json({error:allowance.reason,meter:"voice_minutes",required:minutes,commercial:allowance.context,projectId:project.id},{status:allowanceStatus(allowance.reason)});
-          }
+        const resized=await resizeUsageReservation(reservation,minutes);
+        if(!resized.resized){
+          await releaseUsageReservation(reservation);
+          pendingVoiceReservation=null;
+          await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
+          return NextResponse.json({error:resized.reason,meter:"voice_minutes",required:minutes,commercial:reservation.context,projectId:project.id},{status:usageStatus(resized.reason)});
         }
 
         const speech=await createArmenianSpeech({text:normalized.spokenText,provider:voice.provider,providerVoiceId:voice.providerVoiceId});
         if(speech?.audioBase64){
+          voiceUsage=await commitUsageReservation(reservation,{
+            contentItemId:content.id,projectId:project.id,language,provider:voice.provider,voiceId:voice.id,style,duration,characters:normalized.spokenText.length,minutes,
+          });
+          // Provider cost has already happened. Never release this reservation after a
+          // commit failure; keeping it occupied is safer than creating unmetered speech.
+          pendingVoiceReservation=null;
+          if(!voiceUsage.recorded){
+            return NextResponse.json({error:"content_voice_usage_commit_failed",projectId:project.id,commercialUsage:voiceUsage},{status:503});
+          }
           const aligned=buildAlignedCaptionCues(speech.alignment);
           if(aligned?.length) project={...project,captions:aligned,voice:{...project.voice,text:normalized.spokenText}};
           audioSrc=await uploadPrivateAsset({supabase,userId,bytes:Uint8Array.from(Buffer.from(speech.audioBase64,"base64")),contentType:speech.contentType,extension:"mp3"});
-          voiceUsage=await recordUsage({
-            meter:"voice_minutes",
-            quantity:minutes,
-            businessId:String(business.id),
-            source:"content_factory_voice",
-            idempotencyKey:`content-voice:${content.id}:${project.id}`,
-            metadata:{contentItemId:content.id,projectId:project.id,language,provider:voice.provider,voiceId:voice.id,style,duration},
-          });
+        }else{
+          await releaseUsageReservation(reservation);
+          pendingVoiceReservation=null;
         }
       }
     } else {
-      const voiceId=String(body.providerVoiceId||process.env.ELEVENLABS_VOICE_ID||"")||undefined;
-      if(voiceId){
+      const providerVoiceId=String(body.providerVoiceId||process.env.ELEVENLABS_VOICE_ID||"")||undefined;
+      // A voice ID without an API key is not a configured provider and must not occupy quota.
+      if(providerVoiceId&&process.env.ELEVENLABS_API_KEY){
         const minutes=estimatedVoiceMinutes(project.voice.text);
-        const allowance=await checkUsageAllowance("voice_minutes",minutes);
-        if(!allowance.allowed){
+        const reservation=await reserveUsage({
+          meter:"voice_minutes",
+          quantity:minutes,
+          businessId:String(business.id),
+          source:"content_factory_voice",
+          idempotencyKey:voiceIdempotencyKey,
+          metadata:{contentItemId:content.id,projectId:project.id,language,provider:"elevenlabs",voiceId:providerVoiceId,duration},
+        });
+        if(!reservation.allowed){
           await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
-          return NextResponse.json({error:allowance.reason,meter:"voice_minutes",required:minutes,commercial:allowance.context,projectId:project.id},{status:allowanceStatus(allowance.reason)});
+          return NextResponse.json({error:reservation.reason,meter:"voice_minutes",required:minutes,commercial:reservation.context,projectId:project.id},{status:usageStatus(reservation.reason)});
         }
+        if(reservation.duplicate){
+          await supabase.from("creator_projects").update({status:"planned",updated_at:new Date().toISOString()}).eq("id",project.id);
+          return NextResponse.json({error:"duplicate_content_voice_request",projectId:project.id,commercialUsage:{recorded:true,duplicate:true,eventId:reservation.eventId}},{status:409});
+        }
+        pendingVoiceReservation=reservation;
 
-        const speech=await createElevenSpeech(project.voice.text,voiceId);
+        const speech=await createElevenSpeech(project.voice.text,providerVoiceId);
         if(speech?.audioBase64){
+          voiceUsage=await commitUsageReservation(reservation,{contentItemId:content.id,projectId:project.id,language,provider:"elevenlabs",voiceId:providerVoiceId,duration,characters:project.voice.text.length,minutes});
+          pendingVoiceReservation=null;
+          if(!voiceUsage.recorded){
+            return NextResponse.json({error:"content_voice_usage_commit_failed",projectId:project.id,commercialUsage:voiceUsage},{status:503});
+          }
           const aligned=buildAlignedCaptionCues(speech.alignment);
           if(aligned?.length) project={...project,captions:aligned};
           audioSrc=await uploadPrivateAsset({supabase,userId,bytes:Uint8Array.from(Buffer.from(speech.audioBase64,"base64")),contentType:speech.contentType,extension:"mp3"});
-          voiceUsage=await recordUsage({
-            meter:"voice_minutes",
-            quantity:minutes,
-            businessId:String(business.id),
-            source:"content_factory_voice",
-            idempotencyKey:`content-voice:${content.id}:${project.id}`,
-            metadata:{contentItemId:content.id,projectId:project.id,language,provider:"elevenlabs",voiceId,duration},
-          });
+        }else{
+          await releaseUsageReservation(reservation);
+          pendingVoiceReservation=null;
         }
       }
     }
@@ -189,7 +229,7 @@ export async function POST(request: Request) {
       quantity:1,
       businessId:String(business.id),
       source:"video_regeneration",
-      idempotencyKey:typeof body.requestId==="string"&&body.requestId?`video-regeneration:${body.requestId}`:undefined,
+      idempotencyKey:requestId?`video-regeneration:${requestId}`:undefined,
       metadata:{contentItemId:content.id,projectId:project.id,format:content.format},
     }):{recorded:false,reason:"included_in_plan"};
 
@@ -204,6 +244,7 @@ export async function POST(request: Request) {
       next: render.configured ? "render_worker" : "configure_render_worker",
     });
   } catch (error) {
+    if(pendingVoiceReservation)await releaseUsageReservation(pendingVoiceReservation).catch(()=>undefined);
     console.error("Marketing content factory failed", error);
     return NextResponse.json({ error: "marketing_content_factory_failed", detail: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }

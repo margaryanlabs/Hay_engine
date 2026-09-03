@@ -262,27 +262,72 @@ assert.match(
 );
 
 const contentFactorySource = readFileSync("app/api/marketing/content/create/route.ts", "utf8");
-const factoryHyPreflight = contentFactorySource.indexOf("await checkUsageAllowance(\"voice_minutes\",preflightMinutes)");
-const factoryNaturalizer = contentFactorySource.indexOf("await naturalizeArmenianText(project.voice.text,style)");
+assert.match(contentFactorySource,/value\.length\/780/,"Content Factory voice estimation must include the same character floor as direct Voice");
+const factoryHyProviderCheck=contentFactorySource.indexOf("if(voice?.available)");
+const factoryHyReserve=contentFactorySource.indexOf("const reservation=await reserveUsage(",factoryHyProviderCheck);
+const factoryHyDuplicate=contentFactorySource.indexOf("if(reservation.duplicate)",factoryHyReserve);
+const factoryNaturalizer=contentFactorySource.indexOf("await naturalizeArmenianText(project.voice.text,style)");
+const factoryResize=contentFactorySource.indexOf("await resizeUsageReservation(reservation,minutes)",factoryNaturalizer);
+const factoryHyTts=contentFactorySource.indexOf("await createArmenianSpeech(",factoryNaturalizer);
+const factoryHyCommit=contentFactorySource.indexOf("await commitUsageReservation(reservation",factoryHyTts);
+const factoryHyUpload=contentFactorySource.indexOf("await uploadPrivateAsset(",factoryHyCommit);
 assert.ok(
-  factoryHyPreflight >= 0 && factoryNaturalizer > factoryHyPreflight,
-  "Content Factory must check Armenian voice capacity before its OpenAI-backed naturalizer runs",
+  factoryHyProviderCheck>=0&&factoryHyProviderCheck<factoryHyReserve,
+  "Content Factory must require an actually available Armenian TTS provider before reservation or naturalization",
 );
-const elevenSpeechCall = contentFactorySource.indexOf("await createElevenSpeech(project.voice.text,voiceId)");
-const elevenAllowanceCall = contentFactorySource.lastIndexOf("await checkUsageAllowance(\"voice_minutes\",minutes)", elevenSpeechCall);
-const factoryVoiceUsageCall = contentFactorySource.indexOf("source:\"content_factory_voice\"", elevenSpeechCall);
 assert.ok(
-  elevenSpeechCall >= 0 && elevenAllowanceCall >= 0 && elevenAllowanceCall < elevenSpeechCall,
-  "Content Factory must check voice capacity before non-Armenian ElevenLabs TTS",
+  factoryHyReserve>=0&&factoryHyReserve<factoryNaturalizer,
+  "Content Factory must atomically reserve Armenian voice capacity before OpenAI naturalization",
 );
 assert.ok(
-  factoryVoiceUsageCall > elevenSpeechCall,
-  "Content Factory must meter non-Armenian ElevenLabs speech after a successful provider call",
+  factoryHyDuplicate>factoryHyReserve&&factoryHyDuplicate<factoryNaturalizer,
+  "Content Factory Armenian voice retries must stop before provider-backed naturalization",
+);
+assert.ok(
+  factoryResize>factoryNaturalizer&&factoryResize<factoryHyTts,
+  "Content Factory must atomically resize Armenian voice usage to normalized minutes before TTS",
+);
+assert.ok(
+  factoryHyCommit>factoryHyTts&&factoryHyCommit<factoryHyUpload,
+  "Content Factory must commit Armenian TTS cost before asset upload/render can fail",
+);
+
+const factoryNonHyProviderCheck=contentFactorySource.indexOf("providerVoiceId&&process.env.ELEVENLABS_API_KEY");
+const factoryNonHyReserve=contentFactorySource.indexOf("const reservation=await reserveUsage(",factoryNonHyProviderCheck);
+const factoryNonHyDuplicate=contentFactorySource.indexOf("if(reservation.duplicate)",factoryNonHyReserve);
+const factoryNonHyTts=contentFactorySource.indexOf("await createElevenSpeech(project.voice.text,providerVoiceId)");
+const factoryNonHyCommit=contentFactorySource.indexOf("await commitUsageReservation(reservation",factoryNonHyTts);
+const factoryNonHyUpload=contentFactorySource.indexOf("await uploadPrivateAsset(",factoryNonHyCommit);
+assert.ok(
+  factoryNonHyProviderCheck>=0&&factoryNonHyProviderCheck<factoryNonHyReserve,
+  "Content Factory non-Armenian voice must verify ElevenLabs key and voice ID before occupying quota",
+);
+assert.ok(
+  factoryNonHyReserve>=0&&factoryNonHyReserve<factoryNonHyTts,
+  "Content Factory must reserve non-Armenian voice capacity before ElevenLabs TTS",
+);
+assert.ok(
+  factoryNonHyDuplicate>factoryNonHyReserve&&factoryNonHyDuplicate<factoryNonHyTts,
+  "Content Factory non-Armenian retries must stop before ElevenLabs provider spend",
+);
+assert.ok(
+  factoryNonHyCommit>factoryNonHyTts&&factoryNonHyCommit<factoryNonHyUpload,
+  "Content Factory must commit non-Armenian TTS cost before asset upload/render can fail",
+);
+assert.match(
+  contentFactorySource,
+  /content_voice_usage_commit_failed[\s\S]*?status:503/,
+  "Content Factory voice must fail closed after paid TTS if commercial commit fails",
+);
+assert.match(
+  contentFactorySource,
+  /pendingVoiceReservation[\s\S]*?releaseUsageReservation\(pendingVoiceReservation\)/,
+  "Content Factory must release only still-pending voice reservations on pre-provider failure paths",
 );
 
 console.log(JSON.stringify({
   securityPolicy: "passed",
-  cases: 49,
+  cases: 59,
   providerCostRoutes: meteredProviderRoutes,
   meteredLanguageRoutes,
   usageBusinessOwnership: true,
@@ -297,7 +342,8 @@ console.log(JSON.stringify({
   voiceAtomicResizeBeforeTts: true,
   voicePreProviderIdempotency: true,
   voiceRequestSizeBound: true,
-  contentFactoryVoicePreProviderGate: true,
-  contentFactoryAllVoiceMetered: true,
+  contentFactoryVoiceAtomic: true,
+  contentFactoryVoicePreProviderIdempotency: true,
+  contentFactoryVoiceCommitBeforeAssetPersistence: true,
   translationSizeBound: true,
 }, null, 2));
