@@ -41,6 +41,33 @@ async function operatorAuthorized() {
   }
 }
 
+async function billingEventMigrationReady(){
+  if(!isSupabaseAdminConfigured())return false;
+  try{
+    const admin=createAdminClient();
+    const [events,entitlementColumns,rpc]=await Promise.all([
+      admin.from("billing_events").select("id,provider,event_id,applied",{head:true,count:"exact"}).limit(1),
+      admin.from("account_entitlements").select("owner_id,billing_event_created_at,billing_event_id",{head:true,count:"exact"}).limit(1),
+      // Null-owner probe is mutation-free: an installed RPC returns owner_required;
+      // a missing migration returns a PostgREST function error.
+      admin.rpc("hay_apply_billing_entitlement",{
+        p_owner_id:null,
+        p_plan_id:"free",
+        p_status:"active",
+        p_provider:"migration_probe",
+        p_provider_customer_id:null,
+        p_provider_subscription_id:null,
+        p_current_period_start:null,
+        p_current_period_end:null,
+        p_overrides:{},
+        p_event_id:"migration_probe",
+        p_event_created_at:null,
+      }),
+    ]);
+    return !events.error&&!entitlementColumns.error&&!rpc.error;
+  }catch{return false;}
+}
+
 function protectedResponse() {
   return NextResponse.json(
     {
@@ -104,6 +131,7 @@ export async function GET() {
     }
   }
   const atomicUsageMigration = admin ? await atomicUsageMigrationsReady() : false;
+  const billingEventMigration = admin ? await billingEventMigrationReady() : false;
   const developerMigration = admin ? await developerApiMigrationReady() : false;
   const pronunciationRegistry = admin ? await pronunciationRegistryReady() : false;
   const correctionFlywheel = admin ? await correctionFlywheelReady() : false;
@@ -118,8 +146,9 @@ export async function GET() {
     business: Boolean(process.env.HAY_CHECKOUT_BUSINESS_URL),
     agency: Boolean(process.env.HAY_CHECKOUT_AGENCY_URL),
   };
-  const billingSync = Boolean(process.env.HAY_BILLING_SYNC_SECRET) && admin;
-  const commercialReady = supabase && admin && commercialMigration && atomicUsageMigration && billingSync && checkout.creator && checkout.growth && checkout.business;
+  const billingSecretConfigured = Boolean(process.env.HAY_BILLING_SYNC_SECRET);
+  const billingSync = billingSecretConfigured && admin && billingEventMigration;
+  const commercialReady = supabase && admin && commercialMigration && atomicUsageMigration && billingEventMigration && billingSync && checkout.creator && checkout.growth && checkout.business;
   const developerApiReady = supabase && admin && developerMigration && developerEnabled && developerRateLimitReady;
   const coreReady = providers.strategy && supabase && admin;
   const marketingReady = coreReady && workers.publish;
@@ -166,9 +195,11 @@ export async function GET() {
       commercial: {
         migration: commercialMigration,
         atomicUsageMigration,
-        requiredMigrations: ["007_commercial_core.sql","010_atomic_usage_reservations.sql","011_atomic_usage_resize.sql"],
+        billingEventMigration,
+        requiredMigrations: ["007_commercial_core.sql","010_atomic_usage_reservations.sql","011_atomic_usage_resize.sql","013_atomic_billing_events.sql"],
         planEnforcement: planEnforcementEnabled(),
         billingSync,
+        billingSecretConfigured,
         checkout,
       },
       blockers: [
@@ -177,13 +208,14 @@ export async function GET() {
         ...(!workers.publish ? ["publish_worker_required_for_automatic_posting"] : []),
         ...(supabase && !commercialMigration ? ["commercial_migration_007_required"] : []),
         ...(commercialMigration && !atomicUsageMigration ? ["atomic_usage_migrations_010_011_required"] : []),
+        ...(commercialMigration && !billingEventMigration ? ["billing_event_migration_013_required"] : []),
         ...(admin && !pronunciationRegistry ? ["language_registry_migration_008_required"] : []),
         ...(admin && !correctionFlywheel ? ["language_correction_migration_009_required"] : []),
         ...(correctionFlywheel && !reviewerAllowlist ? ["language_reviewer_allowlist_required"] : []),
         ...(admin && !developerMigration ? ["developer_api_migration_012_required"] : []),
         ...(developerMigration && !developerEnabled ? ["developer_api_disabled"] : []),
         ...(developerEnabled && !developerRateLimitReady ? ["developer_api_hourly_rate_limit_required"] : []),
-        ...(commercialMigration && !billingSync ? ["billing_sync_secret_required"] : []),
+        ...(commercialMigration && !billingSecretConfigured ? ["billing_sync_secret_required"] : []),
         ...(commercialMigration && !atomicUsageMigration && planEnforcementEnabled() ? ["plan_enforcement_requires_atomic_usage_migrations"] : []),
         ...(commercialMigration && !planEnforcementEnabled() ? ["plan_enforcement_disabled"] : []),
         ...(!checkout.creator || !checkout.growth || !checkout.business ? ["paid_checkout_links_required"] : []),
