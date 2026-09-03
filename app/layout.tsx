@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./landing-v5.css";
+import "./landing-v6.css";
 import "./creator.css";
 import "./marketing.css";
 import "./competitor-intel.css";
