@@ -13,7 +13,7 @@ assert.match(sync,/MAX_EVENT_FUTURE_SKEW_MS\s*=\s*10\*60\*1000/,"Billing sync mu
 assert.match(sync,/cleanText\(body\.provider,64\)\.toLowerCase\(\)/,"Billing provider replay namespace must be normalized to lowercase");
 assert.match(sync,/rpc\("hay_apply_billing_entitlement"/,"Billing sync must apply verified events through the atomic database RPC");
 assert.doesNotMatch(sync,/\.from\("account_entitlements"\)[\s\S]*?\.upsert\(/,"Billing route must not directly upsert entitlement state outside the atomic event RPC");
-assert.match(sync,/duplicate[\s\S]*stale[\s\S]*ok:true/,"Duplicate/stale verified events must be acknowledged without endless provider retries");
+assert.match(sync,/ok:true[\s\S]*?duplicate:result\.duplicate===true[\s\S]*?stale:result\.stale===true/,"Duplicate/stale verified events must be acknowledged without endless provider retries");
 
 const checkout=read("app/api/billing/checkout/route.ts");
 assert.match(checkout,/supabase\.auth\.getClaims\(\)/,"Checkout resolution must require an authenticated HAY account");
