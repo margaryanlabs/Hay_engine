@@ -22,7 +22,8 @@ export async function POST(request:Request){
     if(!raw)return NextResponse.json({error:"transcription_provider_unconfigured"},{status:503});
     const shouldCorrect=language==="hy"&&String(form.get("correct")??"true")!=="false";
     const correction=shouldCorrect?await correctArmenianTranscript(raw.text):null;
-    await recordDeveloperApiUsage(auth.context,{endpoint:"/api/v1/language/transcribe",operation:"transcribe",audioBytes:file.size,metadata:{language,model:raw.model,corrected:Boolean(correction)}});
+    const usage=await recordDeveloperApiUsage(auth.context,{endpoint:"/api/v1/language/transcribe",operation:"transcribe",audioBytes:file.size,metadata:{language,model:raw.model,corrected:Boolean(correction)}});
+    if(!usage.recorded)return NextResponse.json({error:"developer_api_metering_failed"},{status:503});
     return NextResponse.json({apiVersion:"v1",locale:language==="hy"?"hy-AM":language,provider:raw.provider,model:raw.model,rawText:raw.text,text:correction?.text||raw.text,corrected:Boolean(correction&&correction.text!==raw.text),correction:correction?{generatedBy:correction.generatedBy,rejectedAiCorrection:"rejectedAiCorrection" in correction?Boolean(correction.rejectedAiCorrection):false}:null});
   }catch(error){
     console.error("HAY v1 transcription failed",error);
