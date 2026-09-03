@@ -11,6 +11,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "quality": "rm -rf .quality-build && tsc -p scripts/tsconfig.quality.json && node .quality-build/scripts/quality-check.js",
+    "security:policy": "rm -rf .security-build && tsc -p scripts/tsconfig.security.json && node .security-build/scripts/security-policy-check.js",
     "env:check": "node scripts/env-contract.mjs",
     "smoke": "node scripts/runtime-smoke.mjs"
   },
