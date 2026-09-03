@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authenticateDeveloperRequest, recordDeveloperApiUsage } from "@/lib/developer/api-keys";
+import { authenticateDeveloperRequest, developerApiMaxTextChars, recordDeveloperApiUsage } from "@/lib/developer/api-keys";
 import { translateHayText } from "@/lib/hay/translate";
 import type { Locale } from "@/lib/hay/types";
 
@@ -12,6 +12,8 @@ export async function POST(request:Request){
   const body=await request.json();
   const text=String(body.text||"").trim();
   if(!text)return NextResponse.json({error:"text_required"},{status:400});
+  const maxTextChars=developerApiMaxTextChars();
+  if(text.length>maxTextChars)return NextResponse.json({error:"text_too_large",maxTextChars},{status:413});
   const target=String(body.target||"hy") as Locale;
   if(!locales.includes(target))return NextResponse.json({error:"unsupported_target_language"},{status:400});
   const sourceRaw=String(body.source||"auto");
