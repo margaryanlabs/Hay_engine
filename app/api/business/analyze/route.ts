@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkUsageAllowance } from "@/lib/commercial/entitlements";
 import { analyzeCompetitorEvidence, collectCompetitorEvidence, competitorContextForPlan } from "@/lib/marketing/competitor-intelligence";
 import { inspectPublicSite } from "@/lib/marketing/site-inspect";
 import { buildMarketingPlan } from "@/lib/marketing/planner";
@@ -13,6 +14,14 @@ export async function POST(request: Request) {
     const competitors = (body.competitors ?? []) as CompetitorInput[];
     if (!business?.name || !business.category) {
       return NextResponse.json({ error: "invalid_business_profile" }, { status: 400 });
+    }
+
+    // Analysis itself is included in HAY plans, but once commercial enforcement is on
+    // it must come from an authenticated active account with usable plan capacity.
+    const allowance=await checkUsageAllowance("content_assets",1);
+    if(!allowance.allowed){
+      const status=allowance.reason==="unauthorized"?401:allowance.reason==="commercial_migration_required"?503:402;
+      return NextResponse.json({error:allowance.reason,commercial:allowance.context},{status});
     }
 
     const [businessSnapshot, competitorEvidence] = await Promise.all([

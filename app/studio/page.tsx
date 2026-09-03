@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
 import MarketingOS from "@/components/MarketingOS";
 import StudioCampaignAnalytics from "@/components/StudioCampaignAnalytics";
 import StudioCampaignBrain from "@/components/StudioCampaignBrain";
 import StudioCommandPalette from "@/components/StudioCommandPalette";
+import StudioCommercialRail from "@/components/StudioCommercialRail";
 import StudioContentMemory from "@/components/StudioContentMemory";
 import StudioContentSeries from "@/components/StudioContentSeries";
 import StudioConversionBridge from "@/components/StudioConversionBridge";
@@ -12,15 +14,33 @@ import StudioScheduleQueue from "@/components/StudioScheduleQueue";
 import StudioStatusRail from "@/components/StudioStatusRail";
 import StudioTodayBrief from "@/components/StudioTodayBrief";
 import StudioWorkspaceSwitcher from "@/components/StudioWorkspaceSwitcher";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const metadata = {
   title: "HAY Studio — Marketing OS",
   description: "Analyze, create, publish and learn with the HAY Armenian-first Marketing OS.",
 };
 
-export default function StudioPage(){
+type StudioPageProps={searchParams:Promise<{plan?:string|string[]}>};
+const allowedPlans=new Set(["free","creator","growth","business","agency"]);
+
+export default async function StudioPage({searchParams}:StudioPageProps){
+  const params=await searchParams;
+  const rawPlan=Array.isArray(params.plan)?params.plan[0]:params.plan;
+  const selectedPlan=rawPlan&&allowedPlans.has(rawPlan)?rawPlan:null;
+  const nextPath=selectedPlan?`/studio?plan=${encodeURIComponent(selectedPlan)}`:"/studio";
+
+  // Keep local/demo exploration possible when Supabase is intentionally absent,
+  // but never expose a persistent production workspace without an authenticated owner.
+  if(isSupabaseConfigured()){
+    const supabase=await createClient();
+    const {data,error}=await supabase.auth.getClaims();
+    if(error||!data?.claims?.sub)redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+  }
+
   return <>
     <StudioStatusRail/>
+    <StudioCommercialRail/>
     <StudioWorkspaceSwitcher/>
     <MarketingOS/>
     <StudioTodayBrief/>

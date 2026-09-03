@@ -1,0 +1,28 @@
+import type { ArmenianQualityCase } from "./quality-benchmark";
+
+export const ARMENIAN_COMMERCE_QUALITY_PACK: ArmenianQualityCase[] = [
+  {id:"commerce-001",domain:"retail",kind:"speech",input:"Գինը 14,900 ֏ է։",mustInclude:["տասնչորս հազար ինը հարյուր դրամ"],mustExclude:["֏","14,900"],note:"Comma-formatted Armenian dram price must be spoken as one amount."},
+  {id:"commerce-002",domain:"retail",kind:"speech",input:"Արժեքը 99000 AMD է։",mustInclude:["իննսունինը հազար դրամ"],mustExclude:["AMD","99000"],note:"AMD ISO code should become natural Armenian currency speech."},
+  {id:"commerce-003",domain:"hospitality",kind:"speech",input:"Փաթեթը ֏ 25,000 է մեկ գիշերվա համար։",mustInclude:["քսանհինգ հազար դրամ"],mustExclude:["֏","25,000"],note:"Leading dram symbol should normalize before TTS."},
+  {id:"commerce-004",domain:"tourism",kind:"speech",input:"Գինը € 1,200 է։",mustInclude:["հազար երկու հարյուր եվրո"],mustExclude:["€","1,200"],note:"Euro prices should be natural in Armenian narration."},
+  {id:"commerce-005",domain:"tourism",kind:"speech",input:"Տրանսֆերը 250 GEL է։",mustInclude:["երկու հարյուր հիսուն լարի"],mustExclude:["GEL","250"],note:"Georgian lari is common in regional Armenian travel content."},
+  {id:"commerce-006",domain:"finance-tech",kind:"speech",input:"Բյուջեն $14,900 է։",mustInclude:["տասնչորս հազար ինը հարյուր դոլար"],mustExclude:["$14,900"],note:"Grouped USD amount must not be interpreted as a decimal."},
+  {id:"commerce-007",domain:"finance-tech",kind:"speech",input:"BTC-ի գինը $115.5K է։",mustInclude:["Բիթքոյնի","հարյուր տասնհինգ հազար հինգ հարյուր դոլար"],note:"Compact decimal K amount must preserve exact commercial value."},
+  {id:"commerce-008",domain:"retail",kind:"speech",input:"Այս ամիս ունենք 25% զեղչ։",mustInclude:["քսանհինգ տոկոս"],mustExclude:["25%"],note:"Percentage must be speech-safe."},
+  {id:"commerce-009",domain:"general",kind:"speech",input:"Արդեն ունենք 1,000,000 դիտում։",mustInclude:["մեկ միլիոն"],mustExclude:["1,000,000"],note:"Grouped large numbers should be read as one value."},
+  {id:"commerce-010",domain:"creator",kind:"speech",input:"HAY-ը ստեղծում է բնական հայերեն կոնտենտ։",mustInclude:["Հայը ստեղծում է"],mustExclude:["HAY-ը"],note:"HAY product name should inflect naturally in Armenian speech."},
+  {id:"commerce-011",domain:"creator",kind:"speech",input:"HAY-ի Voice Lab-ը պատրաստ է։",mustInclude:["Հայի"],mustExclude:["HAY-ի"],note:"HAY genitive must not sound like Latin letters plus Armenian suffix."},
+  {id:"commerce-012",domain:"creator",kind:"speech",input:"HAY-ում կարող ես կառավարել ամբողջ կոնտենտը։",mustInclude:["Հայում"],mustExclude:["HAY-ում"],note:"HAY locative should be fully Armenian in speech."},
+  {id:"commerce-013",domain:"creator",kind:"speech",input:"Instagram-ում հրապարակումը պատրաստ է։",mustInclude:["Ինստագրամում"],mustExclude:["Ինստագրամ-ում","Instagram-ում"],note:"Instagram locative suffix should merge naturally."},
+  {id:"commerce-014",domain:"creator",kind:"speech",input:"Instagram-ի Reel-ը արդեն հաստատված է։",mustInclude:["Ինստագրամի"],mustExclude:["Instagram-ի"],note:"Instagram genitive should sound native."},
+  {id:"commerce-015",domain:"creator",kind:"speech",input:"TikTok-ում տեսանյութը լավ է աշխատում։",mustInclude:["ՏիկՏոկում"],mustExclude:["ՏիկՏոկ-ում","TikTok-ում"],note:"TikTok locative should not retain a machine-like hyphen."},
+  {id:"commerce-016",domain:"creator",kind:"speech",input:"YouTube-ի Short-ը պատրաստ է։",mustInclude:["ՅուԹյուբի"],mustExclude:["YouTube-ի"],note:"YouTube genitive should be Armenian speech-safe."},
+  {id:"commerce-017",domain:"finance-tech",kind:"speech",input:"Gemini և Claude մոդելները միացված են։",mustInclude:["Ջեմինայ","Կլոդ"],mustExclude:["Gemini","Claude"],note:"Major AI provider names should have stable Armenian pronunciation."},
+  {id:"commerce-018",domain:"finance-tech",kind:"speech",input:"Supabase և Vercel կարգավորումները պատրաստ են։",mustInclude:["Սուպաբեյս","Վերսել"],mustExclude:["Supabase","Vercel"],note:"Developer platform names used in founder content need deterministic speech."},
+  {id:"commerce-019",domain:"creator",kind:"speech",input:"LinkedIn և Telegram ալիքները միացված են։",mustInclude:["ԼինքդԻն","Տելեգրամ"],mustExclude:["LinkedIn","Telegram"],note:"Business social channel names should be stable in Armenian narration."},
+  {id:"commerce-020",domain:"support",kind:"speech",input:"Ուղարկեք WhatsApp կամ SMS հաղորդագրություն։",mustInclude:["ՎոթսԱփ","Էս Էմ Էս"],mustExclude:["WhatsApp","SMS"],note:"Customer-support channel names should sound intentional."},
+  {id:"commerce-021",domain:"finance-tech",kind:"speech",input:"Google AI API-ն ակտիվ է։",mustInclude:["Գուգլ","Էյ Այ","Էյ Փի Այ"],note:"Common code-switch stack should be pronounceable without translation."},
+  {id:"commerce-022",domain:"retail",kind:"naturalization",style:"natural",input:"Ներկայումս ցանկանում եք կատարել վճարում 14,900 ֏ չափով։",mustInclude:["հիմա","ուզում եք","վճարել"],mustExclude:["Ներկայումս","ցանկանում եք","կատարել վճարում"],preserve:["14,900 ֏"],note:"Naturalization must simplify wording while preserving the displayed commercial amount."},
+  {id:"commerce-023",domain:"creator",kind:"naturalization",style:"yerevan",input:"Այո, այս պահին Instagram-ում կարող եք տեսնել արդյունքը։",mustInclude:["հա","էս պահին"],preserve:["Instagram"],note:"Yerevan mode may become conversational without corrupting brand names."},
+  {id:"commerce-024",domain:"retail",kind:"naturalization",style:"standard",input:"Ներկայումս արժեքը 99,000 ֏ է։",mustInclude:["Ներկայումս"],preserve:["99,000 ֏"],note:"Standard Armenian remains a stable control and must preserve prices exactly."},
+];

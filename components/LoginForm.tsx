@@ -6,6 +6,12 @@ import HayLogo from "./HayLogo";
 
 type SetupStatus = { mode?: "demo" | "persistent"; persistence?: { supabase?: boolean } };
 
+function safeNextPath(){
+  if(typeof window==="undefined")return "/studio";
+  const value=new URLSearchParams(window.location.search).get("next")||"/studio";
+  return value.startsWith("/")&&!value.startsWith("//")?value:"/studio";
+}
+
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -18,6 +24,19 @@ export default function LoginForm() {
 
   const persistenceReady = setup?.persistence?.supabase === true;
 
+  useEffect(()=>{
+    if(!persistenceReady)return;
+    const supabase=createClient();
+    let active=true;
+    void supabase.auth.getSession().then(({data})=>{
+      if(active&&data.session)window.location.replace(safeNextPath());
+    });
+    const {data:listener}=supabase.auth.onAuthStateChange((_event,session)=>{
+      if(active&&session)window.location.replace(safeNextPath());
+    });
+    return()=>{active=false;listener.subscription.unsubscribe();};
+  },[persistenceReady]);
+
   async function signIn(event: FormEvent) {
     event.preventDefault();
     if (!persistenceReady) {
@@ -27,7 +46,8 @@ export default function LoginForm() {
     setBusy(true); setMessage("");
     try {
       const supabase = createClient();
-      const redirectTo = `${window.location.origin}/`;
+      const next=safeNextPath();
+      const redirectTo = `${window.location.origin}/login?next=${encodeURIComponent(next)}`;
       const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
       if (error) throw error;
       setMessage("Check your email — HAY sent a secure sign-in link.");

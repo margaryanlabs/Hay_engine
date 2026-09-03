@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { getCommercialContext } from "@/lib/commercial/entitlements";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { BusinessProfile } from "@/lib/marketing/types";
 
@@ -39,6 +40,18 @@ export async function POST(request: Request) {
   if (!business?.name || !business.category || !["hy", "en", "ru"].includes(business.primaryLanguage)) {
     return NextResponse.json({ error: "invalid_business_profile" }, { status: 400 });
   }
+
+  if(!body.id){
+    const commercial=await getCommercialContext();
+    if(commercial.enforcementEnabled){
+      if(!commercial.migrationReady)return NextResponse.json({error:"commercial_migration_required",commercial},{status:503});
+      if(!["active","trialing"].includes(commercial.status))return NextResponse.json({error:"subscription_inactive",commercial},{status:402});
+      const {count,error:countError}=await auth.supabase.from("businesses").select("id",{count:"exact",head:true}).eq("owner_id",auth.userId);
+      if(countError)return NextResponse.json({error:"business_limit_check_failed",detail:countError.message},{status:500});
+      if((count||0)>=commercial.limits.brands)return NextResponse.json({error:"brand_limit_reached",limit:commercial.limits.brands,commercial},{status:402});
+    }
+  }
+
   const row = {
     owner_id: auth.userId,
     name: business.name,

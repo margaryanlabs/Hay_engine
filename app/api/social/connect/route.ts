@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCommercialContext } from "@/lib/commercial/entitlements";
 import { buildOAuthUrl, getConnectorReadiness } from "@/lib/marketing/connectors";
 import type { SocialPlatform } from "@/lib/marketing/types";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -31,6 +32,26 @@ export async function GET(request: Request) {
   if (claimsError || !userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { data: business } = await supabase.from("businesses").select("id").eq("id", businessId).eq("owner_id", userId).maybeSingle();
   if (!business) return NextResponse.json({ error: "business_not_found" }, { status: 404 });
+
+  const commercial=await getCommercialContext();
+  if(commercial.enforcementEnabled){
+    if(!commercial.migrationReady)return NextResponse.json({error:"commercial_migration_required",commercial},{status:503});
+    if(!["active","trialing"].includes(commercial.status))return NextResponse.json({error:"subscription_inactive",commercial},{status:402});
+
+    const {data:existing}=await supabase.from("social_connections").select("id,status").eq("business_id",businessId).eq("platform",platform).neq("status","disconnected").limit(1).maybeSingle();
+    if(!existing){
+      const {data:ownedBusinesses,error:businessError}=await supabase.from("businesses").select("id").eq("owner_id",userId);
+      if(businessError)return NextResponse.json({error:"channel_limit_check_failed",detail:businessError.message},{status:500});
+      const ids=(ownedBusinesses||[]).map(item=>String(item.id));
+      let channelCount=0;
+      if(ids.length){
+        const {count,error:countError}=await supabase.from("social_connections").select("id",{count:"exact",head:true}).in("business_id",ids).neq("status","disconnected");
+        if(countError)return NextResponse.json({error:"channel_limit_check_failed",detail:countError.message},{status:500});
+        channelCount=count||0;
+      }
+      if(channelCount>=commercial.limits.channels)return NextResponse.json({error:"channel_limit_reached",limit:commercial.limits.channels,commercial},{status:402});
+    }
+  }
 
   const state = crypto.randomUUID();
   const authorizationUrl = buildOAuthUrl(platform, state);
