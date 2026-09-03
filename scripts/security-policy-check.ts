@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   evaluateUsageAllowance,
   type UsageMeter,
@@ -69,4 +70,14 @@ assert.deepEqual(
   "Negative requested quantities must never reduce existing usage",
 );
 
-console.log(JSON.stringify({ securityPolicy: "passed", cases: 7 }, null, 2));
+const meteredProviderRoutes = [
+  "app/api/marketing/autopilot/route.ts",
+  "app/api/marketing/campaign/route.ts",
+];
+for (const route of meteredProviderRoutes) {
+  const source = readFileSync(route, "utf8");
+  assert.match(source, /checkUsageAllowance\s*\(/, `${route} must gate provider-backed generation before calling AI providers`);
+  assert.match(source, /recordUsage\s*\(/, `${route} must meter generated content after successful persistence`);
+}
+
+console.log(JSON.stringify({ securityPolicy: "passed", cases: 9, providerCostRoutes: meteredProviderRoutes }, null, 2));

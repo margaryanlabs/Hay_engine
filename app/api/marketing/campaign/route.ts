@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkUsageAllowance, recordUsage } from "@/lib/commercial/entitlements";
 import { analyzeCompetitorEvidence, collectCompetitorEvidence, competitorContextForPlan } from "@/lib/marketing/competitor-intelligence";
 import { applyCampaignWindowSchedule, buildCampaignBlueprint, campaignPlanningContext, normalizeCampaignBrief, remapCampaignBlueprint } from "@/lib/marketing/campaign";
 import { contentMemoryForPlan, loadContentMemory } from "@/lib/marketing/content-memory";
@@ -26,6 +27,13 @@ export async function POST(request:Request){
     if(campaignEnd<=Date.now()+90*60*1000)return NextResponse.json({error:"campaign_window_too_close",minimumLeadMinutes:90},{status:400});
     if(brief.eventDate&&(Date.parse(brief.eventDate)<start||Date.parse(brief.eventDate)>end))return NextResponse.json({error:"event_date_outside_campaign_window"},{status:400});
 
+    const planningDays=Math.min(30,Math.max(7,durationDays));
+    const allowance=await checkUsageAllowance("content_assets",planningDays);
+    if(!allowance.allowed){
+      const status=allowance.reason==="unauthorized"?401:allowance.reason==="commercial_migration_required"?503:402;
+      return NextResponse.json({error:allowance.reason,meter:"content_assets",required:planningDays,commercial:allowance.context},{status});
+    }
+
     const requestedBusinessId=typeof body.businessId==="string"?body.businessId:undefined;
     const competitors=(body.competitors??[]) as CompetitorInput[];
     const [performance,competitorEvidence,contentMemory]=await Promise.all([
@@ -38,7 +46,6 @@ export async function POST(request:Request){
       ...business,
       description:`${business.description||""}${competitorContextForPlan(competitorEvidence,competitorSignals)}${contentMemoryForPlan(contentMemory)}${campaignPlanningContext(brief,business)}`.trim(),
     };
-    const planningDays=Math.min(30,Math.max(7,durationDays));
     const raw=await buildMarketingPlan(planningBusiness,competitors,planningDays,performance);
     const restored={...raw,business,competitors:competitorSignals.length?competitorSignals:raw.competitors};
     const windowed=applyCampaignWindowSchedule(restored,brief);
@@ -46,6 +53,14 @@ export async function POST(request:Request){
     const campaign=buildCampaignBlueprint(brief,scheduled);
     const persisted=await persistMarketingPlan(scheduled,requestedBusinessId,{campaign});
     const durableCampaign=remapCampaignBlueprint(campaign,persisted.idMap);
+    const usage=await recordUsage({
+      meter:"content_assets",
+      quantity:persisted.plan.items.length,
+      businessId:persisted.businessId||requestedBusinessId||null,
+      source:"marketing_campaign",
+      idempotencyKey:typeof body.requestId==="string"&&body.requestId?`marketing-campaign:${body.requestId}`:undefined,
+      metadata:{durationDays,planningDays,generatedBy:persisted.plan.generatedBy,planId:persisted.planId||persisted.plan.id,campaignId:durableCampaign.id},
+    });
 
     return NextResponse.json({
       plan:persisted.plan,
@@ -54,6 +69,7 @@ export async function POST(request:Request){
       contentMemoryUsed:Boolean(contentMemory),
       competitorIntelligence:{evidence:competitorEvidence,signals:competitorSignals},
       persistence:{persisted:persisted.persisted,businessId:persisted.businessId,planId:persisted.planId,reason:persisted.reason},
+      commercialUsage:usage,
     });
   }catch(error){
     console.error("Campaign Brain failed",error);
