@@ -64,26 +64,32 @@ try {
   const health = await healthResponse.json();
   assert(health.ok === true, "/api/health must report ok=true");
   assert(health.service === "HAY Engine", "/api/health returned an unexpected service");
+  assert(health.status === "online", "/api/health must expose only public liveness status");
+  assert(!("providers" in health), "/api/health must not expose provider readiness");
+  assert(!("persistence" in health), "/api/health must not expose persistence readiness");
+  assert(!("social" in health), "/api/health must not expose social connector readiness");
 
   const rootResponse = await fetchReady("/");
   assert(rootResponse.status === 200, "/ must return HTTP 200");
 
-  const setupResponse = await fetchReady("/api/setup/status");
+  const setupResponse = await fetch(`${baseUrl}/api/setup/status`, {
+    signal: AbortSignal.timeout(2000),
+    headers: { "user-agent": "hay-runtime-smoke" },
+  });
   const setup = await setupResponse.json();
+  assert(setupResponse.status === 403, "/api/setup/status must reject unauthenticated production traffic");
   assert(setup.service === "HAY Engine", "/api/setup/status returned an unexpected service");
-  assert(Array.isArray(setup.blockers), "/api/setup/status must expose a blockers array");
-  assert(typeof setup.mode === "string", "/api/setup/status must expose a mode");
+  assert(setup.protected === true, "/api/setup/status must report protected=true");
+  assert(setup.detailed === false, "/api/setup/status must not expose detailed diagnostics publicly");
+  assert(!("blockers" in setup), "/api/setup/status public response must not expose blockers");
+  assert(!("providers" in setup), "/api/setup/status public response must not expose providers");
 
   console.log(
     JSON.stringify(
       {
         smoke: "passed",
-        health: { version: health.version, mode: health.mode },
-        setup: {
-          environment: setup.environment,
-          mode: setup.mode,
-          blockerCount: setup.blockers.length,
-        },
+        health: { version: health.version, status: health.status },
+        setup: { protected: setup.protected, detailed: setup.detailed, status: setupResponse.status },
       },
       null,
       2,
