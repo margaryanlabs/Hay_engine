@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { planEnforcementEnabled } from "@/lib/commercial/entitlements";
-import { developerApiMigrationReady } from "@/lib/developer/api-keys";
+import { developerApiEnabled, developerApiHourlyLimit, developerApiMigrationReady } from "@/lib/developer/api-keys";
 import { getConnectorReadiness } from "@/lib/marketing/connectors";
 import { isPublishWorkerConfigured } from "@/lib/publish/client";
 import { isOpenAITranscriptionConfigured } from "@/lib/providers/openai-transcription";
@@ -47,7 +47,9 @@ export async function GET() {
     }catch{/* setup endpoint reports the blocker below */}
   }
   const developerMigration=admin ? await developerApiMigrationReady() : false;
-  const developerEnabled=process.env.HAY_DEVELOPER_API_ENABLED === "true";
+  const developerEnabled=developerApiEnabled();
+  const hourlyRequestLimit=developerApiHourlyLimit();
+  const developerRateLimitReady=hourlyRequestLimit>0;
   const checkout={
     creator:Boolean(process.env.HAY_CHECKOUT_CREATOR_URL),
     growth:Boolean(process.env.HAY_CHECKOUT_GROWTH_URL),
@@ -56,7 +58,7 @@ export async function GET() {
   };
   const billingSync=Boolean(process.env.HAY_BILLING_SYNC_SECRET)&&admin;
   const commercialReady=supabase&&admin&&commercialMigration&&billingSync&&checkout.creator&&checkout.growth&&checkout.business;
-  const developerApiReady=supabase&&admin&&developerMigration&&developerEnabled;
+  const developerApiReady=supabase&&admin&&developerMigration&&developerEnabled&&developerRateLimitReady;
   const coreReady = providers.strategy && supabase && admin;
   const marketingReady = coreReady && workers.publish;
 
@@ -78,6 +80,8 @@ export async function GET() {
       keyPrefix:"hay_live_",
       hashedAtRest:true,
       metering:true,
+      hourlyRequestLimit,
+      rateLimitReady:developerRateLimitReady,
     },
     workers,
     social,
@@ -94,6 +98,7 @@ export async function GET() {
       ...(supabase&&!commercialMigration ? ["commercial_migration_007_required"] : []),
       ...(admin&&!developerMigration ? ["developer_api_schema_required"] : []),
       ...(developerMigration&&!developerEnabled ? ["developer_api_disabled"] : []),
+      ...(developerEnabled&&!developerRateLimitReady ? ["developer_api_hourly_rate_limit_required"] : []),
       ...(commercialMigration&&!billingSync ? ["billing_sync_secret_required"] : []),
       ...(commercialMigration&&!planEnforcementEnabled() ? ["plan_enforcement_disabled"] : []),
       ...(!checkout.creator||!checkout.growth||!checkout.business ? ["paid_checkout_links_required"] : []),
