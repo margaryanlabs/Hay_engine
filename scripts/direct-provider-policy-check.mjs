@@ -6,7 +6,7 @@ const read=(path)=>readFileSync(path,"utf8");
 const directRoutes=[
   {path:"app/api/image/route.ts",provider:"await generateSceneImage(",duplicate:"if(reservation.duplicate)",commitError:"image_usage_commit_failed"},
   {path:"app/api/create/route.ts",provider:"await createCreatorProject(",duplicate:"if(reservation.duplicate)",commitError:"creator_usage_commit_failed"},
-] as const;
+];
 
 for(const route of directRoutes){
   const source=read(route.path);
