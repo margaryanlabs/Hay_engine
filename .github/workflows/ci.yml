@@ -34,7 +34,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+          cache: npm
+          cache-dependency-path: render-worker/package-lock.json
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run check
 
   publish-worker:
@@ -47,5 +50,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
-      - run: node --check src/server.mjs
+          cache: npm
+          cache-dependency-path: publish-worker/package-lock.json
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run check
