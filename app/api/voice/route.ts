@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkUsageAllowance, recordUsage } from "@/lib/commercial/entitlements";
-import { normalizeForSpeech } from "@/lib/hay/normalize";
+import { currentPronunciationOwner, normalizeWithPronunciationRegistry } from "@/lib/hay/pronunciation-store";
 import { naturalizeArmenianText, type ArmenianSpeechStyle } from "@/lib/hay/conversational";
 import { createArmenianSpeech } from "@/lib/providers/armenian-speech";
 import { getVoiceCatalog, resolveVoice } from "@/lib/providers/voice-catalog";
@@ -29,7 +29,10 @@ export async function POST(request: Request) {
   const dialect=body.dialect === "western" ? "western" : "eastern";
   const style=(body.style==="standard"||body.style==="yerevan"?body.style:"natural") as ArmenianSpeechStyle;
   const naturalized=dialect==="eastern" ? await naturalizeArmenianText(text,style) : {text,generatedBy:"rules" as const,style:"standard" as const};
-  const normalized = normalizeForSpeech(naturalized.text, "hy", dialect);
+  const owner=await currentPronunciationOwner();
+  const businessId=typeof body.businessId==="string"?body.businessId:null;
+  const runtimeResult=await normalizeWithPronunciationRegistry({text:naturalized.text,locale:"hy",dialect,ownerId:owner?.ownerId,businessId});
+  const normalized=runtimeResult.normalized;
   const voice = resolveVoice(body.voiceId ? String(body.voiceId) : undefined);
   const minutes=estimatedVoiceMinutes(normalized.spokenText);
 
@@ -46,6 +49,7 @@ export async function POST(request: Request) {
       configured: false,
       naturalized,
       normalized,
+      pronunciationRegistry:runtimeResult.registry,
       voices:getVoiceCatalog().map(({providerVoiceId,...item})=>item),
       message: "Configure ElevenLabs custom Armenian voices or Azure Speech (AZURE_SPEECH_KEY + AZURE_SPEECH_REGION).",
     });
@@ -54,16 +58,17 @@ export async function POST(request: Request) {
   const usage=await recordUsage({
     meter:"voice_minutes",
     quantity:minutes,
-    businessId:typeof body.businessId==="string"?body.businessId:null,
+    businessId,
     source:"armenian_voice",
     idempotencyKey:typeof body.requestId==="string"&&body.requestId?`voice:${body.requestId}`:undefined,
-    metadata:{provider:voice?.provider||speech.provider,voiceId:voice?.id||null,dialect,style,characters:normalized.spokenText.length},
+    metadata:{provider:voice?.provider||speech.provider,voiceId:voice?.id||null,dialect,style,characters:normalized.spokenText.length,pronunciationRegistryVersion:runtimeResult.registry.version},
   });
 
   return NextResponse.json({
     configured: true,
     naturalized,
     normalized,
+    pronunciationRegistry:runtimeResult.registry,
     voice: voice ? { id: voice.id, label: voice.label, dialect: voice.dialect, provider:voice.provider, character:voice.character } : null,
     captions: captionsFromAlignment(speech.alignment),
     commercialUsage:usage,

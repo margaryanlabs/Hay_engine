@@ -1,3 +1,4 @@
+import { normalizeForSpeech } from "../lib/hay/normalize";
 import { protectedValueReport } from "../lib/hay/protected-values";
 import { runArmenianQualityBenchmark } from "../lib/hay/quality-suite";
 
@@ -38,6 +39,21 @@ for(const test of protectedCases){
 }
 console.log(`Protected-value guard: ${protectedCases.length-protectedFailures}/${protectedCases.length} cases`);
 
-if(report.failedCases>0||protectedFailures>0){
+const runtimePronunciationCases=[
+  {id:"pr-rt-001",source:"Acme Pro-ը նոր առաջարկ ունի։",overrides:{"Acme Pro":"Աքմե Փրո"},mustInclude:"Աքմե Փրո"},
+  {id:"pr-rt-002",source:"Ակմե այսօր բաց է։",overrides:{"Ակմե":"Աքմե"},mustInclude:"Աքմե այսօր"},
+  {id:"pr-rt-003",source:"Instagram live այսօր։",overrides:{"Instagram":"Ինստա Թեստ"},mustInclude:"Ինստա Թեստ"},
+] as const;
+let runtimePronunciationFailures=0;
+for(const test of runtimePronunciationCases){
+  const output=normalizeForSpeech(test.source,"hy","eastern",test.overrides).spokenText;
+  if(!output.includes(test.mustInclude)){
+    runtimePronunciationFailures+=1;
+    console.error(`FAIL ${test.id} [runtime-pronunciation] expected ${test.mustInclude}; output: ${output}`);
+  }
+}
+console.log(`Runtime pronunciation layer: ${runtimePronunciationCases.length-runtimePronunciationFailures}/${runtimePronunciationCases.length} cases`);
+
+if(report.failedCases>0||protectedFailures>0||runtimePronunciationFailures>0){
   process.exitCode=1;
 }

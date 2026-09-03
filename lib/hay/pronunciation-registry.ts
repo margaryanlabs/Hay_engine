@@ -34,10 +34,10 @@ export function getPronunciationEntries(): PronunciationEntry[] {
     .sort((a, b) => a.written.localeCompare(b.written, "en"));
 }
 
-export function pronounceArmenian(text: string, dialect: Dialect = "eastern") {
-  const normalized = normalizeForSpeech(text, "hy", dialect);
+export function pronounceArmenian(text: string, dialect: Dialect = "eastern", overrides:Record<string,string>={}, runtimeVersion?:string) {
+  const normalized = normalizeForSpeech(text, "hy", dialect, overrides);
   return {
-    version: HAY_PRONUNCIATION_VERSION,
+    version: runtimeVersion&&runtimeVersion!=="core"?`${HAY_PRONUNCIATION_VERSION}+${runtimeVersion}`:HAY_PRONUNCIATION_VERSION,
     locale: "hy-AM",
     dialect,
     displayText: normalized.displayText,

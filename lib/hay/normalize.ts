@@ -6,6 +6,10 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function tokenRegex(value:string){
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(value)}(?![\\p{L}\\p{N}])`,"giu");
+}
+
 function numericValue(raw:string){
   return Number(raw.replace(/[\s,]/g,""));
 }
@@ -19,6 +23,7 @@ export function normalizeForSpeech(
   input: string,
   locale: Locale = "hy",
   dialect: Dialect = "eastern",
+  pronunciationOverrides: Record<string,string> = {},
 ): NormalizationResult {
   const displayText = input.trim().replace(/\s+/g, " ");
   const issues: NormalizationIssue[] = [];
@@ -81,8 +86,13 @@ export function normalizeForSpeech(
     });
   }
 
-  for (const [source, spoken] of Object.entries(PRONUNCIATION_DICTIONARY)) {
-    const regex = new RegExp(`\\b${escapeRegExp(source)}\\b`, "gi");
+  const pronunciationDictionary:Record<string,string>={...PRONUNCIATION_DICTIONARY};
+  for(const [source,spoken] of Object.entries(pronunciationOverrides)){
+    const key=source.trim().toLocaleUpperCase("en-US");
+    if(key&&spoken.trim())pronunciationDictionary[key]=spoken.trim();
+  }
+  for (const [source, spoken] of Object.entries(pronunciationDictionary)) {
+    const regex = tokenRegex(source);
     spokenText = spokenText.replace(regex, (match) => {
       issues.push({ kind: source.length <= 4 ? "acronym" : "brand", source: match, spoken });
       return spoken;

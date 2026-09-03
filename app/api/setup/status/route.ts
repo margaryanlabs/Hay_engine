@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { planEnforcementEnabled } from "@/lib/commercial/entitlements";
 import { developerApiEnabled, developerApiHourlyLimit, developerApiMaxTextChars, developerApiMigrationReady } from "@/lib/developer/api-keys";
+import { pronunciationRegistryReady } from "@/lib/hay/pronunciation-store";
 import { getConnectorReadiness } from "@/lib/marketing/connectors";
 import { isPublishWorkerConfigured } from "@/lib/publish/client";
 import { isOpenAITranscriptionConfigured } from "@/lib/providers/openai-transcription";
@@ -47,6 +48,7 @@ export async function GET() {
     }catch{/* setup endpoint reports the blocker below */}
   }
   const developerMigration=admin ? await developerApiMigrationReady() : false;
+  const pronunciationRegistry=admin ? await pronunciationRegistryReady() : false;
   const developerEnabled=developerApiEnabled();
   const hourlyRequestLimit=developerApiHourlyLimit();
   const maxTextChars=developerApiMaxTextChars();
@@ -74,6 +76,13 @@ export async function GET() {
     persistence: { supabase, admin },
     providers,
     languageApi,
+    languageData:{
+      pronunciationRegistry,
+      migration:"008_language_registry.sql",
+      fallback:"curated-core",
+      precedence:["business","account","hay-reviewed-system","curated-core"],
+      audit:"append-only-snapshots",
+    },
     developerApi:{
       enabled:developerEnabled,
       migration:developerMigration,
@@ -98,6 +107,7 @@ export async function GET() {
       ...(!providers.strategy ? ["openai_key_required_for_ai_strategy"] : []),
       ...(!workers.publish ? ["publish_worker_required_for_automatic_posting"] : []),
       ...(supabase&&!commercialMigration ? ["commercial_migration_007_required"] : []),
+      ...(admin&&!pronunciationRegistry ? ["language_registry_migration_008_required"] : []),
       ...(admin&&!developerMigration ? ["developer_api_schema_required"] : []),
       ...(developerMigration&&!developerEnabled ? ["developer_api_disabled"] : []),
       ...(developerEnabled&&!developerRateLimitReady ? ["developer_api_hourly_rate_limit_required"] : []),
