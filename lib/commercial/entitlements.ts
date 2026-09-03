@@ -172,9 +172,20 @@ export async function recordUsage(input: {
   const userId = claimsData?.claims?.sub ? String(claimsData.claims.sub) : null;
   if (!userId) return { recorded: false, reason: "unauthenticated" };
 
+  let usageBusinessId: string | null = null;
+  if (input.businessId) {
+    const { data: ownedBusiness } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("id", input.businessId)
+      .eq("owner_id", userId)
+      .maybeSingle();
+    usageBusinessId = ownedBusiness?.id ? String(ownedBusiness.id) : null;
+  }
+
   const { error } = await supabase.from("usage_events").insert({
     owner_id: userId,
-    business_id: input.businessId || null,
+    business_id: usageBusinessId,
     meter: input.meter,
     quantity: input.quantity,
     source: input.source,
@@ -185,5 +196,5 @@ export async function recordUsage(input: {
     if (String(error.code) === "23505") return { recorded: true, duplicate: true };
     return { recorded: false, reason: error.message };
   }
-  return { recorded: true };
+  return { recorded: true, businessId: usageBusinessId };
 }
