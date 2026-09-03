@@ -152,14 +152,35 @@ assert.ok(
   "Voice allowance must be checked before the OpenAI-backed Armenian naturalizer can run",
 );
 
+const contentFactorySource = readFileSync("app/api/marketing/content/create/route.ts", "utf8");
+const factoryHyPreflight = contentFactorySource.indexOf("await checkUsageAllowance(\"voice_minutes\",preflightMinutes)");
+const factoryNaturalizer = contentFactorySource.indexOf("await naturalizeArmenianText(project.voice.text,style)");
+assert.ok(
+  factoryHyPreflight >= 0 && factoryNaturalizer > factoryHyPreflight,
+  "Content Factory must check Armenian voice capacity before its OpenAI-backed naturalizer runs",
+);
+const elevenSpeechCall = contentFactorySource.indexOf("await createElevenSpeech(project.voice.text,voiceId)");
+const elevenAllowanceCall = contentFactorySource.lastIndexOf("await checkUsageAllowance(\"voice_minutes\",minutes)", elevenSpeechCall);
+const factoryVoiceUsageCall = contentFactorySource.indexOf("source:\"content_factory_voice\"", elevenSpeechCall);
+assert.ok(
+  elevenSpeechCall >= 0 && elevenAllowanceCall >= 0 && elevenAllowanceCall < elevenSpeechCall,
+  "Content Factory must check voice capacity before non-Armenian ElevenLabs TTS",
+);
+assert.ok(
+  factoryVoiceUsageCall > elevenSpeechCall,
+  "Content Factory must meter non-Armenian ElevenLabs speech after a successful provider call",
+);
+
 console.log(JSON.stringify({
   securityPolicy: "passed",
-  cases: 26,
+  cases: 30,
   providerCostRoutes: meteredProviderRoutes,
   meteredLanguageRoutes,
   usageBusinessOwnership: true,
   productionProviderFailClosed: true,
   veoOperationOwnership: true,
   voicePreProviderGate: true,
+  contentFactoryVoicePreProviderGate: true,
+  contentFactoryAllVoiceMetered: true,
   translationSizeBound: true,
 }, null, 2));
