@@ -54,7 +54,7 @@ export default function LanguageLab(){
   };
 
   return <main className="languageLabPage">
-    <header className="languageLabNav"><a href="/"><HayLogo/></a><nav><a href="/studio">MARKETING OS</a><a href="/creator">CREATOR</a><a href="/voice">VOICE</a><a href="/quality">QUALITY</a></nav><span>HAY / LANGUAGE API V1</span></header>
+    <header className="languageLabNav"><a href="/"><HayLogo/></a><nav><a href="/studio">MARKETING OS</a><a href="/creator">CREATOR</a><a href="/voice">VOICE</a><a href="/quality">QUALITY</a><a href="/developers">DEVELOPERS</a></nav><span>HAY / LANGUAGE API V1</span></header>
 
     <section className="languageHero"><div><span>ARMENIAN LANGUAGE INFRASTRUCTURE / 01</span><h1>Հայերենը ոչ թե<br/><em>թարգմանություն է։</em></h1></div><p>Pronunciation, transcription correction, captions and translation behind one Armenian-first control layer. Foundation models stay replaceable; HAY owns the Armenian behavior.</p></section>
 
@@ -80,6 +80,6 @@ export default function LanguageLab(){
 
     <section className="languageArchitecture"><div><span>HAY LANGUAGE PIPELINE</span><h2>Provider in. Armenian control out.</h2></div><ol><li><b>01</b><span>FOUNDATION PROVIDER</span><p>OpenAI STT / language models, ElevenLabs, Azure, future Chirp routing.</p></li><li><b>02</b><span>HAY CONTROL</span><p>Protected values, pronunciation graph, code-switch rules, transcript and editorial correction.</p></li><li><b>03</b><span>QUALITY GATE</span><p>Deterministic Armenian regressions plus reviewed blind benchmarks.</p></li><li><b>04</b><span>OUTPUT</span><p>Speech-safe text, clean transcript, captions or natural translation.</p></li></ol></section>
 
-    <footer className="languageLabFooter"><span>HAY LANGUAGE API / V1</span><span>HY-AM FIRST · EN · RU</span><a href="/api/quality">QUALITY JSON ↗</a></footer>
+    <footer className="languageLabFooter"><span>HAY LANGUAGE API / V1</span><span>HY-AM FIRST · EN · RU</span><a href="/developers">OPEN DEVELOPER CONSOLE ↗</a></footer>
   </main>;
 }
