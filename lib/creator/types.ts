@@ -10,12 +10,29 @@ export type CaptionCue = {
   text: string;
 };
 
+export type StockMediaAsset = {
+  provider: "pexels";
+  mediaType: "video" | "image";
+  id: string;
+  url: string;
+  previewUrl: string | null;
+  width: number;
+  height: number;
+  duration: number | null;
+  sourcePage: string;
+  creatorName: string;
+  creatorUrl: string;
+  providerUrl: "https://www.pexels.com";
+  attribution: string;
+};
+
 export type SceneAssetPlan = {
   kind: AssetKind;
   prompt: string;
   searchQuery: string;
   status: AssetStatus;
   typographyOverlay: boolean;
+  stock?: StockMediaAsset | null;
 };
 
 export type CreatorScene = {
@@ -60,6 +77,7 @@ export type CreatorProject = {
     planner: "openai" | "hay-demo";
     image: "openai" | "unconfigured";
     video: "google-veo" | "unconfigured";
+    stock: "pexels" | "unconfigured";
     voice: "elevenlabs" | "unconfigured";
   };
 };
