@@ -43,12 +43,15 @@ const staticForce=staticRoute.indexOf("if(force)");
 const staticReserve=staticRoute.indexOf("await reserveUsage(",staticForce);
 const staticDuplicate=staticRoute.indexOf("if(next.duplicate)",staticReserve);
 const staticProvider=staticRoute.indexOf("const base=await imageBytes(",staticReserve);
+const staticNoBase=staticRoute.indexOf("if(!base)",staticProvider);
+const staticRelease=staticRoute.indexOf("await releaseUsageReservation(reservation)",staticNoBase);
+const staticNoBaseReturn=staticRoute.indexOf("image_provider_unconfigured_or_failed",staticNoBase);
 const staticCommit=staticRoute.indexOf("await commitUsageReservation(",staticProvider);
 const staticSharp=staticRoute.indexOf("await sharp(base)",staticCommit);
 assert.ok(staticForce>=0&&staticReserve>staticForce&&staticProvider>staticReserve,"Forced static regeneration must reserve quota before OpenAI image generation");
 assert.ok(staticDuplicate>staticReserve&&staticDuplicate<staticProvider,"Static regeneration duplicates must stop before OpenAI image generation");
+assert.ok(staticNoBase>staticProvider&&staticRelease>staticNoBase&&staticNoBaseReturn>staticRelease,"Static regeneration must release quota before returning when no provider image exists");
 assert.ok(staticCommit>staticProvider&&staticSharp>staticCommit,"Forced static regeneration must commit provider cost before local compositing/storage can fail");
-assert.match(staticRoute,/image_provider_unconfigured_or_failed[\s\S]*?releaseUsageReservation\(reservation\)/,"Static regeneration must release quota when no provider image exists");
 assert.match(staticRoute,/static_regeneration_usage_commit_failed[\s\S]*?status:503/,"Static regeneration must fail closed after paid image generation when usage commit fails");
 assert.match(staticRoute,/reason:"included_in_plan"/,"Initial static asset generation must remain included in the plan allocation");
 
@@ -58,5 +61,6 @@ console.log(JSON.stringify({
   preProviderIdempotency:true,
   providerCostFailClosed:true,
   staticProviderCommitBeforeStorage:true,
+  staticNoOutputRelease:true,
   initialStaticIncludedInPlan:true,
 },null,2));
