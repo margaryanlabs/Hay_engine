@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkUsageAllowance, recordUsage } from "@/lib/commercial/entitlements";
-import { extractVeoVideoUri, getVeoOperation, isVeoConfigured, startVeoVideo } from "@/lib/providers/veo";
+import { checkOwnedProviderOperation } from "@/lib/commercial/provider-operations";
+import { extractVeoVideoUri, getVeoOperation, isVeoConfigured, normalizeVeoOperationName, startVeoVideo } from "@/lib/providers/veo";
 
 export const runtime = "nodejs";
 
@@ -26,15 +27,24 @@ export async function POST(request: Request) {
       aspectRatio: body.aspectRatio === "16:9" ? "16:9" : "9:16",
       resolution,
     });
+    if (!operation?.name) return NextResponse.json({ error: "video_operation_missing" }, { status: 502 });
+
+    let operationName: string;
+    try {
+      operationName = normalizeVeoOperationName(operation.name);
+    } catch {
+      return NextResponse.json({ error: "video_operation_invalid" }, { status: 502 });
+    }
+
     const usage=await recordUsage({
       meter:"ai_video_credits",
       quantity:1,
       businessId:typeof body.businessId==="string"?body.businessId:null,
       source:"veo_video",
       idempotencyKey:typeof body.requestId==="string"&&body.requestId?`video:${body.requestId}`:undefined,
-      metadata:{durationSeconds,resolution,aspectRatio:body.aspectRatio==="16:9"?"16:9":"9:16",operationName:operation?.name||null},
+      metadata:{durationSeconds,resolution,aspectRatio:body.aspectRatio==="16:9"?"16:9":"9:16",operationName},
     });
-    return NextResponse.json({ configured: true, operation, commercialUsage:usage });
+    return NextResponse.json({ configured: true, operation: { ...operation, name: operationName }, commercialUsage:usage });
   } catch (error) {
     console.error("Veo start failed", error);
     return NextResponse.json({ error: "video_generation_failed" }, { status: 500 });
@@ -43,9 +53,27 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const operationName = new URL(request.url).searchParams.get("operation");
-    if (!operationName) return NextResponse.json({ error: "operation_required" }, { status: 400 });
+    const rawOperationName = new URL(request.url).searchParams.get("operation");
+    if (!rawOperationName) return NextResponse.json({ error: "operation_required" }, { status: 400 });
     if (!isVeoConfigured()) return NextResponse.json({ configured: false });
+
+    let operationName: string;
+    try {
+      operationName = normalizeVeoOperationName(rawOperationName);
+    } catch {
+      return NextResponse.json({ error: "invalid_operation_name" }, { status: 400 });
+    }
+
+    const access = await checkOwnedProviderOperation({
+      meter: "ai_video_credits",
+      source: "veo_video",
+      operationName,
+    });
+    if (!access.allowed) {
+      const status = access.reason === "unauthorized" ? 401 : access.reason === "operation_not_owned" ? 404 : 503;
+      return NextResponse.json({ error: access.reason }, { status });
+    }
+
     const operation = await getVeoOperation(operationName);
     return NextResponse.json({
       configured: true,
