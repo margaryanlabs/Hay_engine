@@ -74,6 +74,18 @@ on public.dataset_records(dataset_key, content_hash) where status in ('candidate
 create index if not exists dataset_records_provenance_idx
 on public.dataset_records(dataset_key, source_type, status, created_at desc);
 
+create table if not exists public.dataset_record_audit (
+  id uuid primary key default gen_random_uuid(),
+  dataset_record_id uuid not null references public.dataset_records(id) on delete restrict,
+  action text not null check (action in ('insert','update')),
+  actor_id uuid references auth.users(id) on delete set null,
+  snapshot jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists dataset_record_audit_idx
+on public.dataset_record_audit(dataset_record_id, created_at desc);
+
 create or replace function public.hay_language_correction_before_update()
 returns trigger
 language plpgsql
@@ -92,9 +104,16 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  audit_actor uuid;
 begin
+  audit_actor := coalesce(
+    (select auth.uid()),
+    case when new.status in ('reviewing','accepted','rejected') then new.reviewed_by else new.owner_id end,
+    new.owner_id
+  );
   insert into public.language_correction_audit(correction_id, action, actor_id, snapshot)
-  values(new.id, lower(TG_OP), coalesce((select auth.uid()), new.owner_id), to_jsonb(new));
+  values(new.id, lower(TG_OP), audit_actor, to_jsonb(new));
   return new;
 end;
 $$;
@@ -111,9 +130,30 @@ begin
 end;
 $$;
 
+create or replace function public.hay_dataset_record_audit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  audit_actor uuid;
+begin
+  audit_actor := coalesce(
+    (select auth.uid()),
+    case when new.status = 'withdrawn' then new.owner_id else new.approved_by end,
+    new.owner_id
+  );
+  insert into public.dataset_record_audit(dataset_record_id, action, actor_id, snapshot)
+  values(new.id, lower(TG_OP), audit_actor, to_jsonb(new));
+  return new;
+end;
+$$;
+
 revoke all on function public.hay_language_correction_before_update() from public;
 revoke all on function public.hay_language_correction_audit() from public;
 revoke all on function public.hay_dataset_record_before_update() from public;
+revoke all on function public.hay_dataset_record_audit() from public;
 
 drop trigger if exists language_corrections_updated_at on public.language_corrections;
 create trigger language_corrections_updated_at
@@ -135,16 +175,29 @@ create trigger dataset_records_updated_at
 before update on public.dataset_records
 for each row execute function public.hay_dataset_record_before_update();
 
+drop trigger if exists dataset_records_audit_insert on public.dataset_records;
+create trigger dataset_records_audit_insert
+after insert on public.dataset_records
+for each row execute function public.hay_dataset_record_audit();
+
+drop trigger if exists dataset_records_audit_update on public.dataset_records;
+create trigger dataset_records_audit_update
+after update on public.dataset_records
+for each row execute function public.hay_dataset_record_audit();
+
 alter table public.language_corrections enable row level security;
 alter table public.language_correction_audit enable row level security;
 alter table public.dataset_records enable row level security;
+alter table public.dataset_record_audit enable row level security;
 
--- All three tables stay behind server-side application boundaries. User routes authenticate
+-- All language-data tables stay behind server-side application boundaries. User routes authenticate
 -- an owner before service-role access; reviewer routes additionally require an operator allowlist.
-revoke all on public.language_corrections, public.language_correction_audit, public.dataset_records from anon, authenticated;
+revoke all on public.language_corrections, public.language_correction_audit, public.dataset_records, public.dataset_record_audit from anon, authenticated;
 grant select, insert, update on public.language_corrections to service_role;
 grant select, insert on public.language_correction_audit to service_role;
 grant select, insert, update on public.dataset_records to service_role;
+grant select, insert on public.dataset_record_audit to service_role;
 
 comment on table public.language_corrections is 'Consent-aware user corrections. Private submission is allowed without reuse consent; promotion requires explicit product-improvement consent.';
 comment on table public.dataset_records is 'General HAY dataset provenance/license/consent registry. Approved records are eligible for reviewed datasets; model-training consent remains a separate flag on the originating correction.';
+comment on table public.dataset_record_audit is 'Append-only provenance snapshots for dataset approval, withdrawal and archival changes.';
