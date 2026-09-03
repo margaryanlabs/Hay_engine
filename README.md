@@ -6,6 +6,16 @@ HAY Engine is an Armenian-first AI language, creator and marketing operating sys
 
 ## Current product layers
 
+### HAY Language API
+- versioned Armenian pronunciation registry
+- speech-safe normalization for commercial numbers, currencies, brands, suffixes and code-switching
+- Armenian file transcription through a replaceable STT provider adapter
+- HAY transcript correction with protected-value fail-safe
+- standalone caption generation with structured cues, SRT and WebVTT
+- HY / EN / RU translation with Armenian-first syntax and preservation of prices, URLs and Latin brand tokens
+- interactive `/language` Language Lab for testing the whole pipeline
+- provider-backed language routes are account-gated in production by default
+
 ### HAY Creator
 - Armenian / English / Russian Creator Studio
 - one-request `prompt → CreatorProject` pipeline
@@ -64,14 +74,21 @@ The app works without provider keys in demo mode. Persistent Studio becomes auth
 
 ## Core APIs
 
-- `POST /api/create` — create a complete Reel project manifest
+### Language
 - `POST /api/normalize` — create speech-safe Armenian representation
-- `POST /api/storyboard` — generate a storyboard
+- `GET/POST /api/pronounce` — inspect the versioned pronunciation registry or pronounce arbitrary text
+- `POST /api/transcribe` — transcribe an uploaded audio/video file and run Armenian transcript correction
+- `POST /api/captions` — create caption cues plus SRT and WebVTT from text or provider alignment
+- `POST /api/translate` — translate HY / EN / RU with protected-value preservation
 - `POST /api/voice` — generate and meter Armenian voice when a provider is configured
+
+### Creator / marketing / commercial
+- `POST /api/create` — create a complete Reel project manifest
+- `POST /api/storyboard` — generate a storyboard
 - `POST /api/image` — generate a vertical scene visual when OpenAI is configured
 - `POST /api/video` — start a metered Veo scene generation
 - `GET /api/health` — inspect provider/runtime readiness
-- `GET /api/setup/status` — inspect provider, worker, social and commercial go-live readiness
+- `GET /api/setup/status` — inspect provider, language API, worker, social and commercial go-live readiness
 - `POST /api/marketing/plan` — create, persist and meter a marketing plan
 - `POST /api/marketing/autopilot` — create the HAY analyze→plan→create→approve→publish→learn run
 - `GET/PATCH /api/social/connections` — inspect connections and publishing policies
@@ -107,6 +124,8 @@ HAY does not hard-code one payment company. Configure HTTPS hosted checkout URLs
 
 `npm run quality` is a release gate. It covers natural Eastern Armenian, Yerevan-casual transformations, business domains, code-switching, currencies, exact commercial values and brand/suffix pronunciation. `/quality` exposes the deterministic report.
 
+Provider STT/translation output is not trusted blindly: HAY adds transcript/translation preservation checks around commercial values and code-switched brand tokens. Comparative model claims still require a blind native-speaker benchmark.
+
 This is an internal regression system, not an independent claim that HAY is the world's best Armenian AI. Comparative claims should follow a blind native-speaker benchmark.
 
 ## Architecture
@@ -124,4 +143,4 @@ See [`docs/DATASET_SCHEMA.md`](docs/DATASET_SCHEMA.md). Proprietary datasets sho
 
 ## Philosophy
 
-We do **not** need to train an Armenian frontier model from scratch. HAY uses strong foundation models as interchangeable providers and owns the missing Armenian-specific layer around them: normalization, pronunciation, dialect handling, code-switching, typography, evaluation, business context, workflow, outcome memory and eventually targeted fine-tuned components where measured benchmarks justify them.
+We do **not** need to train an Armenian frontier model from scratch. HAY uses strong foundation models as interchangeable providers and owns the missing Armenian-specific layer around them: normalization, pronunciation, dialect handling, code-switching, typography, transcript correction, translation safeguards, evaluation, business context, workflow, outcome memory and eventually targeted fine-tuned components where measured benchmarks justify them.
