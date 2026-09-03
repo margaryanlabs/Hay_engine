@@ -28,6 +28,7 @@ export async function POST(request:Request){
   const aligned=alignment?captionsFromAlignment(alignment):[];
   const cues=aligned.length?aligned:text?buildCaptionCues(text,duration,wordsPerCue):[];
   if(!cues.length)return NextResponse.json({error:"text_or_alignment_required"},{status:400});
-  await recordDeveloperApiUsage(auth.context,{endpoint:"/api/v1/language/captions",operation:"captions",inputChars:text.length,metadata:{source:aligned.length?"alignment":"estimated",cueCount:cues.length}});
+  const usage=await recordDeveloperApiUsage(auth.context,{endpoint:"/api/v1/language/captions",operation:"captions",inputChars:text.length,metadata:{source:aligned.length?"alignment":"estimated",cueCount:cues.length}});
+  if(!usage.recorded)return NextResponse.json({error:"developer_api_metering_failed"},{status:503});
   return NextResponse.json({apiVersion:"v1",source:aligned.length?"alignment":"estimated",duration,cueCount:cues.length,cues,srt:toSrt(cues),vtt:toVtt(cues)});
 }
