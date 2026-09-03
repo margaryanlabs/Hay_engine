@@ -1,0 +1,181 @@
+/* HAY unified product system — shared by landing, auth, Studio and Creator. */
+:root{
+  --hay-bg:#08090b;
+  --hay-bg-2:#0d0f12;
+  --hay-surface:#111318;
+  --hay-surface-2:#151820;
+  --hay-line:rgba(244,240,232,.10);
+  --hay-line-strong:rgba(244,240,232,.18);
+  --hay-text:#f1ede5;
+  --hay-soft:#c4c0b9;
+  --hay-muted:#858994;
+  --hay-dim:#555a64;
+  --hay-accent:#da8d80;
+  --hay-accent-strong:#b86257;
+  --hay-blue:#aebfe1;
+  --hay-blue-strong:#768fc2;
+  --hay-success:#91b58d;
+  --bg:var(--hay-bg);
+  --panel:var(--hay-surface);
+  --line:var(--hay-line);
+  --muted:var(--hay-muted);
+  --text:var(--hay-text);
+  --soft:var(--hay-soft);
+  --accent:var(--hay-accent);
+}
+html{background:var(--hay-bg)}
+body{
+  background:
+    radial-gradient(circle at 74% -10%,rgba(118,143,194,.09),transparent 29%),
+    radial-gradient(circle at 4% 18%,rgba(184,98,87,.075),transparent 25%),
+    var(--hay-bg);
+  color:var(--hay-text);
+}
+::selection{background:rgba(218,141,128,.34);color:#fff8f1}
+
+/* Shared legacy controls now inherit the same language as Landing V5. */
+.brandMark{border-color:rgba(218,141,128,.28);color:var(--hay-accent)}
+.localeSwitch{border-color:var(--hay-line)}
+.localeSwitch button.active{background:#202329;color:var(--hay-text)}
+textarea:focus,select:focus{border-color:rgba(218,141,128,.45);box-shadow:0 0 0 3px rgba(218,141,128,.055)}
+.primary{background:var(--hay-text);color:#0c0d10}
+.secondary{background:rgba(255,255,255,.025);border-color:var(--hay-line);color:var(--hay-soft)}
+.dot,.live{color:var(--hay-success)}
+.dot{background:var(--hay-success);box-shadow:0 0 14px rgba(145,181,141,.42)}
+
+/* Product-consistent official social platform marks. */
+.socialBrandIcon{position:relative;display:inline-grid;place-items:center;flex:0 0 auto;line-height:0}
+.socialBrandIcon>svg{width:100%;height:100%;display:block;fill:currentColor}
+.socialBrandIcon--instagram{color:#fff;border-radius:7px;padding:4px;background:radial-gradient(circle at 70% 70%,#ffdc80 0 12%,#fcaf45 20%,#f77737 36%,#e1306c 58%,#c13584 72%,#833ab4 88%)}
+.socialBrandIcon--youtube{color:#ff0033}
+.socialBrandIcon--facebook{color:#1877f2}
+.socialBrandIcon--linkedin{color:#0a66c2}
+.socialBrandIcon--tiktok{color:#fff}
+.socialBrandTikTokLayer{position:absolute;inset:0;width:100%;height:100%;fill:currentColor}
+.socialBrandTikTokLayer.cyan{color:#25f4ee;transform:translate(-.75px,.75px)}
+.socialBrandTikTokLayer.pink{color:#fe2c55;transform:translate(.75px,-.75px)}
+.socialBrandTikTokLayer.main{color:#f5f5f5}
+
+/* Marketing OS: same palette and spatial language as the public product. */
+.marketingPage{
+  --m-bg:var(--hay-bg);
+  --m-card:var(--hay-surface);
+  --m-card2:var(--hay-surface-2);
+  --m-line:var(--hay-line);
+  --m-text:var(--hay-text);
+  --m-muted:var(--hay-muted);
+  --m-warm:var(--hay-accent);
+  --m-cream:var(--hay-text);
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 78% 7%,rgba(118,143,194,.10),transparent 26%),
+    radial-gradient(circle at 6% 28%,rgba(184,98,87,.085),transparent 25%),
+    linear-gradient(180deg,var(--hay-bg),#090a0d 58%,#07080a);
+}
+.marketingNav{height:88px;width:min(1480px,calc(100% - 64px));background:rgba(8,9,11,.78);backdrop-filter:blur(20px);position:sticky;top:0;z-index:40}
+.marketingPage .hayGlyph{color:var(--hay-accent)}
+.productNav{color:#777b84}
+.productNav a.active{color:var(--hay-text)}
+.productNav a.active:after{background:var(--hay-accent)}
+.localePill{border-color:var(--hay-line);background:rgba(255,255,255,.018)}
+.localePill button{color:#676b74}
+.localePill button.active{background:#202329;color:var(--hay-text)}
+.commandButton{border-color:var(--hay-line);background:rgba(255,255,255,.018);color:#858994}
+.marketingHero,.marketingGrid,.contentPulse,.systemLine{width:min(1480px,calc(100% - 64px))}
+.signalLabel{color:var(--hay-blue)}
+.signalLabel i{background:var(--hay-accent);box-shadow:0 0 18px rgba(218,141,128,.42)}
+.heroCopy h1 span{color:#f0ece4}
+.heroCopy>p{color:#9a9da5}
+.hayPrimary{border-color:var(--hay-text);background:var(--hay-text);color:#0c0d10}
+.haySecondary{border-color:var(--hay-line-strong);background:rgba(255,255,255,.012);color:#b4b6bc}
+.autopilot{border-color:var(--hay-line);background:rgba(255,255,255,.012)}
+.autopilot.on>span{background:rgba(184,98,87,.28)}
+.autopilot.on>span:after{background:var(--hay-accent)}
+.marketingMessage{color:#d9a59c!important}
+.orbitPanel:before,.orbitPanel:after{border-color:rgba(174,191,225,.14)}
+.orbitCore{background:radial-gradient(circle at 35% 28%,rgba(184,98,87,.16),#0b0d11 72%);border-color:rgba(218,141,128,.25);box-shadow:0 0 90px rgba(118,143,194,.07)}
+.orbitCore>span,.orbit i{color:var(--hay-accent)}
+.orbit{background:rgba(10,11,14,.82);border-color:var(--hay-line)}
+.intelCard{background:linear-gradient(180deg,rgba(17,19,24,.97),rgba(10,11,14,.99));border-color:var(--hay-line)}
+.intelCard:after{background:var(--hay-accent)}
+.intelCard:hover{transform:translateY(-2px);border-color:rgba(218,141,128,.19);background:linear-gradient(180deg,rgba(20,22,28,.98),rgba(10,11,14,.99))}
+.intelCard input,.intelCard textarea{background:#0b0d10;border-color:var(--hay-line);color:#d5d1ca}
+.intelCard input:focus,.intelCard textarea:focus{border-color:rgba(218,141,128,.38)}
+.pulseDot{background:var(--hay-accent);box-shadow:0 0 14px rgba(218,141,128,.38)}
+.dnaStrip,.channelList button,.radarRows>div,.contentTile footer{border-color:var(--hay-line)}
+.dnaStrip b,.pillarCloud i,.tileMeta span,.contentTile footer button,.pulseHeader>div>span{color:var(--hay-accent)}
+.channelList button:hover{background:rgba(218,141,128,.035)}
+.channelList button>i{width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--hay-line);background:#0d0f13;color:inherit}
+.channelList button>i .socialBrandIcon{width:18px!important;height:18px!important}
+.connectionLed.ready,.connectionLed.connected{background:var(--hay-success);box-shadow:0 0 13px rgba(145,181,141,.42)}
+.contentPulse{border-color:var(--hay-line);background:linear-gradient(180deg,#0d0f12,#090a0d)}
+.contentTile{border-color:var(--hay-line);background:rgba(255,255,255,.004)}
+.contentTile:hover{background:rgba(184,98,87,.025)}
+.tileMeta i{display:inline-flex;align-items:center;gap:6px;font-style:normal;color:#8d919a}
+.tileMeta .socialBrandIcon{width:12px!important;height:12px!important}
+.emptyGlyph{border-color:rgba(218,141,128,.3);color:var(--hay-accent);box-shadow:0 0 30px rgba(218,141,128,.07)}
+
+/* Studio modules: all generations share one neutral shell. Local --green was an old neon skin. */
+:where(
+  .studioStatusRail,.studioCommercial,.studioCommandPalette,.studioOnboarding,.studioDecisionConsole,
+  .studioTodayBrief,.studioScheduleQueue,.studioPublishingPolicy,.studioContentMemory,.studioWorkspaceSwitcher,
+  .studioContentSeries,.studioCampaignBrain,.studioCampaignAnalytics,.studioExperimentRunner,.studioConversionBridge
+){
+  --green:var(--hay-accent);
+  --accent:var(--hay-accent);
+  --warm:var(--hay-accent);
+  --line:var(--hay-line);
+  color:var(--hay-text);
+  border-color:var(--hay-line);
+}
+:where(
+  .studioStatusRail,.studioTodayBrief,.studioScheduleQueue,.studioPublishingPolicy,.studioContentMemory,
+  .studioWorkspaceSwitcher,.studioContentSeries,.studioCampaignBrain,.studioCampaignAnalytics,
+  .studioExperimentRunner,.studioConversionBridge,.studioDecisionConsole,.studioOnboarding
+){background-color:var(--hay-bg-2)!important}
+.studioStatusRail{background:rgba(13,15,18,.96)!important;box-shadow:0 24px 70px rgba(0,0,0,.28)}
+.studioStatusIntro span i{background:var(--hay-success);box-shadow:0 0 14px rgba(145,181,141,.46)}
+.studioStatusCells a:hover{background:rgba(218,141,128,.025)}
+.studioStatusCells a.ready i{background:var(--hay-success);box-shadow:0 0 10px rgba(145,181,141,.42)}
+.studioStatusQuality{background:linear-gradient(120deg,rgba(118,143,194,.04),transparent)}
+.studioStatusQuality strong{color:var(--hay-blue)}
+.studioTodayBrief{background:rgba(13,15,18,.94)!important}
+.todayMove>span i{background:var(--hay-success);box-shadow:0 0 12px rgba(145,181,141,.42)}
+.todayMove button,.todayMetric.signal strong{color:var(--hay-accent)}
+.todayMetric.signal:hover{background:rgba(218,141,128,.025)}
+.campaignHead>div:first-child>span i,.campaignAnalyticsHead>div:first-child>span i{background:var(--hay-accent);box-shadow:0 0 14px rgba(218,141,128,.40)}
+.campaignState{background:linear-gradient(135deg,rgba(118,143,194,.04),transparent)}
+.campaignForm input,.campaignForm select,.campaignForm textarea,.campaignAnalyticsSelect select{background:#0b0d10}
+.campaignForm input:focus,.campaignForm select:focus,.campaignForm textarea:focus{border-color:rgba(218,141,128,.38);background:#0d0f12}
+.phaseRows i{background:#1b1e24}
+.campaignEvidenceStrip .evidence-strong strong{color:var(--hay-blue)}
+
+/* Login is not a separate brand — it is the same HAY surface. */
+.loginPage{background:var(--hay-bg);color:var(--hay-text)}
+.loginIndex{color:var(--hay-accent)}
+.loginPanel h1 span{color:#777b84}
+.loginPanel>p{color:#92959d}
+.loginPanel input{border-color:var(--hay-line);background:#0d0f12;color:var(--hay-text)}
+.loginPanel input:focus{border-color:rgba(218,141,128,.45)}
+.loginMessage{border-left-color:var(--hay-accent);background:rgba(184,98,87,.07);color:#c9aaa4}
+.loginAside{border-left-color:var(--hay-line);background:radial-gradient(circle at 50% 45%,rgba(118,143,194,.12),transparent 36%),radial-gradient(circle at 50% 58%,rgba(184,98,87,.13),transparent 38%),#0d0f12}
+.loginGlyph{border-color:rgba(218,141,128,.28);color:var(--hay-accent);box-shadow:0 0 100px rgba(118,143,194,.07)}
+
+/* Creator keeps scene personality, but the product chrome stays HAY. */
+.creatorMessage{border-color:rgba(218,141,128,.26);background:rgba(184,98,87,.07);color:#d7aca3}
+.reelPreview::before{background:radial-gradient(circle at 70% 20%,rgba(184,98,87,.16),transparent 28%),linear-gradient(145deg,#151318,#0a0b0e 62%)}
+.reelPreview.scene-4::before{background:radial-gradient(circle at 50% 32%,rgba(118,143,194,.18),transparent 27%),linear-gradient(155deg,#11141a,#090a0d 62%)}
+.sceneInspector>button.active{background:#15171c}
+
+/* Publish surface and provider-specific controls stay inside the same visual system. */
+.publishDialog{background:var(--hay-bg-2)!important;border-color:var(--hay-line-strong)!important;color:var(--hay-text)!important}
+.publishAccount{border-color:var(--hay-line)!important;background:rgba(255,255,255,.018)!important}
+.publishPlatformMark{display:flex;align-items:center;gap:9px}
+.publishPlatformMark .socialBrandIcon{width:18px!important;height:18px!important}
+
+@media(max-width:760px){
+  .marketingNav,.marketingHero,.marketingGrid,.contentPulse,.systemLine{width:calc(100% - 24px)}
+}
+@media(prefers-reduced-motion:reduce){
+  .socialBrandIcon *, .marketingPage *{animation-duration:.001ms!important;animation-iteration-count:1!important}
+}
