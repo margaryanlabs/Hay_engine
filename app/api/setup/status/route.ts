@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { planEnforcementEnabled } from "@/lib/commercial/entitlements";
-import { developerApiEnabled, developerApiHourlyLimit, developerApiMigrationReady } from "@/lib/developer/api-keys";
+import { developerApiEnabled, developerApiHourlyLimit, developerApiMaxTextChars, developerApiMigrationReady } from "@/lib/developer/api-keys";
 import { getConnectorReadiness } from "@/lib/marketing/connectors";
 import { isPublishWorkerConfigured } from "@/lib/publish/client";
 import { isOpenAITranscriptionConfigured } from "@/lib/providers/openai-transcription";
@@ -49,6 +49,7 @@ export async function GET() {
   const developerMigration=admin ? await developerApiMigrationReady() : false;
   const developerEnabled=developerApiEnabled();
   const hourlyRequestLimit=developerApiHourlyLimit();
+  const maxTextChars=developerApiMaxTextChars();
   const developerRateLimitReady=hourlyRequestLimit>0;
   const checkout={
     creator:Boolean(process.env.HAY_CHECKOUT_CREATOR_URL),
@@ -81,6 +82,7 @@ export async function GET() {
       hashedAtRest:true,
       metering:true,
       hourlyRequestLimit,
+      maxTextChars,
       rateLimitReady:developerRateLimitReady,
     },
     workers,
