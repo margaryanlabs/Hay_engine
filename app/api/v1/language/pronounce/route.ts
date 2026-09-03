@@ -20,5 +20,5 @@ export async function POST(request:Request){
   const version=result.registry.version!=="core"?`${HAY_PRONUNCIATION_VERSION}+${result.registry.version}`:HAY_PRONUNCIATION_VERSION;
   const usage=await recordDeveloperApiUsage(auth.context,{endpoint:"/api/v1/language/pronounce",operation:"pronounce",inputChars:text.length,metadata:{dialect,registryVersion:result.registry.version,businessApplied:result.registry.businessApplied}});
   if(!usage.recorded)return NextResponse.json({error:"developer_api_metering_failed"},{status:503});
-  return NextResponse.json({apiVersion:"v1",version,locale:"hy-AM",dialect,...result.normalized,registry:result.registry});
+  return NextResponse.json({apiVersion:"v1",version,...result.normalized,registry:result.registry});
 }
