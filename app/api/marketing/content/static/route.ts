@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
+import { checkUsageAllowance, recordUsage } from "@/lib/commercial/entitlements";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { generateSceneImage } from "@/lib/providers/openai-image";
@@ -35,7 +36,7 @@ function overlaySvg(args: { brand: string; headline: string; kicker?: string; in
     <rect width="1080" height="1350" fill="url(#shade)"/>
     <text x="80" y="92" font-family="DejaVu Sans, sans-serif" font-size="25" font-weight="600" fill="#F7F7F4" letter-spacing="2">${escapeXml(args.brand.toUpperCase())}</text>
     <text x="1000" y="92" text-anchor="end" font-family="DejaVu Sans, sans-serif" font-size="20" fill="#D8DBD2">${escapeXml(page)}</text>
-    <text x="80" y="675" font-family="DejaVu Sans, sans-serif" font-size="22" font-weight="600" fill="#D9FF63" letter-spacing="3">${escapeXml((args.kicker||"ARMENIA").toUpperCase())}</text>
+    <text x="80" y="675" font-family="DejaVu Sans, sans-serif" font-size="22" font-weight="600" fill="#C47A66" letter-spacing="3">${escapeXml((args.kicker||"ARMENIA").toUpperCase())}</text>
     <g font-family="DejaVu Sans, sans-serif">${lineSvg}</g>
     <line x1="80" y1="1220" x2="1000" y2="1220" stroke="#F7F7F4" stroke-opacity="0.22"/>
   </svg>`);
@@ -58,17 +59,31 @@ export async function POST(request: Request) {
     if (!isSupabaseConfigured() || !isSupabaseAdminConfigured()) return NextResponse.json({configured:false,message:"Dedicated HAY Supabase is required for static publishing assets."});
     const body = await request.json();
     const contentItemId = String(body.contentItemId||"");
+    const force=body.force===true;
     if (!contentItemId) return NextResponse.json({error:"content_item_id_required"},{status:400});
 
     const supabase = await createClient();
     const {data:claimsData,error:claimsError}=await supabase.auth.getClaims();
     const userId=claimsData?.claims?.sub;
     if(claimsError||!userId)return NextResponse.json({error:"unauthorized"},{status:401});
-    const {data:content}=await supabase.from("content_items").select("id,business_id,platform,format,hook,concept,caption,cta,asset_brief").eq("id",contentItemId).maybeSingle();
+    const {data:content}=await supabase.from("content_items").select("id,business_id,platform,format,hook,concept,caption,cta,asset_brief,asset_url,asset_urls,status").eq("id",contentItemId).maybeSingle();
     if(!content)return NextResponse.json({error:"content_not_found"},{status:404});
     const {data:business}=await supabase.from("businesses").select("id,owner_id,name,category,offer,description,location").eq("id",content.business_id).eq("owner_id",userId).maybeSingle();
     if(!business)return NextResponse.json({error:"forbidden"},{status:403});
     if(!["post","carousel"].includes(String(content.format)))return NextResponse.json({error:"static_format_required"},{status:409});
+
+    const existingUrls=Array.isArray(content.asset_urls)?content.asset_urls.filter((value):value is string=>typeof value==="string"&&Boolean(value)):[];
+    if(content.asset_url&&!force){
+      return NextResponse.json({configured:true,reused:true,contentItemId,format:content.format,assetUrl:content.asset_url,assetUrls:existingUrls.length?existingUrls:[content.asset_url],count:existingUrls.length||1});
+    }
+
+    if(force){
+      const allowance=await checkUsageAllowance("content_assets",1);
+      if(!allowance.allowed){
+        const status=allowance.reason==="unauthorized"?401:allowance.reason==="commercial_migration_required"?503:402;
+        return NextResponse.json({error:allowance.reason,meter:"content_assets",required:1,commercial:allowance.context},{status});
+      }
+    }
 
     const base=await imageBytes(`${content.asset_brief}. Business: ${business.name}, ${business.category}. Location: ${business.location||"Armenia"}. Concept: ${content.concept}.`);
     if(!base)return NextResponse.json({configured:true,error:"image_provider_unconfigured_or_failed"},{status:503});
@@ -88,7 +103,17 @@ export async function POST(request: Request) {
     }
     const {error:updateError}=await supabase.from("content_items").update({asset_url:urls[0],asset_urls:urls,status:"draft",updated_at:new Date().toISOString()}).eq("id",content.id);
     if(updateError)throw updateError;
-    return NextResponse.json({configured:true,contentItemId,format:content.format,assetUrl:urls[0],assetUrls:urls,count:urls.length});
+
+    const usage=force?await recordUsage({
+      meter:"content_assets",
+      quantity:1,
+      businessId:String(content.business_id),
+      source:"static_regeneration",
+      idempotencyKey:typeof body.requestId==="string"&&body.requestId?`static-regeneration:${body.requestId}`:undefined,
+      metadata:{contentItemId,format:content.format,slides:urls.length},
+    }):{recorded:false,reason:"included_in_plan"};
+
+    return NextResponse.json({configured:true,reused:false,contentItemId,format:content.format,assetUrl:urls[0],assetUrls:urls,count:urls.length,commercialUsage:usage});
   }catch(error){
     console.error("Static content compositor failed",error);
     return NextResponse.json({error:"static_content_compositor_failed",detail:error instanceof Error?error.message:String(error)},{status:500});
