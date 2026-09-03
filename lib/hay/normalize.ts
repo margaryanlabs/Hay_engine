@@ -6,6 +6,15 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function numericValue(raw:string){
+  return Number(raw.replace(/[\s,]/g,""));
+}
+
+function moneySpoken(raw:string,currency:string){
+  const value=numericValue(raw);
+  return Number.isFinite(value)?`${numberToArmenian(value)} ${currency}`:null;
+}
+
 export function normalizeForSpeech(
   input: string,
   locale: Locale = "hy",
@@ -19,12 +28,42 @@ export function normalizeForSpeech(
     return { displayText, spokenText, locale, dialect, issues };
   }
 
-  spokenText = spokenText.replace(/\$\s*([0-9]+(?:\.[0-9]+)?)\s*([kKmM])?/g, (_, raw, suffix) => {
-    const base = Number(raw);
+  // Armenian commerce most often displays prices as `14,900 ֏` or `14900 AMD`.
+  // Normalize the full token before the generic number pass so TTS never says a comma
+  // or leaves the dram sign hanging after a spoken number.
+  const groupedNumber="[0-9]{1,3}(?:[ ,][0-9]{3})+|[0-9]+";
+  const replaceCurrency=(pattern:RegExp,currency:string)=>{
+    spokenText=spokenText.replace(pattern,(source:string,raw:string)=>{
+      const spoken=moneySpoken(raw,currency);
+      if(!spoken)return source;
+      issues.push({kind:"currency",source,spoken});
+      return spoken;
+    });
+  };
+
+  replaceCurrency(new RegExp(`(${groupedNumber})\\s*(?:֏|AMD\\b)`,"giu"),"դրամ");
+  replaceCurrency(new RegExp(`(?:֏|AMD\\b)\\s*(${groupedNumber})`,"giu"),"դրամ");
+  replaceCurrency(new RegExp(`(${groupedNumber})\\s*(?:€|EUR\\b)`,"giu"),"եվրո");
+  replaceCurrency(new RegExp(`(?:€|EUR\\b)\\s*(${groupedNumber})`,"giu"),"եվրո");
+  replaceCurrency(new RegExp(`(${groupedNumber})\\s*(?:₾|GEL\\b)`,"giu"),"լարի");
+  replaceCurrency(new RegExp(`(?:₾|GEL\\b)\\s*(${groupedNumber})`,"giu"),"լարի");
+
+  spokenText = spokenText.replace(/\$\s*([0-9]+(?:[,.][0-9]+)?)\s*([kKmM])?/g, (source, raw, suffix) => {
+    const normalizedRaw=String(raw).replace(",",".");
+    const base = Number(normalizedRaw);
     const multiplier = suffix?.toLowerCase() === "k" ? 1_000 : suffix?.toLowerCase() === "m" ? 1_000_000 : 1;
     const value = base * multiplier;
+    if(!Number.isFinite(value))return source;
     const spoken = `${numberToArmenian(value)} դոլար`;
-    issues.push({ kind: "currency", source: `$${raw}${suffix ?? ""}`, spoken });
+    issues.push({ kind: "currency", source, spoken });
+    return spoken;
+  });
+
+  // Read thousands-grouped non-currency numbers as one number, not `14` then `900`.
+  spokenText = spokenText.replace(/\b([0-9]{1,3}(?:,[0-9]{3})+)\b/g, (source) => {
+    const value=numericValue(source);
+    const spoken=numberToArmenian(value);
+    issues.push({kind:"number",source,spoken});
     return spoken;
   });
 
