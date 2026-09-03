@@ -54,15 +54,17 @@ export async function startVeoVideo(input: VeoStartInput): Promise<VeoOperation 
   return response.json() as Promise<VeoOperation>;
 }
 
-function validateOperationName(name: string) {
-  if (!name || name.length > 400 || name.includes("..") || !/^[A-Za-z0-9._\-/:]+$/.test(name)) throw new Error("invalid_operation_name");
+export function normalizeVeoOperationName(name: string) {
+  if (!name || name.length > 400 || name.includes("..") || !/^[A-Za-z0-9._\-/:]+$/.test(name)) {
+    throw new Error("invalid_operation_name");
+  }
   return name.replace(/^\/+/, "");
 }
 
 export async function getVeoOperation(name: string): Promise<VeoOperation | null> {
   const apiKey = getKey();
   if (!apiKey) return null;
-  const safeName = validateOperationName(name);
+  const safeName = normalizeVeoOperationName(name);
   const response = await fetch(`${GEMINI_BASE}/${safeName}`, { headers: { "x-goog-api-key": apiKey }, cache: "no-store" });
   if (!response.ok) {
     const detail = await response.text();
