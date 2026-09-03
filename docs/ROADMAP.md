@@ -60,7 +60,7 @@ This file tracks what is actually missing in the current repository. Completed i
 
 - [x] Free / Creator / Growth / Business plan definitions
 - [x] owner-scoped account entitlement schema
-- [x] append-only usage ledger
+- [x] append-only Studio usage ledger
 - [x] server-side content / video / voice usage enforcement
 - [x] brand-workspace and social-channel limit enforcement
 - [x] live Studio plan / usage visibility
@@ -68,8 +68,13 @@ This file tracks what is actually missing in the current repository. Completed i
 - [x] trusted server-to-server billing entitlement sync endpoint
 - [x] persistent Studio auth gate and plan-preserving magic-link flow
 - [x] commercial readiness diagnostics in `/api/setup/status`
+- [x] server-only developer credential schema with one-time raw secret and SHA-256-at-rest keys
+- [x] separate developer API request / character / audio-byte metering
+- [x] fail-closed per-key hourly API rate-limit infrastructure
 - [ ] choose/configure production billing provider and hosted checkout URLs
 - [ ] wire that provider's verified webhook adapter to `/api/billing/sync`
+- [ ] define developer API quota / overage pricing by commercial plan
+- [ ] enforce plan-level developer API monthly quota / overage policy after pricing is approved
 - [ ] invoice / receipt / tax workflow required by the selling entity
 - [ ] transactional lifecycle email (trial, payment, limit, failed payment, cancellation)
 
@@ -83,23 +88,27 @@ This file tracks what is actually missing in the current repository. Completed i
 - [x] `/translate` with Armenian-first syntax and protected-value preservation
 - [x] model/quality dashboard via `/quality` and `/api/quality`
 - [x] interactive `/language` Language Lab surface
-- [ ] public developer authentication / API keys
-- [ ] API usage metering distinct from Studio subscriptions
+- [x] revocable developer authentication / API keys
+- [x] stable `/api/v1/language/*` developer surface
+- [x] `/developers` key + usage console
+- [x] API usage metering distinct from Studio subscriptions
 - [ ] persistent versioned pronunciation dictionary management
 - [ ] dataset provenance and license registry in persistence
 - [ ] fine-tuned Armenian speech/language components only where blind benchmarks justify them
 
 ## Go-live checklist
 
-1. Apply Supabase migrations through `007_commercial_core.sql` in the dedicated HAY project.
-2. Configure provider keys and workers required by the launch package.
-3. Configure Creator / Growth / Business hosted checkout URLs and `HAY_BILLING_SYNC_SECRET`.
-4. Verify the chosen payment provider's signed webhook, then call HAY `/api/billing/sync` from that trusted adapter.
-5. Set `HAY_ENFORCE_PLANS=true` only after migration + billing sync are verified.
-6. Run `npm run typecheck`, `npm run quality`, `npm run build`, render-worker check and publish-worker check.
-7. Onboard the first real businesses in managed mode and measure time-to-first-useful-plan, publish success and attributed outcomes.
-8. Collect independent blind native-speaker benchmark reviews before making comparative "best Armenian" claims.
+1. Create a dedicated HAY Supabase project; do not reuse Meqena or the old shared Margaryan Labs database.
+2. Apply the canonical HAY Supabase migrations through `007_commercial_core.sql`.
+3. Configure provider keys and workers required by the launch package.
+4. Configure Creator / Growth / Business hosted checkout URLs and `HAY_BILLING_SYNC_SECRET`.
+5. Verify the chosen payment provider's signed webhook, then call HAY `/api/billing/sync` from that trusted adapter.
+6. Set `HAY_ENFORCE_PLANS=true` only after migration + billing sync are verified.
+7. For Developer API launch, choose a positive `HAY_DEVELOPER_API_HOURLY_REQUEST_LIMIT`, create a test `hay_live_*` key, verify success + `429` behavior + usage recording + revoke, then set `HAY_DEVELOPER_API_ENABLED=true`.
+8. Run `npm run typecheck`, `npm run quality`, `npm run build`, render-worker check and publish-worker check.
+9. Onboard the first real businesses in managed mode and measure time-to-first-useful-plan, publish success and attributed outcomes.
+10. Collect independent blind native-speaker benchmark reviews before making comparative "best Armenian" claims.
 
 ## Non-goal
 
-Do not train a frontier LLM or video foundation model from scratch. HAY wins by owning the Armenian-specific normalization, pronunciation, evaluation, workflow, business context, outcome memory and proprietary reviewed data around interchangeable foundation providers.
+Do not train a frontier LLM or video foundation model from scratch. HAY wins by owning the Armenian-specific normalization, pronunciation, evaluation, workflow, developer infrastructure, business context, outcome memory and proprietary reviewed data around interchangeable foundation providers.
