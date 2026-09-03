@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import packageJson from "@/package.json";
 import { isVeoConfigured } from "@/lib/providers/veo";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
@@ -23,7 +24,9 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     service: "HAY Engine",
-    version: "0.2.0",
+    version: packageJson.version,
+    environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "development",
+    commit: process.env.VERCEL_GIT_COMMIT_SHA || null,
     armenianPriority: true,
     locales: ["hy", "en", "ru"],
     providers,

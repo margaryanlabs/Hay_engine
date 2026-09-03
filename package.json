@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "quality": "rm -rf .quality-build && tsc -p scripts/tsconfig.quality.json && node .quality-build/scripts/quality-check.js"
+    "quality": "rm -rf .quality-build && tsc -p scripts/tsconfig.quality.json && node .quality-build/scripts/quality-check.js",
+    "smoke": "node scripts/runtime-smoke.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.5",
