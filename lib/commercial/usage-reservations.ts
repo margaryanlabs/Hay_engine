@@ -22,12 +22,14 @@ type ReservationInput = {
   metadata?: Record<string, unknown>;
 };
 
+type CommercialContext = Awaited<ReturnType<typeof checkUsageAllowance>>["context"];
+
 type NonAtomicReservation = {
   allowed: true;
   atomic: false;
   duplicate: false;
   input: ReservationInput;
-  context: Awaited<ReturnType<typeof checkUsageAllowance>>["context"];
+  context: CommercialContext;
 };
 
 type AtomicReservation = {
@@ -38,7 +40,7 @@ type AtomicReservation = {
   releaseToken: string;
   ownerId: string;
   input: ReservationInput;
-  context: Awaited<ReturnType<typeof checkUsageAllowance>>["context"];
+  context: CommercialContext;
 };
 
 type AtomicDuplicate = {
@@ -48,7 +50,7 @@ type AtomicDuplicate = {
   eventId: string | null;
   metadata: Record<string, unknown>;
   input: ReservationInput;
-  context: Awaited<ReturnType<typeof checkUsageAllowance>>["context"];
+  context: CommercialContext;
 };
 
 export type UsageReservation = NonAtomicReservation | AtomicReservation | AtomicDuplicate;
@@ -56,7 +58,7 @@ export type UsageReservation = NonAtomicReservation | AtomicReservation | Atomic
 export type UsageReservationFailure = {
   allowed: false;
   reason: UsageReservationReason | string;
-  context: Awaited<ReturnType<typeof checkUsageAllowance>>["context"];
+  context: CommercialContext;
   duplicate?: boolean;
   detail?: string;
 };
@@ -75,27 +77,34 @@ function makeReleaseToken() {
 
 export async function reserveUsage(input: ReservationInput): Promise<UsageReservation | UsageReservationFailure> {
   const preflight = await checkUsageAllowance(input.meter, input.quantity);
-  if (!preflight.allowed) return { allowed:false, reason:preflight.reason, context:preflight.context };
+  const context = preflight.context;
 
-  // Before commercial plan enforcement is enabled, preserve the existing authenticated
-  // ledger path. Once enforcement is enabled, quota-consuming provider work must use
-  // migration 010 so the check and reservation happen atomically in Postgres.
-  if (!preflight.context.enforcementEnabled) {
-    return { allowed:true, atomic:false, duplicate:false, input, context:preflight.context };
+  // Before commercial enforcement is enabled, preserve the existing ledger behavior.
+  // Once enforcement is enabled, the database reservation RPC becomes authoritative:
+  // a non-atomic JS allowance result must never decide quota because concurrent calls can
+  // observe the same remaining balance. We still use the preflight context for identity,
+  // migration readiness and fail-closed configuration checks.
+  if (!context.enforcementEnabled) {
+    if (!preflight.allowed) return { allowed:false, reason:preflight.reason, context };
+    return { allowed:true, atomic:false, duplicate:false, input, context };
   }
-  if (!preflight.context.configured || !preflight.context.authenticated || !("userId" in preflight.context) || !preflight.context.userId) {
-    return { allowed:false, reason:"unauthorized", context:preflight.context };
+
+  if (!context.configured || !context.authenticated || !("userId" in context) || !context.userId) {
+    return { allowed:false, reason:"unauthorized", context };
+  }
+  if (!context.migrationReady) {
+    return { allowed:false, reason:"commercial_migration_required", context };
   }
   if (!isSupabaseAdminConfigured()) {
-    return { allowed:false, reason:"atomic_usage_admin_required", context:preflight.context };
+    return { allowed:false, reason:"atomic_usage_admin_required", context };
   }
 
   const releaseToken = makeReleaseToken();
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("hay_reserve_usage", {
-    p_owner_id: preflight.context.userId,
+    p_owner_id: context.userId,
     p_meter: input.meter,
-    p_quantity: input.quantity,
+    p_quantity: Math.max(0, Number(input.quantity) || 0),
     p_business_id: input.businessId || null,
     p_source: input.source,
     p_idempotency_key: input.idempotencyKey || null,
@@ -104,7 +113,7 @@ export async function reserveUsage(input: ReservationInput): Promise<UsageReserv
   });
   if (error) {
     console.error("Atomic usage reservation RPC failed", error.message);
-    return { allowed:false, reason:"atomic_usage_migration_required", context:preflight.context, detail:error.message };
+    return { allowed:false, reason:"atomic_usage_migration_required", context, detail:error.message };
   }
 
   const result = object(data);
@@ -113,7 +122,7 @@ export async function reserveUsage(input: ReservationInput): Promise<UsageReserv
       allowed:false,
       reason:text(result.reason) || "atomic_usage_reservation_failed",
       duplicate:result.duplicate === true,
-      context:preflight.context,
+      context,
     };
   }
 
@@ -125,13 +134,13 @@ export async function reserveUsage(input: ReservationInput): Promise<UsageReserv
       eventId:text(result.eventId) || null,
       metadata:object(result.metadata),
       input,
-      context:preflight.context,
+      context,
     };
   }
 
   const eventId = text(result.eventId);
   if (!eventId) {
-    return { allowed:false, reason:"atomic_usage_reservation_failed", context:preflight.context };
+    return { allowed:false, reason:"atomic_usage_reservation_failed", context };
   }
   return {
     allowed:true,
@@ -139,9 +148,9 @@ export async function reserveUsage(input: ReservationInput): Promise<UsageReserv
     duplicate:false,
     eventId,
     releaseToken,
-    ownerId:preflight.context.userId,
+    ownerId:context.userId,
     input,
-    context:preflight.context,
+    context,
   };
 }
 
