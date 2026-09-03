@@ -17,13 +17,21 @@ function cleanScopes(value:unknown):HayDeveloperScope[]{
   return result.length?result:["language"];
 }
 function scopeAllows(scopes:string[],required:HayDeveloperScope){return scopes.includes("language")||scopes.includes(required);}
-function developerApiEnabled(){return process.env.HAY_DEVELOPER_API_ENABLED==="true";}
+export function developerApiEnabled(){return process.env.HAY_DEVELOPER_API_ENABLED==="true";}
+export function developerApiHourlyLimit(){
+  const value=Number(process.env.HAY_DEVELOPER_API_HOURLY_REQUEST_LIMIT||0);
+  return Number.isFinite(value)&&value>0?Math.floor(value):0;
+}
 
 export async function developerApiMigrationReady(){
   if(!isSupabaseAdminConfigured())return false;
   try{
-    const check=await createAdminClient().from("developer_api_keys").select("id",{head:true,count:"exact"}).limit(1);
-    return !check.error;
+    const admin=createAdminClient();
+    const [keys,usage]=await Promise.all([
+      admin.from("developer_api_keys").select("id",{head:true,count:"exact"}).limit(1),
+      admin.from("developer_api_usage").select("id",{head:true,count:"exact"}).limit(1),
+    ]);
+    return !keys.error&&!usage.error;
   }catch{return false;}
 }
 
@@ -86,6 +94,8 @@ export type DeveloperApiContext={keyId:string;ownerId:string;scopes:string[];pla
 export async function authenticateDeveloperRequest(request:Request,requiredScope:HayDeveloperScope):Promise<{allowed:true;context:DeveloperApiContext}|{allowed:false;reason:string;status:number}>{
   if(!developerApiEnabled())return {allowed:false,reason:"developer_api_disabled",status:503};
   if(!isSupabaseAdminConfigured())return {allowed:false,reason:"developer_api_unconfigured",status:503};
+  const hourlyLimit=developerApiHourlyLimit();
+  if(hourlyLimit<=0)return {allowed:false,reason:"developer_api_rate_limit_unconfigured",status:503};
   const raw=requestKey(request);
   if(!raw||!raw.startsWith(HAY_API_KEY_PREFIX))return {allowed:false,reason:"invalid_api_key",status:401};
   const admin=createAdminClient();
@@ -96,16 +106,22 @@ export async function authenticateDeveloperRequest(request:Request,requiredScope
   const scopes=Array.isArray(key.scopes)?key.scopes.map(String):[];
   if(!scopeAllows(scopes,requiredScope))return {allowed:false,reason:"insufficient_scope",status:403};
 
-  const {data:entitlement}=await admin.from("account_entitlements").select("plan_id,status").eq("owner_id",key.owner_id).maybeSingle();
+  const since=new Date(Date.now()-60*60*1000).toISOString();
+  const rate=await admin.from("developer_api_usage").select("id",{count:"exact",head:true}).eq("api_key_id",key.id).gte("created_at",since);
+  if(rate.error)return {allowed:false,reason:"developer_api_metering_unavailable",status:503};
+  if(Number(rate.count||0)>=hourlyLimit)return {allowed:false,reason:"developer_api_rate_limit_reached",status:429};
+
+  const {data:entitlement,error:entitlementError}=await admin.from("account_entitlements").select("plan_id,status").eq("owner_id",key.owner_id).maybeSingle();
+  if(entitlementError)return {allowed:false,reason:"commercial_entitlement_unavailable",status:503};
   const planId=String(entitlement?.plan_id||"free");
   const status=String(entitlement?.status||"active");
   if(planEnforcementEnabled()&&!["active","trialing"].includes(status))return {allowed:false,reason:"subscription_inactive",status:402};
-  void admin.from("developer_api_keys").update({last_used_at:new Date().toISOString()}).eq("id",key.id);
+  await admin.from("developer_api_keys").update({last_used_at:new Date().toISOString()}).eq("id",key.id);
   return {allowed:true,context:{keyId:String(key.id),ownerId:String(key.owner_id),scopes,planId,status}};
 }
 
 export async function recordDeveloperApiUsage(context:DeveloperApiContext,input:{endpoint:string;operation:string;inputChars?:number;audioBytes?:number;metadata?:Record<string,unknown>}){
-  if(!isSupabaseAdminConfigured())return {recorded:false};
+  if(!isSupabaseAdminConfigured())throw new Error("developer_api_metering_unconfigured");
   const {error}=await createAdminClient().from("developer_api_usage").insert({
     owner_id:context.ownerId,
     api_key_id:context.keyId,
@@ -116,7 +132,8 @@ export async function recordDeveloperApiUsage(context:DeveloperApiContext,input:
     audio_bytes:Math.max(0,Math.round(Number(input.audioBytes)||0)),
     metadata:input.metadata||{},
   });
-  return error?{recorded:false,error:error.message}:{recorded:true};
+  if(error)throw new Error(`developer_api_usage_record_failed:${error.code||"unknown"}`);
+  return {recorded:true};
 }
 
 export async function developerUsageSummary(ownerId:string){
