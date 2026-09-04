@@ -46,19 +46,17 @@ The agent must say it does not know rather than inventing availability, price, b
 
 ### 4. Outcome memory
 
-The important unit is not a generated sentence. It is an outcome:
+The important unit is not a generated sentence. It is an outcome derived from executed HAY actions, not model self-report:
 
-- answered
-- resolved
-- lead created
-- callback requested
-- appointment requested/booked
-- order captured
-- transferred to human
-- abandoned
-- failed
+- `appointment_request`
+- `order_captured`
+- `callback_requested`
+- `lead_captured`
+- `human_handoff`
+- `resolved_without_action`
+- `voice_transport_failed`
 
-This gives HAY a proprietary Armenian business-conversation evaluation loop that generic model vendors do not have by default.
+This gives HAY a proprietary Armenian business-conversation evaluation loop that generic model vendors do not have by default. Outcome classification does not require storing raw audio or full call transcripts.
 
 ## Realtime architecture
 
@@ -67,15 +65,31 @@ Initial production path:
 `phone/browser audio`
 → `realtime speech provider (ASR, VAD, interruption, TTS)`
 → `HAY voice-worker`
+→ `atomic seat/minute/concurrency admission`
 → `POST /api/employee/realtime-turn`
 → `HAY employee runtime`
 → `Armenian interaction policy`
 → `business action proposal`
+→ `deterministic caller confirmation`
 → `HAY action gate / business connector`
 → `short Armenian reply`
 → `realtime TTS`
+→ `outcome + billable-minute finalization`
 
 The first worker uses ElevenLabs Speech Engine because it can keep ASR/TTS/turn-taking outside HAY while letting our server own the LLM/business logic. Provider interfaces must remain replaceable.
+
+For real PSTN calls the first bridge target is the documented Twilio Media Streams + Speech Engine custom-LLM pattern. Twilio and ElevenLabs both use μ-law 8 kHz in that bridge, avoiding transcoding. A local Armenian/SIP carrier is preferred where it materially improves inbound numbering or telephony economics.
+
+## Call transaction semantics
+
+A phone side effect is a two-step transaction:
+
+1. HAY proposes and reads back the exact action/data.
+2. A deterministic Armenian confirmation parser resolves the next `այո / հա / ճիշտ է / հաստատում եմ` or rejection against the **same call session and same stored proposal**.
+
+The LLM does not get a second chance to regenerate or silently change the amount/time/name between the read-back and caller confirmation.
+
+An appointment remains an `appointment_request` until a real calendar/booking connector confirms a slot. HAY must never tell the caller that an external booking succeeded merely because the model proposed it.
 
 ## Privacy default
 
@@ -85,42 +99,71 @@ The first worker uses ElevenLabs Speech Engine because it can keep ASR/TTS/turn-
 - recording/long transcript retention requires an explicit business setting and appropriate caller disclosure/consent where required
 - caller phone numbers should be masked for UI and hashed when only identity correlation is needed
 - provider credentials are server-only
+- the realtime voice worker never receives Supabase service-role credentials
 
-## First commercial shape
+## Subscription and usage
 
-HAY Employee should be sold as an add-on / employee subscription, not bundled into unlimited generic tokens. The commercial unit is an employee seat plus included call minutes, with overage after measured provider cost is known.
+Employee billing is separate from Marketing OS token/asset usage. Migration `016_ai_employee_subscriptions.sql` introduces:
 
-Do not lock pricing before the real Armenian latency/quality benchmark and blended per-minute provider cost are measured. The schema and worker should stay provider-neutral so margin can improve by routing providers later.
+- employee seats
+- included call minutes
+- concurrent-call limits
+- maximum duration per call
+- atomic per-call reservation before the first HAY brain turn
+- exact final billable seconds on close/disconnect
 
-## Launch benchmark before accepting real customer calls
+Active reservations count against the monthly minute pool immediately, preventing two concurrent calls from spending the same remaining minutes.
 
-Minimum test pack:
+Initial launch catalog in code is intentionally adjustable before public pricing is frozen:
 
-1. 100+ Armenian names/surnames.
-2. 100+ Armenian dates/times including relative phrasing.
-3. 100+ phone numbers and confirmation turns.
-4. AMD prices and ambiguous number pairs (15,000 vs 50,000 etc.).
-5. Yerevan addresses, neighborhoods and common Armenian place names.
-6. Armenian/Russian/English code-switching.
-7. interruptions and backchannels.
-8. noisy phone audio.
-9. angry caller and human-transfer cases.
-10. prompt-injection attempts from a caller.
-11. hallucination traps for unavailable prices/inventory/appointments.
-12. action confirmation and duplicate/retry tests.
+- Trial — 1 employee / 30 min
+- Reception — 49,900 AMD / 1 employee / 150 min
+- Business — 99,000 AMD / 2 employees / 500 min
+- Team — 199,000 AMD / 5 employees / 1,500 min
 
-A pleasant demo voice is not sufficient for launch.
+Final public pricing should follow measured Armenian call latency, completion rate and blended inbound telephony + realtime speech cost, not generic token pricing.
+
+## Frozen Armenian Call Benchmark
+
+`hay-employee-call-v1-2026-09-04` lives in `lib/employee/call-benchmark.ts` and is an explicit release gate. Its first 12 scenarios cover:
+
+- Armenian name + phone + appointment request
+- 15,000 AMD vs 50,000 AMD
+- caller phone-number correction
+- Armenian surname spelling
+- relative date/time phrasing
+- Armenian/Russian/English code-switching
+- angry caller / human handoff
+- caller prompt injection
+- unsupported price confirmation trap
+- order quantity vs unit price
+- interruption followed by changed appointment request
+- fake payment-success instruction
+
+The benchmark scores **action correctness, caller-confirmation correctness, protected-value preservation, forbidden claims and handoff behavior**. Naturalness remains important, but a pleasant voice cannot compensate for an incorrect business action.
+
+The production evidence layer should expand this frozen core to 100+ names, dates, phones, amounts, addresses and noisy native-speaker calls before broad launch.
+
+## Required migrations
+
+Apply after the existing HAY migrations through `013_atomic_billing_events.sql`:
+
+1. `014_ai_employees.sql` — employee configuration, sessions and auditable action proposals.
+2. `015_ai_employee_inbox.sql` — operational lead/callback/order/appointment-request inbox.
+3. `016_ai_employee_subscriptions.sql` — seats, included call minutes, concurrency and atomic call admission/finalization.
+
+Do not set `HAY_EMPLOYEE_ENFORCE_SUBSCRIPTION=true` until migration 016 is installed and `/api/employee/readiness` reports subscription readiness.
 
 ## User/operator prerequisites for the first real phone pilot
 
 Code can be built without these, but real inbound phone calls require:
 
-- dedicated HAY Supabase migrations through `014_ai_employees.sql`
+- dedicated HAY Supabase migrations through `016_ai_employee_subscriptions.sql`
 - at least one configured HAY business and active AI Employee
-- OpenAI key (brain initially; replaceable later)
-- ElevenLabs key + Armenian-capable realtime voice / Speech Engine resource for the first transport
-- a deployed public WebSocket voice worker
-- a phone/SIP/Twilio-style number/bridge for real telephone calls
+- OpenAI key for the first brain provider (replaceable later)
+- ElevenLabs key + Speech Engine resource for the first realtime speech transport
+- a deployed public voice worker and `HAY_VOICE_WORKER_SECRET`
+- a phone/SIP/Twilio-style inbound number/bridge
 - actual business services, hours, booking rules, escalation contact and allowed actions
 
-The product should first pass browser/WebRTC voice tests, then one controlled phone number, then real businesses.
+The product should pass deterministic/security tests, browser behavior tests, then one controlled phone number and the expanded native-speaker call benchmark before broad customer rollout.
