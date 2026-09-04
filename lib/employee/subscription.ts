@@ -17,6 +17,28 @@ export async function employeeSubscriptionMigrationReady(){
   }catch{return false;}
 }
 
+async function ensureEmployeeTrialEntitlement(ownerId:string){
+  if(!isSupabaseAdminConfigured())return {ok:false as const,reason:"employee_subscription_backend_required"};
+  const admin=createAdminClient();
+  const existing=await admin.from("ai_employee_entitlements").select("plan_id,status,employee_seats,included_minutes,concurrent_calls,max_call_minutes,current_period_start,current_period_end").eq("owner_id",ownerId).maybeSingle();
+  if(existing.error)return {ok:false as const,reason:"employee_subscription_migration_required",detail:existing.error.message};
+  if(existing.data)return {ok:true as const,entitlement:existing.data};
+  const inserted=await admin.from("ai_employee_entitlements").insert({owner_id:ownerId,plan_id:"employee_trial",status:"trialing",employee_seats:1,included_minutes:30,concurrent_calls:1,max_call_minutes:8}).select("plan_id,status,employee_seats,included_minutes,concurrent_calls,max_call_minutes,current_period_start,current_period_end").single();
+  if(inserted.error)return {ok:false as const,reason:"employee_subscription_trial_create_failed",detail:inserted.error.message};
+  return {ok:true as const,entitlement:inserted.data};
+}
+
+export async function checkEmployeeSeatAllowance(ownerId:string,currentEmployees:number){
+  if(!employeeSubscriptionEnforcementEnabled())return {allowed:true as const,enforced:false,limit:null};
+  const ensured=await ensureEmployeeTrialEntitlement(ownerId);
+  if(!ensured.ok)return {allowed:false as const,status:503,reason:ensured.reason,detail:"detail" in ensured?ensured.detail:undefined};
+  const entitlement=ensured.entitlement;
+  if(!["active","trialing"].includes(String(entitlement.status)))return {allowed:false as const,status:402,reason:"employee_subscription_inactive"};
+  const limit=Math.max(0,Number(entitlement.employee_seats||0));
+  if(currentEmployees>=limit)return {allowed:false as const,status:409,reason:"employee_seat_limit_reached",limit,current:currentEmployees};
+  return {allowed:true as const,enforced:true,limit,current:currentEmployees};
+}
+
 export async function admitEmployeeCall(input:{ownerId:string;employeeId:string;sessionId:string;provider:string;externalSessionId:string}){
   if(!employeeSubscriptionEnforcementEnabled())return {allowed:true as const,enforced:false,reservedSeconds:Number(process.env.HAY_EMPLOYEE_DEMO_MAX_CALL_SECONDS)||600,usageId:null};
   if(!isSupabaseAdminConfigured())return {allowed:false as const,status:503,reason:"employee_subscription_backend_required"};
