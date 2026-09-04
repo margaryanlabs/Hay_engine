@@ -17,6 +17,7 @@
     "security:direct-providers": "node scripts/direct-provider-policy-check.mjs",
     "security:developer-api": "node scripts/developer-api-policy-check.mjs",
     "security:billing": "node scripts/billing-policy-check.mjs",
+    "security:accounting-surface": "node scripts/accounting-surface-policy-check.mjs",
     "security:transcription": "node scripts/transcription-provider-policy-check.mjs",
     "security:employee": "node scripts/employee-policy-check.mjs",
     "voice-worker:check": "node --check voice-worker/src/index.mjs",
