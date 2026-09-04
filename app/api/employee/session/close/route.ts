@@ -1,5 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { classifyEmployeeCallOutcome,employeeOutcomeSummaryHy } from "@/lib/employee/outcome";
+import type { EmployeeActionType } from "@/lib/employee/types";
 import { createAdminClient,isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 
 export const runtime="nodejs";
@@ -26,8 +28,14 @@ export async function POST(request:Request){
     if(lookup.error)return NextResponse.json({error:"employee_session_read_failed"},{status:500});
     if(!lookup.data)return NextResponse.json({closed:false,reason:"session_not_found"},{status:200});
     if(String(lookup.data.state)==="handoff")return NextResponse.json({closed:true,state:"handoff",preserved:true},{status:200});
-    const outcome=requestedState==="failed"?"voice_transport_failed":"call_completed";
-    const updated=await admin.from("ai_employee_sessions").update({state:requestedState,outcome,ended_at:new Date().toISOString()}).eq("id",lookup.data.id).eq("employee_id",employeeId).select("id,state,outcome,ended_at").single();
+
+    const actions=await admin.from("ai_employee_actions").select("action_type,status").eq("session_id",lookup.data.id).eq("employee_id",employeeId).eq("status","executed");
+    if(actions.error)return NextResponse.json({error:"employee_session_actions_read_failed"},{status:500});
+    const actionTypes=(actions.data||[]).map(row=>String(row.action_type)).filter(type=>["book_appointment","create_lead","create_callback","take_order","handoff_human"].includes(type)) as EmployeeActionType[];
+    const outcome=classifyEmployeeCallOutcome({actionTypes,failed:requestedState==="failed"});
+    const summary=employeeOutcomeSummaryHy(outcome);
+    const finalState=outcome==="human_handoff"?"handoff":requestedState;
+    const updated=await admin.from("ai_employee_sessions").update({state:finalState,outcome,summary,ended_at:new Date().toISOString(),metadata:{actionCount:actionTypes.length,actionTypes}}).eq("id",lookup.data.id).eq("employee_id",employeeId).select("id,state,outcome,summary,metadata,ended_at").single();
     if(updated.error)return NextResponse.json({error:"employee_session_close_failed"},{status:500});
     return NextResponse.json({closed:true,session:updated.data},{headers:{"Cache-Control":"no-store"}});
   }catch(error){
