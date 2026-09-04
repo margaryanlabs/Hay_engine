@@ -51,22 +51,26 @@ export async function POST(request:Request){
     if(!employeeRow)return NextResponse.json({error:"employee_not_found"},{status:404});
     const employee=employeeProfileFromRow(employeeRow as Record<string,unknown>);
     if(employee.status!=="active"&&process.env.HAY_ALLOW_DRAFT_EMPLOYEE_REALTIME!=="true")return NextResponse.json({error:"employee_not_active"},{status:409});
-    if(!employee.businessId)return NextResponse.json({error:"employee_business_required"},{status:409});
+    if(!employee.id||!employee.ownerId||!employee.businessId)return NextResponse.json({error:"employee_identity_or_business_required"},{status:409});
     const {data:business,error:businessError}=await admin.from("businesses").select("id,name,category,description,location,offer,audience,tone").eq("id",employee.businessId).eq("owner_id",employee.ownerId).maybeSingle();
     if(businessError)return NextResponse.json({error:"employee_business_read_failed"},{status:500});
     if(!business)return NextResponse.json({error:"employee_business_not_found"},{status:404});
 
     const provider="elevenlabs-speech-engine";
-    let sessionResult=await admin.from("ai_employee_sessions").select("id,state").eq("provider",provider).eq("external_session_id",externalSessionId).maybeSingle();
-    if(sessionResult.error)return NextResponse.json({error:"employee_session_read_failed"},{status:500});
-    if(!sessionResult.data){
+    let sessionId="";
+    const sessionLookup=await admin.from("ai_employee_sessions").select("id,state").eq("provider",provider).eq("external_session_id",externalSessionId).eq("employee_id",employee.id).maybeSingle();
+    if(sessionLookup.error)return NextResponse.json({error:"employee_session_read_failed"},{status:500});
+    if(sessionLookup.data)sessionId=String(sessionLookup.data.id);
+    else{
       const inserted=await admin.from("ai_employee_sessions").insert({owner_id:employee.ownerId,business_id:employee.businessId,employee_id:employee.id,channel:"phone",provider,external_session_id:externalSessionId,state:"active",consent_to_record:false,raw_transcript_retained:false,metadata:{transport:"speech-engine"}}).select("id,state").single();
-      if(inserted.error){
-        if(String(inserted.error.code)==="23505")sessionResult=await admin.from("ai_employee_sessions").select("id,state").eq("provider",provider).eq("external_session_id",externalSessionId).single();
-        else return NextResponse.json({error:"employee_session_create_failed",detail:inserted.error.message},{status:500});
-      }else sessionResult={...sessionResult,data:inserted.data,error:null};
+      if(!inserted.error)sessionId=String(inserted.data.id);
+      else if(String(inserted.error.code)==="23505"){
+        const raced=await admin.from("ai_employee_sessions").select("id").eq("provider",provider).eq("external_session_id",externalSessionId).eq("employee_id",employee.id).maybeSingle();
+        if(raced.error)return NextResponse.json({error:"employee_session_race_read_failed"},{status:500});
+        sessionId=String(raced.data?.id||"");
+        if(!sessionId)return NextResponse.json({error:"employee_session_id_conflict"},{status:409});
+      }else return NextResponse.json({error:"employee_session_create_failed",detail:inserted.error.message},{status:500});
     }
-    const sessionId=String(sessionResult.data?.id||"");
     if(!sessionId)return NextResponse.json({error:"employee_session_required"},{status:500});
 
     const pending=await admin.from("ai_employee_actions").select("id,action_type,summary,payload,dedupe_key").eq("employee_id",employee.id).eq("session_id",sessionId).eq("status","proposed").order("created_at",{ascending:false}).limit(1).maybeSingle();
@@ -79,11 +83,12 @@ export async function POST(request:Request){
         const result=await captureEmployeeAction({employee,type:pendingType,payload:sanitizeEmployeeActionPayload(pending.data.payload),summary:String(pending.data.summary||pendingType),idempotencyKey:String(pending.data.dedupe_key||""),callerConfirmed:true,sessionId});
         if(result.status>=400)return NextResponse.json(result.body,{status:result.status});
         const handoff=pendingType==="handoff_human";
+        if(handoff)await admin.from("ai_employee_sessions").update({state:"handoff",outcome:"human_handoff",ended_at:new Date().toISOString()}).eq("id",sessionId).eq("employee_id",employee.id);
         const turn=deterministicTurn(actionCapturedReply(pendingType),"confirm_action",{shouldHandoff:handoff,handoffReason:handoff?"confirmed_human_handoff":null});
         return NextResponse.json({turn,actionResult:result.body,session:{id:sessionId,externalSessionId},employee:{id:employee.id,name:employee.displayName},business:{id:business.id,name:business.name}},{headers:{"Cache-Control":"no-store"}});
       }
       if(confirmation==="no"){
-        await rejectEmployeeAction(String(pending.data.id),String(employee.ownerId));
+        await rejectEmployeeAction(String(pending.data.id),employee.ownerId);
         const turn=deterministicTurn("Լավ, չեմ գրանցում։ Ասեք՝ ինչն եք ուզում փոխել կամ ինչով կարող եմ օգնել։","reject_action");
         return NextResponse.json({turn,session:{id:sessionId,externalSessionId},employee:{id:employee.id,name:employee.displayName},business:{id:business.id,name:business.name}},{headers:{"Cache-Control":"no-store"}});
       }
@@ -98,9 +103,7 @@ export async function POST(request:Request){
       const captured=await captureEmployeeAction({employee,type:turn.action.type,payload:sanitizeEmployeeActionPayload(turn.action.payload),summary:turn.action.summaryHy,idempotencyKey:key,callerConfirmed:!turn.action.requiresConfirmation,sessionId});
       actionResult=captured.body;
       if(captured.status>=400)return NextResponse.json(captured.body,{status:captured.status});
-      if(captured.status===202){
-        turn={...turn,reply:confirmationPrompt(turn.action.summaryHy),intent:"await_action_confirmation",confidence:Math.max(turn.confidence,.9)};
-      }
+      if(captured.status===202)turn={...turn,reply:confirmationPrompt(turn.action.summaryHy),intent:"await_action_confirmation",confidence:Math.max(turn.confidence,.9)};
     }
     return NextResponse.json({turn,actionResult,session:{id:sessionId,externalSessionId},employee:{id:employee.id,name:employee.displayName},business:{id:business.id,name:business.name}},{headers:{"Cache-Control":"no-store"}});
   }catch(error){
