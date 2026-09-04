@@ -5,8 +5,9 @@ import HayLogo from "./HayLogo";
 
 type Employee={id:string;displayName:string;role:string;locale:string;speechStyle:string;greeting:string;status:string;capabilities:Record<string,boolean>};
 type Turn={role:"caller"|"employee";text:string};
-
-type PreviewResult={turn?:{reply:string;intent:string;confidence:number;action?:{type:string;summaryHy:string;requiresConfirmation:boolean}|null;shouldHandoff:boolean;handoffReason?:string|null}};
+type Action={type:string;summaryHy:string;requiresConfirmation:boolean;payload:Record<string,string|number|boolean|null>};
+type InboxItem={id:string;kind:string;status:string;title:string;customer_name?:string|null;phone?:string|null;scheduled_for?:string|null;created_at:string};
+type PreviewResult={turn?:{reply:string;intent:string;confidence:number;action?:Action|null;shouldHandoff:boolean;handoffReason?:string|null}};
 
 export default function EmployeeLab(){
   const [business,setBusiness]=useState<{id:string;name:string}|null>(null);
@@ -19,16 +20,24 @@ export default function EmployeeLab(){
   const [message,setMessage]=useState("");
   const [turns,setTurns]=useState<Turn[]>([]);
   const [lastResult,setLastResult]=useState<PreviewResult["turn"]|null>(null);
+  const [inbox,setInbox]=useState<InboxItem[]>([]);
   const [busy,setBusy]=useState(false);
+  const [actionBusy,setActionBusy]=useState(false);
   const [notice,setNotice]=useState("");
 
   const selected=useMemo(()=>employees.find(item=>item.id===selectedId)||employees[0]||null,[employees,selectedId]);
+
+  async function refreshInbox(businessId?:string){
+    const id=businessId||business?.id;if(!id)return;
+    const response=await fetch(`/api/employee/inbox?businessId=${encodeURIComponent(id)}`,{cache:"no-store"});
+    const data=await response.json().catch(()=>({}));if(response.ok)setInbox(data.items||[]);
+  }
 
   async function refresh(){
     const [studioResponse,employeeResponse]=await Promise.all([fetch("/api/studio/overview",{cache:"no-store"}),fetch("/api/employees",{cache:"no-store"})]);
     const studio=await studioResponse.json().catch(()=>({}));
     const employeeData=await employeeResponse.json().catch(()=>({}));
-    if(studioResponse.ok&&studio.business)setBusiness(studio.business);
+    if(studioResponse.ok&&studio.business){setBusiness(studio.business);void refreshInbox(studio.business.id);}
     if(employeeResponse.ok){setEmployees(employeeData.employees||[]);if(!selectedId&&employeeData.employees?.[0]?.id)setSelectedId(employeeData.employees[0].id);}
     else if(employeeData.error)setNotice(employeeData.error);
   }
@@ -55,6 +64,17 @@ export default function EmployeeLab(){
     }catch(error){setNotice(error instanceof Error?error.message:"employee_preview_failed");}finally{setBusy(false);}
   }
 
+  async function confirmAction(){
+    if(!selected||!lastResult?.action)return;
+    setActionBusy(true);setNotice("");
+    try{
+      const response=await fetch("/api/employee/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({employeeId:selected.id,action:lastResult.action,callerConfirmed:true,idempotencyKey:`preview:${crypto.randomUUID()}`})});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||"employee_action_failed");
+      setNotice(data.inbox?`Գործողությունը գրանցվեց HAY Inbox-ում՝ ${data.inbox.kind}.`:data.executed?"Գործողությունը հաստատվեց։":"Գործողությունը սպասում է հաստատման։");
+      await refreshInbox();
+    }catch(error){setNotice(error instanceof Error?error.message:"employee_action_failed");}finally{setActionBusy(false);}
+  }
+
   return <main className="employeePage">
     <header className="employeeNav"><a href="/"><HayLogo/></a><nav><a href="/studio">MARKETING OS</a><a href="/language">LANGUAGE</a><a href="/voice">VOICE</a><a href="/developers">DEVELOPERS</a></nav><span>HAY / AI EMPLOYEE</span></header>
 
@@ -77,7 +97,9 @@ export default function EmployeeLab(){
         <div className="employeeInput"><textarea value={message} onChange={event=>setMessage(event.target.value)} placeholder="Խոսեք ինչպես իրական հաճախորդը…" onKeyDown={event=>{if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();send();}}}/><button onClick={send} disabled={busy||!selected||!message.trim()}>{busy?"THINKING ···":"SEND →"}</button></div>
       </section>
 
-      <aside className="employeeTelemetry"><header><span>DECISION / ACTION</span><b>{lastResult?"LIVE":"STANDBY"}</b></header>{lastResult?<><dl><div><dt>INTENT</dt><dd>{lastResult.intent}</dd></div><div><dt>CONFIDENCE</dt><dd>{Math.round(lastResult.confidence*100)}%</dd></div><div><dt>HANDOFF</dt><dd>{lastResult.shouldHandoff?"YES":"NO"}</dd></div></dl>{lastResult.action?<div className="employeeAction"><span>PROPOSED ACTION</span><b>{lastResult.action.type}</b><p>{lastResult.action.summaryHy}</p><small>{lastResult.action.requiresConfirmation?"CALLER CONFIRMATION REQUIRED":"NO CALLER CONFIRMATION REQUIRED"}</small></div>:<div className="employeeNoAction">No external action proposed.</div>}</>:<p className="employeeTelemetryHelp">HAY separates speech from action. The model may suggest what to do; the action gate decides whether the business system may actually do it.</p>}</aside>
+      <aside className="employeeTelemetry"><header><span>DECISION / ACTION</span><b>{lastResult?"LIVE":"STANDBY"}</b></header>{lastResult?<><dl><div><dt>INTENT</dt><dd>{lastResult.intent}</dd></div><div><dt>CONFIDENCE</dt><dd>{Math.round(lastResult.confidence*100)}%</dd></div><div><dt>HANDOFF</dt><dd>{lastResult.shouldHandoff?"YES":"NO"}</dd></div></dl>{lastResult.action?<div className="employeeAction"><span>PROPOSED ACTION</span><b>{lastResult.action.type}</b><p>{lastResult.action.summaryHy}</p><small>{lastResult.action.requiresConfirmation?"CALLER CONFIRMATION REQUIRED":"NO CALLER CONFIRMATION REQUIRED"}</small><button onClick={confirmAction} disabled={actionBusy}>{actionBusy?"CAPTURING…":"CONFIRM + CAPTURE →"}</button></div>:<div className="employeeNoAction">No external action proposed.</div>}</>:<p className="employeeTelemetryHelp">HAY separates speech from action. The model may suggest what to do; the action gate decides whether the business system may actually do it.</p>}
+        <div className="employeeInbox"><span>HAY INBOX</span>{inbox.length?inbox.slice(0,5).map(item=><div key={item.id}><b>{item.kind}</b><p>{item.title}</p><small>{item.status}{item.scheduled_for?` · ${new Date(item.scheduled_for).toLocaleString()}`:""}</small></div>):<p>No captured work yet.</p>}</div>
+      </aside>
     </section>
     {notice&&<div className="employeeNotice">{notice}</div>}
 
