@@ -31,16 +31,17 @@ import "./quality.css";
 import "./login.css";
 import "./product-ui.css";
 import "./product-ui-legacy.css";
+import "./redesign-v7.css";
 
 export const metadata: Metadata = {
-  title: "HAY Engine — AI Marketing Autopilot for Armenia",
-  description: "Connect your business once. HAY plans, creates and operates Armenian-first marketing with content, voice, publishing, memory and outcome learning.",
+  title: "HAY — Armenian-first Marketing OS",
+  description: "HAY understands the business, plans the next move, creates Armenian-first content, publishes with approval and learns from outcomes.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="hy">
-      <body>{children}</body>
+      <body className="hay-ui">{children}</body>
     </html>
   );
 }
