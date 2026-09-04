@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "outDir": "../.employee-benchmark-build",
+    "rootDir": "..",
+    "types": ["node"]
+  },
+  "include": [
+    "employee-call-benchmark-check.ts",
+    "../lib/employee/call-benchmark.ts",
+    "../lib/employee/types.ts"
+  ]
+}

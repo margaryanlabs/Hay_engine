@@ -38,7 +38,7 @@ const endpoints=[
   {path:"app/api/v1/language/pronounce/route.ts",provider:null},
   {path:"app/api/v1/language/captions/route.ts",provider:null},
   {path:"app/api/v1/language/translate/route.ts",provider:"await translateHayText("},
-  {path:"app/api/v1/language/transcribe/route.ts",provider:"await transcribeWithOpenAI("},
+  {path:"app/api/v1/language/transcribe/route.ts",provider:"await transcribeWithConfiguredProvider("},
 ];
 for(const endpoint of endpoints){
   const source=read(endpoint.path);

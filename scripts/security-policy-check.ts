@@ -81,13 +81,16 @@ assert.match(transcribeRouteSource,/checkLanguageProviderAccess\s*\(/,"Transcrip
 assert.doesNotMatch(transcribeRouteSource,/checkUsageAllowance\s*\(/,"Transcription must not regress to a non-atomic allowance check");
 assert.doesNotMatch(transcribeRouteSource,/recordUsage\s*\(/,"Transcription must not regress to record-at-end accounting");
 const transcribeFileValidation=transcribeRouteSource.indexOf("if (file.size>maxBytes)");
+const transcribeProviderSelection=transcribeRouteSource.indexOf("resolveTranscriptionProvider(");
+const transcribeGoogleBound=transcribeRouteSource.indexOf('selectedProvider==="google-chirp3"');
 const transcribeReserve=transcribeRouteSource.indexOf("await reserveUsage(");
 const transcribeDuplicate=transcribeRouteSource.indexOf("if(reservation.duplicate)",transcribeReserve);
-const transcribeProvider=transcribeRouteSource.indexOf("await transcribeWithOpenAI(");
+const transcribeProvider=transcribeRouteSource.indexOf("await transcribeWithConfiguredProvider(");
 const transcribeCommit=transcribeRouteSource.indexOf("await commitUsageReservation(",transcribeProvider);
-assert.ok(transcribeFileValidation>=0&&transcribeReserve>transcribeFileValidation,"Transcription must validate upload size before occupying quota");
-assert.ok(transcribeProvider>transcribeReserve,"Transcription must reserve quota before sending audio to OpenAI");
-assert.ok(transcribeDuplicate>transcribeReserve&&transcribeDuplicate<transcribeProvider,"Transcription idempotency duplicates must stop before OpenAI spend");
+assert.ok(transcribeFileValidation>=0&&transcribeProviderSelection>transcribeFileValidation,"Transcription must validate the upload before provider selection");
+assert.ok(transcribeGoogleBound>transcribeProviderSelection&&transcribeReserve>transcribeGoogleBound,"Provider-specific synchronous limits must be validated before occupying quota");
+assert.ok(transcribeProvider>transcribeReserve,"Transcription must reserve quota before sending audio to the selected STT provider");
+assert.ok(transcribeDuplicate>transcribeReserve&&transcribeDuplicate<transcribeProvider,"Transcription idempotency duplicates must stop before STT provider spend");
 assert.ok(transcribeCommit>transcribeProvider,"Transcription must commit usage only after provider output exists");
 assert.match(transcribeRouteSource,/pendingReservation[\s\S]*?releaseUsageReservation\(pendingReservation\)/,"Transcription must release still-pending quota when provider work fails before output");
 assert.match(transcribeRouteSource,/transcription_usage_commit_failed[\s\S]*?status:503/,"Transcription must fail closed if completed provider work cannot commit usage");
@@ -183,7 +186,7 @@ assert.match(contentFactorySource,/pendingVoiceReservation[\s\S]*?releaseUsageRe
 
 console.log(JSON.stringify({
   securityPolicy:"passed",
-  cases:84,
+  cases:88,
   providerCostRoutes:atomicMarketingRoutes.map(item=>item.path),
   languageCostRoutes:["app/api/translate/route.ts","app/api/transcribe/route.ts"],
   marketingPlanningAtomic:true,
@@ -191,6 +194,8 @@ console.log(JSON.stringify({
   marketingPlanExactResize:true,
   languageUsageAtomic:true,
   languagePreProviderIdempotency:true,
+  transcriptionProviderNeutral:true,
+  transcriptionProviderValidationBeforeReservation:true,
   transcriptionValidationBeforeReservation:true,
   transcriptionRawFallback:true,
   atomicBusinessOwnership:true,
