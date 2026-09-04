@@ -4,6 +4,7 @@ import { captureEmployeeAction,parseEmployeeActionType,sanitizeEmployeeActionPay
 import { actionCapturedReply,confirmationPrompt,parseCallerConfirmation } from "@/lib/employee/confirmation";
 import { employeeProfileFromRow } from "@/lib/employee/store";
 import { runEmployeeTurn } from "@/lib/employee/runtime";
+import { employeeSubscriptionEnforcementEnabled } from "@/lib/employee/subscription";
 import { createAdminClient,isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import type { EmployeeConversationTurn,EmployeeTurnResult } from "@/lib/employee/types";
 
@@ -58,11 +59,16 @@ export async function POST(request:Request){
 
     const provider="elevenlabs-speech-engine";
     let sessionId="";
-    const sessionLookup=await admin.from("ai_employee_sessions").select("id,state").eq("provider",provider).eq("external_session_id",externalSessionId).eq("employee_id",employee.id).maybeSingle();
+    const sessionLookup=await admin.from("ai_employee_sessions").select("id,state,metadata").eq("provider",provider).eq("external_session_id",externalSessionId).eq("employee_id",employee.id).maybeSingle();
     if(sessionLookup.error)return NextResponse.json({error:"employee_session_read_failed"},{status:500});
-    if(sessionLookup.data)sessionId=String(sessionLookup.data.id);
-    else{
-      const inserted=await admin.from("ai_employee_sessions").insert({owner_id:employee.ownerId,business_id:employee.businessId,employee_id:employee.id,channel:"phone",provider,external_session_id:externalSessionId,state:"active",consent_to_record:false,raw_transcript_retained:false,metadata:{transport:"speech-engine"}}).select("id,state").single();
+    if(sessionLookup.data){
+      sessionId=String(sessionLookup.data.id);
+      const metadata=sessionLookup.data.metadata&&typeof sessionLookup.data.metadata==="object"?sessionLookup.data.metadata as Record<string,unknown>:{};
+      if(employeeSubscriptionEnforcementEnabled()&&!metadata.callUsageId)return NextResponse.json({error:"employee_call_admission_required"},{status:409});
+      if(["completed","failed"].includes(String(sessionLookup.data.state)))return NextResponse.json({error:"employee_session_closed"},{status:409});
+    }else{
+      if(employeeSubscriptionEnforcementEnabled())return NextResponse.json({error:"employee_call_admission_required"},{status:409});
+      const inserted=await admin.from("ai_employee_sessions").insert({owner_id:employee.ownerId,business_id:employee.businessId,employee_id:employee.id,channel:"phone",provider,external_session_id:externalSessionId,state:"active",consent_to_record:false,raw_transcript_retained:false,metadata:{transport:"speech-engine",subscriptionEnforced:false}}).select("id,state").single();
       if(!inserted.error)sessionId=String(inserted.data.id);
       else if(String(inserted.error.code)==="23505"){
         const raced=await admin.from("ai_employee_sessions").select("id").eq("provider",provider).eq("external_session_id",externalSessionId).eq("employee_id",employee.id).maybeSingle();
