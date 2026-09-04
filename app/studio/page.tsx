@@ -18,7 +18,7 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const metadata = {
   title: "HAY Studio — Marketing OS",
-  description: "Analyze, create, publish and learn with the HAY Armenian-first Marketing OS.",
+  description: "Analyze, decide, create, publish and learn with HAY.",
 };
 
 type StudioPageProps={searchParams:Promise<{plan?:string|string[]}>};
@@ -38,21 +38,31 @@ export default async function StudioPage({searchParams}:StudioPageProps){
     if(error||!data?.claims?.sub)redirect(`/login?next=${encodeURIComponent(nextPath)}`);
   }
 
-  return <>
+  return <div className="studioAppV7">
     <StudioStatusRail/>
     <StudioCommercialRail/>
     <StudioWorkspaceSwitcher/>
+
     <MarketingOS/>
     <StudioTodayBrief/>
-    <StudioCampaignBrain/>
-    <StudioCampaignAnalytics/>
-    <StudioConversionBridge/>
-    <StudioDecisionConsole/>
-    <StudioScheduleQueue/>
-    <StudioContentSeries/>
-    <StudioContentMemory/>
-    <StudioPublishingPolicy/>
-    <StudioOnboarding/>
+
+    <div className="studioInsightGrid" aria-label="HAY intelligence and decision layer">
+      <StudioCampaignBrain/>
+      <StudioCampaignAnalytics/>
+      <StudioConversionBridge/>
+      <StudioDecisionConsole/>
+    </div>
+
+    <div className="studioExecutionGrid" aria-label="HAY publishing and memory layer">
+      <StudioScheduleQueue/>
+      <StudioContentSeries/>
+      <StudioContentMemory/>
+      <StudioPublishingPolicy/>
+    </div>
+
+    <div className="studioOnboardingWrap">
+      <StudioOnboarding/>
+    </div>
     <StudioCommandPalette/>
-  </>;
+  </div>;
 }
