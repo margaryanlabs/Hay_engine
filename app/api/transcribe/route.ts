@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { commitUsageReservation, releaseUsageReservation, reserveUsage, type UsageReservation } from "@/lib/commercial/usage-reservations";
 import { checkLanguageProviderAccess } from "@/lib/hay/api-access";
 import { correctArmenianTranscript } from "@/lib/hay/transcript";
-import { isOpenAITranscriptionConfigured, transcribeWithOpenAI } from "@/lib/providers/openai-transcription";
+import { resolveTranscriptionProvider, transcribeWithConfiguredProvider, transcriptionProviderReadiness } from "@/lib/providers/transcription";
 
 export const runtime = "nodejs";
+const GOOGLE_SYNC_MAX_BYTES = 10 * 1024 * 1024;
 
 function usageStatus(reason:string|undefined){
   if(reason==="unauthorized")return 401;
@@ -16,10 +17,7 @@ function usageStatus(reason:string|undefined){
 export async function GET() {
   return NextResponse.json({
     locale:"hy-AM",
-    providers:{
-      openai:{configured:isOpenAITranscriptionConfigured(),model:process.env.OPENAI_TRANSCRIBE_MODEL||"gpt-4o-transcribe"},
-      googleChirp3:{configured:false,adapter:"benchmark-planned",locale:"hy-AM"},
-    },
+    providers:transcriptionProviderReadiness(),
     correction:"hay-armenian-transcript-v1",
   });
 }
@@ -29,13 +27,10 @@ export async function POST(request: Request) {
   try {
     const access = await checkLanguageProviderAccess();
     if (!access.allowed) return NextResponse.json({error:access.reason},{status:access.reason==="unauthorized"?401:403});
-    if (!isOpenAITranscriptionConfigured()) {
-      return NextResponse.json({configured:false,error:"transcription_provider_unconfigured",message:"Configure OPENAI_API_KEY to enable file transcription."},{status:503});
-    }
 
     // Validate the upload before occupying quota. Provider work starts only after the
-    // reservation succeeds, so concurrent large transcription requests cannot spend the
-    // same remaining content credit.
+    // reservation succeeds, so concurrent transcription requests cannot spend the same
+    // remaining content credit.
     const form = await request.formData();
     const file = form.get("file");
     if (!(file instanceof File)) return NextResponse.json({error:"audio_file_required"},{status:400});
@@ -45,6 +40,14 @@ export async function POST(request: Request) {
 
     const requestedLanguage = String(form.get("language")||"hy").trim().toLowerCase();
     const language = requestedLanguage==="hy-am"?"hy":requestedLanguage;
+    const selectedProvider=resolveTranscriptionProvider(form.get("provider"),language);
+    if(!selectedProvider){
+      return NextResponse.json({configured:false,error:"transcription_provider_unconfigured",providers:transcriptionProviderReadiness()},{status:503});
+    }
+    if(selectedProvider==="google-chirp3"&&file.size>GOOGLE_SYNC_MAX_BYTES){
+      return NextResponse.json({error:"google_chirp3_sync_audio_too_large",maxBytes:GOOGLE_SYNC_MAX_BYTES,maxSeconds:60},{status:413});
+    }
+
     const businessId=typeof form.get("businessId")==="string"?String(form.get("businessId")):null;
     const rawRequestId=typeof form.get("requestId")==="string"?String(form.get("requestId")).trim().slice(0,200):"";
     const reservation=await reserveUsage({
@@ -53,7 +56,7 @@ export async function POST(request: Request) {
       businessId,
       source:"language_transcribe",
       idempotencyKey:rawRequestId?`transcribe:${rawRequestId}`:undefined,
-      metadata:{audioBytes:file.size,language,filename:file.name||"audio.webm"},
+      metadata:{audioBytes:file.size,language,provider:selectedProvider,filename:file.name||"audio.webm"},
     });
     if(!reservation.allowed){
       return NextResponse.json({error:reservation.reason,meter:"content_assets",required:1,commercial:reservation.context},{status:usageStatus(reservation.reason)});
@@ -63,11 +66,12 @@ export async function POST(request: Request) {
     }
     pendingReservation=reservation;
 
-    const raw = await transcribeWithOpenAI({
+    const raw = await transcribeWithConfiguredProvider({
       bytes:new Uint8Array(await file.arrayBuffer()),
       filename:file.name||"audio.webm",
       contentType:file.type||"application/octet-stream",
       language:language||undefined,
+      provider:selectedProvider,
     });
     if (!raw) {
       await releaseUsageReservation(reservation).catch(()=>undefined);pendingReservation=null;
