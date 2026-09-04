@@ -32,19 +32,19 @@ export default function StudioStatusRail(){
   const providers=health?.providers;
   const persistence=health?.persistence;
   const cells=[
-    {k:"AI BRAIN",v:providers?.planner?"READY":"SETUP",ok:Boolean(providers?.planner),href:"/studio"},
-    {k:"HAY VOICE",v:providers?.voice?"READY":"SETUP",ok:Boolean(providers?.voice),href:"/voice"},
-    {k:"VIDEO",v:providers?.video?"VEO READY":"SETUP",ok:Boolean(providers?.video),href:"/creator"},
-    {k:"DATABASE",v:persistence?.supabase&&persistence?.admin?"READY":persistence?.supabase?"PARTIAL":"SETUP",ok:Boolean(persistence?.supabase&&persistence?.admin),href:"/login"},
+    {k:"PLANNER",v:providers?.planner?"READY":"SETUP",ok:Boolean(providers?.planner),href:"/studio"},
+    {k:"VOICE",v:providers?.voice?"READY":"SETUP",ok:Boolean(providers?.voice),href:"/voice"},
+    {k:"VIDEO",v:providers?.video?"READY":"SETUP",ok:Boolean(providers?.video),href:"/creator"},
+    {k:"DATA",v:persistence?.supabase&&persistence?.admin?"READY":persistence?.supabase?"PARTIAL":"SETUP",ok:Boolean(persistence?.supabase&&persistence?.admin),href:"/login"},
     {k:"RENDER",v:providers?.renderWorker?"READY":"SETUP",ok:Boolean(providers?.renderWorker),href:"/creator"},
-    {k:"SOCIAL",v:`${socialReady}/4 READY`,ok:socialReady>0,href:"/studio"},
+    {k:"CHANNELS",v:`${socialReady}/4 READY`,ok:socialReady>0,href:"/studio"},
   ];
   const liveCount=cells.filter(cell=>cell.ok).length;
-  const mode=failed?"HEALTH OFFLINE":health?.mode==="provider-enabled"?"PROVIDER ENABLED":health?"DEMO MODE":"CHECKING";
+  const mode=failed?"STATUS UNAVAILABLE":health?.mode==="provider-enabled"?"CONNECTED":health?"LOCAL / DEMO":"CHECKING";
 
   return <section className="studioStatusRail" aria-label="HAY system readiness">
-    <div className="studioStatusIntro"><span><i/>HAY COMMAND / LIVE SYSTEM</span><b>{mode} · {liveCount}/6 CORE LAYERS ACTIVE</b></div>
+    <div className="studioStatusIntro"><span><i/>SYSTEM STATUS</span><b>{mode} · {liveCount}/6 SERVICES READY</b></div>
     <div className="studioStatusCells">{cells.map(cell=><a key={cell.k} href={cell.href} className={cell.ok?"ready":"setup"}><span>{cell.k}</span><strong>{health?cell.v:"CHECKING"}</strong><i/></a>)}</div>
-    <a className="studioStatusQuality" href="/quality"><span>ARMENIAN QUALITY</span><strong>100/100</strong><small>100 regression cases · release gate</small></a>
+    <a className="studioStatusQuality" href="/quality"><span>ARMENIAN QUALITY</span><strong>VIEW REPORT</strong><small>deterministic release checks</small></a>
   </section>;
 }
