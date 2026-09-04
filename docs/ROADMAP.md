@@ -71,15 +71,17 @@ This file tracks what is actually missing in the current repository. Completed i
 - [x] owner-scoped account entitlement schema
 - [x] append-only Studio usage ledger
 - [x] server-side content / video / voice usage enforcement
+- [x] atomic Studio quota reservations with exact resize + commit
 - [x] brand-workspace and social-channel limit enforcement
 - [x] live Studio plan / usage visibility
 - [x] provider-neutral hosted checkout contract
 - [x] trusted server-to-server billing entitlement sync endpoint
+- [x] replay-safe / stale-event-safe atomic billing event application
 - [x] persistent Studio auth gate and plan-preserving magic-link flow
 - [x] commercial readiness diagnostics in `/api/setup/status`
 - [x] server-only developer credential schema with one-time raw secret and SHA-256-at-rest keys
 - [x] separate developer API request / character / audio-byte metering
-- [x] fail-closed per-key hourly API rate-limit infrastructure
+- [x] atomic per-key hourly Developer API request admission
 - [ ] choose/configure production billing provider and hosted checkout URLs
 - [ ] wire that provider's verified webhook adapter to `/api/billing/sync`
 - [ ] define developer API quota / overage pricing by commercial plan
@@ -114,21 +116,22 @@ This file tracks what is actually missing in the current repository. Completed i
 ## Go-live checklist
 
 1. Create a dedicated HAY Supabase project; do not reuse Meqena or the old shared Margaryan Labs database.
-2. Apply the canonical HAY Supabase migrations through `009_language_corrections_and_dataset_registry.sql`.
-3. Verify `/api/setup/status` reports the commercial/developer schemas, pronunciation registry and correction flywheel correctly.
+2. Apply the full canonical HAY Supabase sequence through `013_atomic_billing_events.sql` — including `007_commercial_core.sql`, `008_language_registry.sql`, `009_language_corrections_and_dataset_registry.sql`, `010_atomic_usage_reservations.sql`, `011_atomic_usage_resize.sql`, `012_atomic_developer_api_requests.sql` and `013_atomic_billing_events.sql` in the README order.
+3. Verify operator-authenticated `/api/setup/status` reports `commercial.migration=true`, `commercial.atomicUsageMigration=true`, `commercial.billingEventMigration=true`, `developerApi.migration=true`, plus the pronunciation registry and correction flywheel as ready.
 4. Configure at least one server-only `HAY_LANGUAGE_REVIEWER_EMAILS` reviewer before operating the correction review queue.
 5. Configure provider keys and workers required by the launch package; add `PEXELS_API_KEY` if Creator should resolve stock scenes automatically.
 6. Configure Creator / Growth / Business hosted checkout URLs and `HAY_BILLING_SYNC_SECRET`.
-7. Verify the chosen payment provider's signed webhook, then call HAY `/api/billing/sync` from that trusted adapter.
-8. Set `HAY_ENFORCE_PLANS=true` only after migration + billing sync are verified.
-9. For Developer API launch, choose a positive `HAY_DEVELOPER_API_HOURLY_REQUEST_LIMIT`, create a test `hay_live_*` key, verify success + `429` behavior + usage recording + revoke, then set `HAY_DEVELOPER_API_ENABLED=true`.
+7. Verify the chosen payment provider's signed webhook before it calls HAY `/api/billing/sync`; pass the verified provider event ID, provider event creation time and exact billing period so replay/stale-event protection is active.
+8. Set `HAY_ENFORCE_PLANS=true` only after migrations `007`, `010`, `011` and `013` are applied, `/api/setup/status` is green for commercial readiness, and billing sync has been smoke-tested with a verified event plus a replayed duplicate.
+9. For Developer API launch, apply `007` + `012`, choose a positive `HAY_DEVELOPER_API_HOURLY_REQUEST_LIMIT`, create a test `hay_live_*` key, verify success + atomic `429` behavior under concurrent requests + usage enrichment + revoke, then set `HAY_DEVELOPER_API_ENABLED=true`.
 10. In `/pronunciations`, create/update/archive an account override and one owned-business override; confirm versions increment and runtime precedence falls back correctly.
 11. In `/corrections`, verify a private no-consent correction never appears in the reviewer queue; verify a product-improvement-consented correction can be accepted; then withdraw it and confirm linked dataset eligibility is withdrawn.
 12. Verify a consented pronunciation correction can be promoted to `hay-reviewed`, then withdraw it and confirm only the matching consent-sourced pronunciation is archived.
 13. Generate a Creator project containing at least one stock scene and verify Pexels credit/source survives preview, save and render.
-14. Run `npm run typecheck`, `npm run quality`, `npm run build`, render-worker check and publish-worker check.
-15. Onboard the first real businesses in managed mode and measure time-to-first-useful-plan, publish success and attributed outcomes.
-16. Collect independent blind native-speaker benchmark reviews before making comparative "best Armenian" claims.
+14. Run the complete release suite: `npm audit --omit=dev --audit-level=high`, env/security/accounting/UI contracts, `npm run typecheck`, `npm run quality`, `npm run build`, runtime smoke, render-worker check and publish-worker check.
+15. Run one end-to-end managed-business test: sign in → create business → connect at least one social channel → generate plan/content → Armenian voice/render → approve/publish → verify attribution and commercial usage.
+16. Onboard the first real businesses in managed mode and measure time-to-first-useful-plan, publish success and attributed outcomes.
+17. Collect independent blind native-speaker benchmark reviews before making comparative "best Armenian" claims.
 
 ## Non-goal
 
