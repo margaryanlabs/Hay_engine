@@ -16,6 +16,8 @@
     "security:direct-providers": "node scripts/direct-provider-policy-check.mjs",
     "security:developer-api": "node scripts/developer-api-policy-check.mjs",
     "security:billing": "node scripts/billing-policy-check.mjs",
+    "security:employee": "node scripts/employee-policy-check.mjs",
+    "voice-worker:check": "node --check voice-worker/src/index.mjs",
     "ui:contract": "node scripts/ui-contract-check.mjs",
     "env:check": "node scripts/env-contract.mjs",
     "smoke": "node scripts/runtime-smoke.mjs"
