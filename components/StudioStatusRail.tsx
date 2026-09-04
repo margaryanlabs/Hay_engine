@@ -40,10 +40,14 @@ export default function StudioStatusRail(){
     {k:"CHANNELS",v:`${socialReady}/4 READY`,ok:socialReady>0,href:"/studio"},
   ];
   const liveCount=cells.filter(cell=>cell.ok).length;
+  const hasSetupIssue=cells.some(cell=>!cell.ok);
   const mode=failed?"STATUS UNAVAILABLE":health?.mode==="provider-enabled"?"CONNECTED":health?"LOCAL / DEMO":"CHECKING";
 
+  if(!health&&!failed)return null;
+  if(health?.mode==="provider-enabled"&&!hasSetupIssue)return null;
+
   return <section className="studioStatusRail" aria-label="HAY system readiness">
-    <div className="studioStatusIntro"><span><i/>SYSTEM STATUS</span><b>{mode} · {liveCount}/6 SERVICES READY</b></div>
+    <div className="studioStatusIntro"><span><i/>SETUP STATUS</span><b>{mode} · {liveCount}/6 SERVICES READY</b></div>
     <div className="studioStatusCells">{cells.map(cell=><a key={cell.k} href={cell.href} className={cell.ok?"ready":"setup"}><span>{cell.k}</span><strong>{health?cell.v:"CHECKING"}</strong><i/></a>)}</div>
     <a className="studioStatusQuality" href="/quality"><span>ARMENIAN QUALITY</span><strong>VIEW REPORT</strong><small>deterministic release checks</small></a>
   </section>;

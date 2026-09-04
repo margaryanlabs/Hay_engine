@@ -17,6 +17,14 @@ type Context={
 const label={content_assets:"CONTENT",ai_video_credits:"VIDEO",voice_minutes:"VOICE"} as const;
 const paidPlans=new Set<PaidPlan>(["creator","growth","business","agency"]);
 
+function clearRequestedPlan(){
+  if(typeof window==="undefined")return;
+  const url=new URL(window.location.href);
+  if(!url.searchParams.has("plan"))return;
+  url.searchParams.delete("plan");
+  window.history.replaceState({},"",`${url.pathname}${url.search}${url.hash}`);
+}
+
 export default function StudioCommercialRail(){
   const [context,setContext]=useState<Context|null>(null);
   const [message,setMessage]=useState("");
@@ -27,6 +35,11 @@ export default function StudioCommercialRail(){
   useEffect(()=>{
     if(!context||attemptedPlan.current)return;
     const requested=new URLSearchParams(window.location.search).get("plan") as PaidPlan|null;
+    if(requested&&paidPlans.has(requested)&&requested===context.planId){
+      attemptedPlan.current=true;
+      clearRequestedPlan();
+      return;
+    }
     if(requested&&paidPlans.has(requested)&&requested!==context.planId){
       attemptedPlan.current=true;
       void upgrade(requested);
@@ -47,6 +60,7 @@ export default function StudioCommercialRail(){
       const response=await fetch("/api/billing/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan})});
       const data=await response.json();
       if(!response.ok){setMessage(data.message||data.error||"Checkout is not configured yet.");return;}
+      clearRequestedPlan();
       window.location.assign(data.checkoutUrl);
     }catch{setMessage("Checkout is temporarily unavailable.");}
     finally{setBusy(null);}
