@@ -30,6 +30,7 @@ export default function LanguageLab(){
 
   const actualSttProvider=mode==="transcribe"&&result&&typeof result.provider==="string"?String(result.provider):null;
   const actualSttModel=mode==="transcribe"&&result&&typeof result.model==="string"?String(result.model):null;
+  const outputStatus=actualSttProvider?`${actualSttProvider}${actualSttModel?` · ${actualSttModel}`:""}`:result?"READY":"STANDBY";
 
   async function run(){
     setBusy(true);setMessage("");setResult(null);
@@ -82,8 +83,7 @@ export default function LanguageLab(){
         {message&&<div className="languageMessage">{message}</div>}
       </div>
       <aside className="languageOutput">
-        <header><span>OUTPUT / 02</span><b>{result?"READY":"STANDBY"}</b></header>
-        {actualSttProvider&&<div className="languageProviderResult"><span>STT</span><b>{actualSttProvider}</b>{actualSttModel&&<small>{actualSttModel}</small>}</div>}
+        <header><span>OUTPUT / 02</span><b>{outputStatus}</b></header>
         <div className="languageOutputText"><small>{mode==="pronounce"?"SPOKEN FORM":mode==="captions"?"SRT / STRUCTURED CUES":"HAY RESULT"}</small><pre>{output}</pre></div>
         {result&&<details><summary>STRUCTURED JSON</summary><pre>{JSON.stringify(result,null,2)}</pre></details>}
       </aside>
