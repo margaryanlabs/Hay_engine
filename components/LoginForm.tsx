@@ -6,10 +6,20 @@ import HayLogo from "./HayLogo";
 
 type SetupStatus = { mode?: "demo" | "persistent"; persistence?: { supabase?: boolean } };
 
+const allowedPlans=new Set(["free","creator","growth","business","agency"]);
+
 function safeNextPath(){
   if(typeof window==="undefined")return "/studio";
-  const value=new URLSearchParams(window.location.search).get("next")||"/studio";
-  return value.startsWith("/")&&!value.startsWith("//")?value:"/studio";
+  const params=new URLSearchParams(window.location.search);
+  const value=params.get("next")||"/studio";
+  const safe=value.startsWith("/")&&!value.startsWith("//")?value:"/studio";
+  const plan=params.get("plan");
+  if(plan&&allowedPlans.has(plan)&&safe.startsWith("/studio")){
+    const target=new URL(safe,window.location.origin);
+    if(!target.searchParams.has("plan"))target.searchParams.set("plan",plan);
+    return `${target.pathname}${target.search}${target.hash}`;
+  }
+  return safe;
 }
 
 export default function LoginForm() {
@@ -40,7 +50,7 @@ export default function LoginForm() {
   async function signIn(event: FormEvent) {
     event.preventDefault();
     if (!persistenceReady) {
-      setMessage("HAY is running in demo mode. A dedicated HAY Supabase project must be activated before accounts and social connections can be saved.");
+      setMessage("Accounts are not active yet because HAY persistence is not connected.");
       return;
     }
     setBusy(true); setMessage("");
@@ -56,5 +66,5 @@ export default function LoginForm() {
     } finally { setBusy(false); }
   }
 
-  return <main className="loginPage"><section className="loginPanel"><a href="/"><HayLogo /></a><div className="loginIndex">ACCOUNT / 01 · {setup?.mode?.toUpperCase() || "CHECKING"}</div><h1>Մեկ բիզնես։<br/><span>Մեկ մարքեթինգային ուղեղ։</span></h1><p>{persistenceReady ? "Sign in to save businesses, connect social channels, keep Creator projects and run HAY Marketing OS continuously." : "Demo mode is active: strategy and Creator can be explored while persistent accounts and social authorization wait for the dedicated HAY database."}</p><form onSubmit={signIn}><label>Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.am" disabled={!persistenceReady} /></label><button className="hayPrimary" disabled={busy || !persistenceReady}>{busy ? "···" : persistenceReady ? "Continue with secure link" : "Persistence not activated"}</button></form>{!persistenceReady && <a href="/" className="haySecondary" style={{display:"inline-flex",marginTop:12,textDecoration:"none"}}>Continue in demo mode →</a>}{message && <div className="loginMessage">{message}</div>}<small>HAY never asks for your Instagram, TikTok or YouTube password. Social accounts connect through provider authorization.</small></section><aside className="loginAside"><div className="loginGlyph">Հ</div><div><span>ANALYZE</span><span>STRATEGIZE</span><span>CREATE</span><span>PUBLISH</span><span>LEARN</span></div></aside></main>;
+  return <main className="loginPage"><section className="loginPanel"><a href="/"><HayLogo /></a><div className="loginIndex">ACCOUNT / {setup?.mode?.toUpperCase() || "CHECKING"}</div><h1>Մեկ բիզնես։<br/><span>Մեկ աշխատանքային կոնտեքստ։</span></h1><p>{persistenceReady ? "Sign in to save the business, connect channels, keep Creator projects and continue from the same context every time." : "You can explore the product now. Accounts, saved businesses and social authorization become available when HAY persistence is connected."}</p><form onSubmit={signIn}><label>Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.am" disabled={!persistenceReady} /></label><button className="hayPrimary" disabled={busy || !persistenceReady}>{busy ? "···" : persistenceReady ? "Continue with secure link" : "Accounts not active yet"}</button></form>{!persistenceReady && <a href="/" className="haySecondary" style={{display:"inline-flex",marginTop:12,textDecoration:"none"}}>Explore HAY →</a>}{message && <div className="loginMessage">{message}</div>}<small>HAY never asks for your Instagram, TikTok or YouTube password. Social accounts connect through provider authorization.</small></section><aside className="loginAside"><div className="loginGlyph">Հ</div><div><span>CONTEXT</span><span>PLAN</span><span>CREATE</span><span>APPROVE</span><span>PUBLISH</span></div></aside></main>;
 }

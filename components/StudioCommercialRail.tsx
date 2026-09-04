@@ -38,7 +38,7 @@ export default function StudioCommercialRail(){
       const response=await fetch("/api/account/entitlement",{cache:"no-store"});
       const data=await response.json();
       if(response.ok||data.configured===false)setContext(data);
-    }catch{/* Studio still works if commercial diagnostics are temporarily unavailable. */}
+    }catch{/* Studio still works if plan diagnostics are temporarily unavailable. */}
   }
 
   async function upgrade(plan:PaidPlan){
@@ -60,13 +60,12 @@ export default function StudioCommercialRail(){
   ];
 
   return <section className="studioCommercial" aria-label="HAY plan and usage">
-    <header><div><span>HAY / COMMERCIAL</span><strong>{context.planId.toUpperCase()}</strong></div><div className={`commercialState ${context.status}`}>{context.status.toUpperCase()}</div></header>
+    <header><div><span>PLAN & USAGE</span><strong>{context.planId.toUpperCase()}</strong></div><div className={`commercialState ${context.status}`}>{context.status.toUpperCase()}</div></header>
     <div className="commercialMeters">{meters.map(item=>{
       const ratio=item.limit?Math.min(100,(item.used/item.limit)*100):0;
       return <div className="commercialMeter" key={item.key}><div><span>{label[item.key]}</span><b>{Math.round(item.used*10)/10} / {item.limit} {item.unit}</b></div><i><b style={{width:`${ratio}%`}}/></i></div>;
     })}</div>
     <footer>
-      <div><span>{context.enforcementEnabled?"PLAN LIMITS ON":"PLAN LIMITS READY"}</span>{!context.migrationReady&&<b>APPLY 007 MIGRATION</b>}</div>
       {context.planId==="free"&&<button disabled={busy!==null} onClick={()=>upgrade("creator")}>{busy?"…":"UPGRADE →"}</button>}
       {context.planId==="creator"&&<button disabled={busy!==null} onClick={()=>upgrade("growth")}>{busy?"…":"MOVE TO GROWTH →"}</button>}
       {context.planId==="growth"&&<button disabled={busy!==null} onClick={()=>upgrade("business")}>{busy?"…":"MOVE TO BUSINESS →"}</button>}
