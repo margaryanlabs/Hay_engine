@@ -29,14 +29,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=high
+      - name: Audit production dependencies
+        run: npm audit --package-lock-only --omit=dev --audit-level=high || (sleep 15 && npm audit --package-lock-only --omit=dev --audit-level=high)
       - run: npm run env:check
       - run: npm run security:policy
       - run: npm run security:regeneration
       - run: npm run security:direct-providers
       - run: npm run security:developer-api
       - run: npm run security:billing
+      - run: npm run security:accounting-surface
+      - run: npm run security:transcription
       - run: npm run security:employee
+      - run: npm run quality:employee-call
       - run: npm run voice-worker:check
       - run: npm run ui:contract
       - run: npm run typecheck
@@ -57,7 +61,8 @@ jobs:
           cache: npm
           cache-dependency-path: render-worker/package-lock.json
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=high
+      - name: Audit production dependencies
+        run: npm audit --package-lock-only --omit=dev --audit-level=high || (sleep 15 && npm audit --package-lock-only --omit=dev --audit-level=high)
       - run: npm run check
 
   publish-worker:
@@ -73,5 +78,6 @@ jobs:
           cache: npm
           cache-dependency-path: publish-worker/package-lock.json
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=high
+      - name: Audit production dependencies
+        run: npm audit --package-lock-only --omit=dev --audit-level=high || (sleep 15 && npm audit --package-lock-only --omit=dev --audit-level=high)
       - run: npm run check
