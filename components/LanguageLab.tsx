@@ -5,6 +5,7 @@ import HayLogo from "./HayLogo";
 
 type Mode="pronounce"|"translate"|"captions"|"transcribe";
 type Locale="hy"|"en"|"ru";
+type SttProvider="openai"|"google-chirp3"|"auto";
 
 const initial="Instagram-ում այսօր նոր առաջարկ ունենք՝ 14,900 ֏։ HAY-ը պատրաստում է բնական հայերեն կոնտենտ։";
 
@@ -14,6 +15,7 @@ export default function LanguageLab(){
   const [target,setTarget]=useState<Locale>("en");
   const [duration,setDuration]=useState(15);
   const [file,setFile]=useState<File|null>(null);
+  const [sttProvider,setSttProvider]=useState<SttProvider>("openai");
   const [busy,setBusy]=useState(false);
   const [result,setResult]=useState<Record<string,unknown>|null>(null);
   const [message,setMessage]=useState("");
@@ -26,13 +28,20 @@ export default function LanguageLab(){
     return JSON.stringify(result,null,2);
   },[result]);
 
+  const actualSttProvider=mode==="transcribe"&&result&&typeof result.provider==="string"?String(result.provider):null;
+  const actualSttModel=mode==="transcribe"&&result&&typeof result.model==="string"?String(result.model):null;
+
   async function run(){
     setBusy(true);setMessage("");setResult(null);
     try{
       let response:Response;
       if(mode==="transcribe"){
         if(!file)throw new Error("Choose an audio file first.");
-        const form=new FormData();form.append("file",file);form.append("language","hy");form.append("correct","true");
+        const form=new FormData();
+        form.append("file",file);
+        form.append("language","hy");
+        form.append("correct","true");
+        form.append("provider",sttProvider);
         response=await fetch("/api/transcribe",{method:"POST",body:form});
       }else{
         const endpoint=mode==="pronounce"?"/api/pronounce":mode==="translate"?"/api/translate":"/api/captions";
@@ -50,7 +59,7 @@ export default function LanguageLab(){
     pronounce:"Display text → speech-safe Armenian. Handles commercial numbers, currencies, brands, suffixes and code-switching.",
     translate:"Translate HY / EN / RU while preserving prices, numbers, URLs, brand tokens and natural Armenian syntax.",
     captions:"Generate production-ready cue timing plus SRT and WebVTT from text, or use provider alignment through the API.",
-    transcribe:"Audio → STT → HAY Armenian correction. The correction layer refuses edits that lose protected values or brand tokens.",
+    transcribe:"Audio → selectable STT provider → HAY Armenian correction. Compare OpenAI and Chirp 3 without changing the Armenian control layer.",
   };
 
   return <main className="languageLabPage">
@@ -63,22 +72,24 @@ export default function LanguageLab(){
       <div className="languageComposer">
         <header><span>INPUT / {mode.toUpperCase()}</span><b>HY-AM</b></header>
         <p>{descriptions[mode]}</p>
-        {mode!=="transcribe"?<textarea value={text} onChange={event=>setText(event.target.value)} maxLength={7000}/>:<label className="languageDrop"><input type="file" accept="audio/*,.mp3,.wav,.m4a,.webm,.mp4" onChange={event=>setFile(event.target.files?.[0]||null)}/><span>{file?file.name:"Choose Armenian audio"}</span><small>{file?`${Math.round(file.size/1024)} KB`:"MP3 · WAV · M4A · WEBM · audio/video containers supported by the STT provider"}</small></label>}
+        {mode!=="transcribe"?<textarea value={text} onChange={event=>setText(event.target.value)} maxLength={7000}/>:<label className="languageDrop"><input type="file" accept="audio/*,.mp3,.wav,.m4a,.webm,.mp4" onChange={event=>setFile(event.target.files?.[0]||null)}/><span>{file?file.name:"Choose Armenian audio"}</span><small>{file?`${Math.round(file.size/1024)} KB`:"OpenAI up to HAY upload limit · Chirp 3 synchronous path up to 10 MB / 60 sec"}</small></label>}
         <div className="languageControls">
           {mode==="translate"&&<label>Target<select value={target} onChange={event=>setTarget(event.target.value as Locale)}><option value="hy">Armenian</option><option value="en">English</option><option value="ru">Russian</option></select></label>}
           {mode==="captions"&&<label>Duration<input type="number" min="1" max="3600" value={duration} onChange={event=>setDuration(Number(event.target.value)||15)}/><i>seconds</i></label>}
+          {mode==="transcribe"&&<label>STT provider<select value={sttProvider} onChange={event=>setSttProvider(event.target.value as SttProvider)}><option value="openai">OpenAI · default</option><option value="google-chirp3">Google · Chirp 3</option><option value="auto">Auto · Armenian routing</option></select></label>}
           <button onClick={run} disabled={busy||(mode==="transcribe"?!file:!text.trim())}>{busy?"PROCESSING ···":`RUN ${mode.toUpperCase()} →`}</button>
         </div>
         {message&&<div className="languageMessage">{message}</div>}
       </div>
       <aside className="languageOutput">
         <header><span>OUTPUT / 02</span><b>{result?"READY":"STANDBY"}</b></header>
+        {actualSttProvider&&<div className="languageProviderResult"><span>STT</span><b>{actualSttProvider}</b>{actualSttModel&&<small>{actualSttModel}</small>}</div>}
         <div className="languageOutputText"><small>{mode==="pronounce"?"SPOKEN FORM":mode==="captions"?"SRT / STRUCTURED CUES":"HAY RESULT"}</small><pre>{output}</pre></div>
         {result&&<details><summary>STRUCTURED JSON</summary><pre>{JSON.stringify(result,null,2)}</pre></details>}
       </aside>
     </section>
 
-    <section className="languageArchitecture"><div><span>HAY LANGUAGE PIPELINE</span><h2>Provider in. Armenian control out.</h2></div><ol><li><b>01</b><span>FOUNDATION PROVIDER</span><p>OpenAI STT / language models, ElevenLabs, Azure, future Chirp routing.</p></li><li><b>02</b><span>HAY CONTROL</span><p>Protected values, pronunciation graph, code-switch rules, transcript and editorial correction.</p></li><li><b>03</b><span>QUALITY GATE</span><p>Deterministic Armenian regressions plus reviewed blind benchmarks.</p></li><li><b>04</b><span>HUMAN MEMORY</span><p>Private corrections can become reviewed provenance only after explicit consent and human review.</p></li></ol></section>
+    <section className="languageArchitecture"><div><span>HAY LANGUAGE PIPELINE</span><h2>Provider in. Armenian control out.</h2></div><ol><li><b>01</b><span>FOUNDATION PROVIDER</span><p>OpenAI or Google Chirp 3 for STT; language models, ElevenLabs and Azure stay replaceable behind HAY boundaries.</p></li><li><b>02</b><span>HAY CONTROL</span><p>Protected values, pronunciation graph, code-switch rules, transcript and editorial correction.</p></li><li><b>03</b><span>QUALITY GATE</span><p>Deterministic Armenian regressions plus reviewed blind benchmarks.</p></li><li><b>04</b><span>HUMAN MEMORY</span><p>Private corrections can become reviewed provenance only after explicit consent and human review.</p></li></ol></section>
 
     <footer className="languageLabFooter"><span>HAY LANGUAGE API / V1</span><span>HY-AM FIRST · EN · RU</span><a href="/corrections">TEACH HAY A CORRECTION ↗</a></footer>
   </main>;
