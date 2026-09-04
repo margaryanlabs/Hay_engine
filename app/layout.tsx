@@ -32,6 +32,7 @@ import "./product-ui-legacy.css";
 import "./redesign-v7.css";
 import "./redesign-v7-labs.css";
 import "./landing-v7.css";
+import "./studio-v7-refine.css";
 
 export const metadata: Metadata = {
   title: "HAY — Marketing OS built for Armenia",
