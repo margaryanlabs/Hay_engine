@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import HayLogo from "./HayLogo";
 import PublishDialog from "./PublishDialog";
 import SocialBrandIcon from "./SocialBrandIcon";
+import { selectBusinessWorkspace } from "@/lib/studio/business-selection";
 import type { BusinessProfile, CompetitorInput, ContentItem, MarketingPlan, SocialConnection, SocialPlatform } from "@/lib/marketing/types";
 import type { Locale } from "@/lib/hay/types";
 
@@ -26,6 +27,7 @@ const copy = {
     contextText: "Բրենդ + շուկա + հիշողություն",
     decisionText: "Հաջորդ լավագույն քայլը",
     executionText: "Create → approve → publish",
+    firstRun: "Սկզբում լրացրու բիզնեսի անունն ու կատեգորիան։",
   },
   en: {
     eyebrow: "HAY STUDIO / ACTIVE WORKSPACE",
@@ -45,6 +47,7 @@ const copy = {
     contextText: "Brand + market + memory",
     decisionText: "The next best move",
     executionText: "Create → approve → publish",
+    firstRun: "Add the business name and category first.",
   },
   ru: {
     eyebrow: "HAY STUDIO / ACTIVE WORKSPACE",
@@ -64,6 +67,7 @@ const copy = {
     contextText: "Бренд + рынок + память",
     decisionText: "Следующее лучшее действие",
     executionText: "Create → approve → publish",
+    firstRun: "Сначала добавьте название и категорию бизнеса.",
   },
 } as const;
 
@@ -74,7 +78,20 @@ const channels: Array<{ platform: SocialPlatform; label: string }> = [
   { platform: "facebook", label: "Facebook" },
 ];
 
-const initialBusiness: BusinessProfile = {
+const emptyBusiness: BusinessProfile = {
+  name: "",
+  category: "",
+  description: "",
+  website: "",
+  location: "Yerevan, Armenia",
+  primaryLanguage: "hy",
+  goals: [],
+  audience: "",
+  offer: "",
+  tone: "",
+};
+
+const sampleBusiness: BusinessProfile = {
   name: "Ararat House",
   category: "Restaurant / Hospitality",
   description: "Modern Armenian restaurant with local ingredients, warm hospitality and contemporary presentation.",
@@ -88,12 +105,14 @@ const initialBusiness: BusinessProfile = {
 };
 
 const wait = (ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
+type WorkspaceMode="loading"|"account"|"preview";
 
 export default function MarketingOSV7(){
   const [locale,setLocale]=useState<Locale>("hy");
-  const [business,setBusiness]=useState<BusinessProfile>(initialBusiness);
+  const [business,setBusiness]=useState<BusinessProfile>(emptyBusiness);
   const [businessId,setBusinessId]=useState<string|null>(null);
-  const [competitorText,setCompetitorText]=useState("Lavash Restaurant\nSherep Restaurant");
+  const [workspaceMode,setWorkspaceMode]=useState<WorkspaceMode>("loading");
+  const [competitorText,setCompetitorText]=useState("");
   const [plan,setPlan]=useState<MarketingPlan|null>(null);
   const [intelligence,setIntelligence]=useState<MarketingPlan["brand"]|null>(null);
   const [connections,setConnections]=useState<SocialConnection[]>([]);
@@ -112,9 +131,18 @@ export default function MarketingOSV7(){
     .filter(Boolean)
     .map(name=>({name})),[competitorText]);
   const activeItems=plan?.items.slice(0,10)??[];
+  const canRun=Boolean(business.name.trim()&&business.category.trim());
+  const previewMode=workspaceMode==="preview";
 
   function patchBusiness<K extends keyof BusinessProfile>(key:K,value:BusinessProfile[K]){
     setBusiness(current=>({...current,[key]:value}));
+  }
+
+  function requireContext(){
+    if(canRun)return true;
+    setMessage(t.firstRun);
+    document.querySelector<HTMLElement>(".businessCard")?.scrollIntoView({behavior:"smooth",block:"center"});
+    return false;
   }
 
   useEffect(()=>{void hydrateAccount();},[]);
@@ -127,11 +155,27 @@ export default function MarketingOSV7(){
   async function hydrateAccount(){
     try{
       const response=await fetch("/api/businesses",{cache:"no-store"});
-      if(response.status===401)return;
+      if(response.status===401){
+        setWorkspaceMode("account");
+        setMessage("Sign in to load your saved workspace.");
+        return;
+      }
       const data=await response.json();
+      if(data.configured===false){
+        setWorkspaceMode("preview");
+        setBusiness(sampleBusiness);
+        setCompetitorText("Lavash Restaurant\nSherep Restaurant");
+        return;
+      }
+      setWorkspaceMode("account");
       const row=data.businesses?.[0];
-      if(!row)return;
-      setBusinessId(row.id);
+      if(!row){
+        setBusiness(emptyBusiness);
+        setCompetitorText("");
+        setMessage(t.firstRun);
+        return;
+      }
+      setBusinessId(String(row.id));
       setBusiness({
         name:row.name,
         category:row.category,
@@ -144,31 +188,39 @@ export default function MarketingOSV7(){
         offer:row.offer||"",
         tone:row.tone||"",
       });
-      await loadConnections(row.id);
-    }catch{/* demo mode */}
+      await loadConnections(String(row.id));
+    }catch{
+      setWorkspaceMode("account");
+      setMessage("Workspace data is temporarily unavailable.");
+    }
+  }
+
+  async function rememberWorkspace(id:string){
+    setBusinessId(id);
+    try{await selectBusinessWorkspace(id,false);}catch{/* selection is helpful, not required for the active session */}
+    window.dispatchEvent(new Event("hay:studio-refresh"));
   }
 
   async function saveBusiness(){
+    if(!requireContext())return null;
+    if(previewMode){setMessage("Saving is not available in preview mode.");return null;}
     const response=await fetch("/api/businesses",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({business,id:businessId}),
     });
-    if(response.status===401){window.location.href="/login";return null;}
+    if(response.status===401){window.location.href="/login?next=%2Fstudio";return null;}
     const data=await response.json();
     if(!response.ok)throw new Error(data.detail||data.error||"business_save_failed");
-    if(!data.configured){
-      setMessage("Connect a dedicated HAY persistence layer to save businesses and social accounts.");
-      return null;
-    }
+    if(!data.configured){setMessage("Saving is not available in preview mode.");return null;}
     const id=String(data.business.id);
-    setBusinessId(id);
+    await rememberWorkspace(id);
     return id;
   }
 
   async function loadConnections(id:string){
     try{
-      const response=await fetch(`/api/social/connections?businessId=${id}`,{cache:"no-store"});
+      const response=await fetch(`/api/social/connections?businessId=${encodeURIComponent(id)}`,{cache:"no-store"});
       if(!response.ok)return;
       const data=await response.json();
       setConnections(data.connections||[]);
@@ -177,12 +229,19 @@ export default function MarketingOSV7(){
   }
 
   async function analyze(){
+    if(workspaceMode==="loading"||!requireContext())return;
     setBusy(true);setMessage("");
     try{
+      let effectiveBusinessId=businessId;
+      if(workspaceMode==="account"){
+        const saved=await saveBusiness();
+        if(!saved)return;
+        effectiveBusinessId=saved;
+      }
       const response=await fetch("/api/business/analyze",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({business,competitors}),
+        body:JSON.stringify({business,businessId:effectiveBusinessId,competitors}),
       });
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||"analysis_failed");
@@ -193,31 +252,38 @@ export default function MarketingOSV7(){
   }
 
   async function generatePlan(){
+    if(workspaceMode==="loading"||!requireContext())return;
     setBusy(true);setMessage("");setAssetState({});setRenderJobs({});
     try{
+      let effectiveBusinessId=businessId;
+      if(workspaceMode==="account"){
+        const saved=await saveBusiness();
+        if(!saved)return;
+        effectiveBusinessId=saved;
+      }
       if(autopilot){
         const response=await fetch("/api/marketing/autopilot",{
           method:"POST",
           headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({business,businessId,competitors,connections,mode:"approval",horizonDays:7}),
+          body:JSON.stringify({business,businessId:effectiveBusinessId,competitors,connections,mode:"approval",horizonDays:7}),
         });
         const data=await response.json();
         if(!response.ok)throw new Error(data.error||"autopilot_failed");
         setPlan(data.plan);
         setIntelligence(data.plan.brand);
-        if(data.persistence?.businessId)setBusinessId(data.persistence.businessId);
+        if(data.persistence?.businessId)await rememberWorkspace(String(data.persistence.businessId));
         setMessage(`Next cycle ready · ${data.jobs.length} jobs mapped${data.performanceUsed?" · previous performance included":""}`);
       }else{
         const response=await fetch("/api/marketing/plan",{
           method:"POST",
           headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({business,businessId,competitors,horizonDays:7}),
+          body:JSON.stringify({business,businessId:effectiveBusinessId,competitors,horizonDays:7}),
         });
         const data=await response.json();
         if(!response.ok)throw new Error(data.error||"plan_failed");
         setPlan(data);
         setIntelligence(data.brand);
-        if(data.persistence?.businessId)setBusinessId(data.persistence.businessId);
+        if(data.persistence?.businessId)await rememberWorkspace(String(data.persistence.businessId));
         setMessage(data.performanceUsed?"Next cycle updated from measured performance.":"Next 7-day cycle ready.");
       }
     }catch(error){setMessage(error instanceof Error?error.message:"Plan failed");}
@@ -271,7 +337,7 @@ export default function MarketingOSV7(){
       if(!response.ok)throw new Error(data.detail||data.error||"asset_creation_failed");
       if(data.configured===false){
         setAssetState(state=>({...state,[item.id]:"setup"}));
-        setMessage(data.message||"Activate HAY persistence to create durable assets.");
+        setMessage("Asset saving is not available in preview mode.");
         return;
       }
       if(isStatic){
@@ -288,7 +354,7 @@ export default function MarketingOSV7(){
         return;
       }
       setAssetState(state=>({...state,[item.id]:"renderable"}));
-      setMessage("Creator project prepared. Configure Render Worker to produce the final MP4.");
+      setMessage("Video rendering is not connected yet.");
     }catch(error){
       setAssetState(state=>({...state,[item.id]:"error"}));
       setMessage(error instanceof Error?error.message:"Asset creation failed");
@@ -296,16 +362,19 @@ export default function MarketingOSV7(){
   }
 
   async function connect(platform:SocialPlatform){
+    if(workspaceMode==="loading")return;
+    if(previewMode){setMessage("Channel connections are not available in preview mode.");return;}
+    if(!requireContext())return;
     setConnectionState(state=>({...state,[platform]:"saving"}));setMessage("");
     try{
       const id=await saveBusiness();
-      if(!id){setConnectionState(state=>({...state,[platform]:"setup"}));return;}
-      const response=await fetch(`/api/social/connect?platform=${platform}&businessId=${id}`);
+      if(!id){setConnectionState(state=>({...state,[platform]:"disconnected"}));return;}
+      const response=await fetch(`/api/social/connect?platform=${platform}&businessId=${encodeURIComponent(id)}`);
       const data=await response.json();
-      if(response.status===401){window.location.href="/login";return;}
+      if(response.status===401){window.location.href="/login?next=%2Fstudio";return;}
       if(data.authorizationUrl){window.location.href=data.authorizationUrl;return;}
       setConnectionState(state=>({...state,[platform]:data.configured?"ready":"setup"}));
-      setMessage(data.configured?`${platform} connector is ready for authorization.`:`${platform}: ${data.missing?.join(", ")||"developer app configuration required"}`);
+      setMessage(data.configured?`${platform} is ready for authorization.`:`${platform}: connection setup is not available yet.`);
     }catch(error){
       setConnectionState(state=>({...state,[platform]:"error"}));
       setMessage(error instanceof Error?error.message:"Connection failed");
@@ -322,8 +391,8 @@ export default function MarketingOSV7(){
     if(state==="creating")return "Creating ···";
     if(state==="rendering")return "Rendering ···";
     if(state==="ready")return "Publish →";
-    if(state==="renderable")return "Render setup";
-    if(state==="setup")return "Setup needed";
+    if(state==="renderable")return "Rendering unavailable";
+    if(state==="setup")return "Preview only";
     if(state==="error")return "Retry";
     return "Create asset →";
   };
@@ -337,10 +406,10 @@ export default function MarketingOSV7(){
 
     <section className="marketingHero marketingHeroV7">
       <div className="heroCopy">
-        <div className="signalLabel"><i/>{t.eyebrow}</div>
+        <div className="signalLabel"><i/>{previewMode?"HAY STUDIO / PREVIEW":t.eyebrow}</div>
         <h1><span>{t.titleA}</span>{t.titleB}</h1>
         <p>{t.sub}</p>
-        <div className="heroActions"><button className="hayPrimary" onClick={generatePlan} disabled={busy}>{busy?"HAY ···":t.plan}</button><button className="haySecondary" onClick={analyze} disabled={busy}>{t.analyze}</button><label className={`autopilot ${autopilot?"on":""}`}><input type="checkbox" checked={autopilot} onChange={event=>setAutopilot(event.target.checked)}/><span/><b>{t.autopilot}</b><small>{autopilot?"ON":"OFF"}</small></label></div>
+        <div className="heroActions"><button className="hayPrimary" onClick={generatePlan} disabled={busy||workspaceMode==="loading"||!canRun}>{busy?"HAY ···":t.plan}</button><button className="haySecondary" onClick={analyze} disabled={busy||workspaceMode==="loading"||!canRun}>{t.analyze}</button><label className={`autopilot ${autopilot?"on":""}`}><input type="checkbox" checked={autopilot} onChange={event=>setAutopilot(event.target.checked)}/><span/><b>{t.autopilot}</b><small>{autopilot?"ON":"OFF"}</small></label></div>
         {message&&<p className="marketingMessage">{message}</p>}
       </div>
       <div className="studioContextStrip" aria-label="Studio operating model">
@@ -352,39 +421,39 @@ export default function MarketingOSV7(){
 
     <section className="marketingGrid">
       <article className="intelCard businessCard">
-        <div className="panelTop"><span>01 / BUSINESS CONTEXT</span><em>{businessId?"SAVED":"INPUT"}</em></div>
-        <div className="businessNameRow"><input value={business.name} onChange={event=>patchBusiness("name",event.target.value)}/><span className="pulseDot"/></div>
-        <div className="fieldPair"><label>Category<input value={business.category} onChange={event=>patchBusiness("category",event.target.value)}/></label><label>Location<input value={business.location||""} onChange={event=>patchBusiness("location",event.target.value)}/></label></div>
+        <div className="panelTop"><span>01 / BUSINESS CONTEXT</span><em>{previewMode?"SAMPLE":businessId?"SAVED":workspaceMode==="loading"?"LOADING":"NEW"}</em></div>
+        <div className="businessNameRow"><input value={business.name} onChange={event=>patchBusiness("name",event.target.value)} placeholder="Business name"/><span className="pulseDot"/></div>
+        <div className="fieldPair"><label>Category<input value={business.category} onChange={event=>patchBusiness("category",event.target.value)} placeholder="Restaurant, retail, hotel…"/></label><label>Location<input value={business.location||""} onChange={event=>patchBusiness("location",event.target.value)} placeholder="Yerevan, Armenia"/></label></div>
         <label className="fullField">Website<input value={business.website||""} onChange={event=>patchBusiness("website",event.target.value)} placeholder="https://…"/></label>
-        <label className="fullField">Business / offer<textarea value={business.description} onChange={event=>patchBusiness("description",event.target.value)}/></label>
+        <label className="fullField">Business / offer<textarea value={business.description} onChange={event=>patchBusiness("description",event.target.value)} placeholder="What do you sell, who is it for, and why should people choose you?"/></label>
         <div className="dnaStrip"><span>LANGUAGE <b>{business.primaryLanguage.toUpperCase()}</b></span><span>MARKET <b>ARMENIA</b></span><span>MODE <b>{autopilot?"AUTO":"REVIEW"}</b></span></div>
       </article>
 
       <article className="intelCard channelsCard">
-        <div className="panelTop"><span>02 / {t.connections.toUpperCase()}</span><em>OAUTH</em></div>
-        <div className="channelList">{channels.map(({platform,label})=>{const state=connectionState[platform]||"disconnected";return <button key={platform} onClick={()=>void connect(platform)}><i><SocialBrandIcon platform={platform} size={18} decorative/></i><div><strong>{label}</strong><small>{state==="setup"?"developer app required":state}</small></div><span className={`connectionLed ${state}`}/></button>;})}</div>
+        <div className="panelTop"><span>02 / {t.connections.toUpperCase()}</span><em>AUTHORIZE</em></div>
+        <div className="channelList">{channels.map(({platform,label})=>{const state=connectionState[platform]||"disconnected";return <button key={platform} onClick={()=>void connect(platform)} disabled={workspaceMode==="loading"}><i><SocialBrandIcon platform={platform} size={18} decorative/></i><div><strong>{label}</strong><small>{state==="setup"?"setup required":state}</small></div><span className={`connectionLed ${state}`}/></button>;})}</div>
         <p className="microcopy">Every channel is authorized by the account owner. Social passwords are never requested.</p>
       </article>
 
       <article className="intelCard intelligenceCard">
         <div className="panelTop"><span>03 / {t.intelligence.toUpperCase()}</span><em>{intelligence?"CURRENT":"NOT MEASURED"}</em></div>
         <div className="strategyQuote">{intelligence?.positioning||"Map the offer, audience, category language, proof and conversion path before producing the next content cycle."}</div>
-        <div className="pillarCloud">{(intelligence?.contentPillars||["Proof","Product","Story","Education","Offer"]).map((pillar,index)=><span key={pillar}><i>{String(index+1).padStart(2,"0")}</i>{pillar}</span>)}</div>
+        <div className="pillarCloud">{(intelligence?.contentPillars||[]).map((pillar,index)=><span key={pillar}><i>{String(index+1).padStart(2,"0")}</i>{pillar}</span>)}</div>
       </article>
 
       <article className="intelCard competitorsCard">
         <div className="panelTop"><span>04 / {t.competitors.toUpperCase()}</span><em>{competitors.length} TRACKED</em></div>
-        <textarea value={competitorText} onChange={event=>setCompetitorText(event.target.value)}/>
+        <textarea value={competitorText} onChange={event=>setCompetitorText(event.target.value)} placeholder="One competitor per line"/>
         <div className="radarRows">{(plan?.competitors||competitors.map(item=>({name:item.name,strength:"awaiting analysis",gap:"—",opportunity:"—"}))).slice(0,3).map((item,index)=><div key={item.name}><span>0{index+1}</span><strong>{item.name}</strong><small>{item.gap}</small></div>)}</div>
       </article>
     </section>
 
     <section className="contentPulse">
       <div className="pulseHeader"><div><span>05 / EXECUTION QUEUE</span><h2>{t.calendar}</h2></div><div className="pulseStats"><span><b>{plan?.items.length||0}</b> assets</span><span><b>{plan?"7":"—"}</b> days</span><span><b>{autopilot?"AUTO":"REVIEW"}</b> publish</span></div></div>
-      {activeItems.length?<div className="calendarRail">{activeItems.map(item=><article key={item.id} className={`contentTile asset-${assetState[item.id]||"idea"}`}><div className="tileMeta"><span>D{item.day}</span><i><SocialBrandIcon platform={item.platform} size={12} decorative/>{item.platform}</i><em>{item.objective}</em></div><h3>{item.hook}</h3><p>{item.concept}</p><footer><span>{item.format}{renderJobs[item.id]?" · job":""}</span><button onClick={()=>tileAction(item)} disabled={assetState[item.id]==="creating"||assetState[item.id]==="rendering"}>{assetLabel(item)}</button></footer></article>)}</div>:<div className="emptyPulse"><div className="emptyGlyph">Հ</div><h3>Start with context, not content volume.</h3><p>Confirm the business context and competitors, then build the first executable 7-day cycle.</p><button className="hayPrimary" onClick={generatePlan}>{t.plan}</button></div>}
+      {activeItems.length?<div className="calendarRail">{activeItems.map(item=><article key={item.id} className={`contentTile asset-${assetState[item.id]||"idea"}`}><div className="tileMeta"><span>D{item.day}</span><i><SocialBrandIcon platform={item.platform} size={12} decorative/>{item.platform}</i><em>{item.objective}</em></div><h3>{item.hook}</h3><p>{item.concept}</p><footer><span>{item.format}{renderJobs[item.id]?" · job":""}</span><button onClick={()=>tileAction(item)} disabled={assetState[item.id]==="creating"||assetState[item.id]==="rendering"}>{assetLabel(item)}</button></footer></article>)}</div>:<div className="emptyPulse"><div className="emptyGlyph">Հ</div><h3>Start with context, not content volume.</h3><p>{canRun?"Add competitors if useful, then build the first executable 7-day cycle.":"Add the business name and category above. HAY will save the context when you build the first cycle."}</p><button className="hayPrimary" onClick={generatePlan} disabled={busy||workspaceMode==="loading"||!canRun}>{t.plan}</button></div>}
     </section>
 
-    <section className="systemLine"><span>HAY ENGINE / ACTIVE WORKSPACE</span><span>CONTEXT → DECISION → CREATE → APPROVE → PUBLISH → LEARN</span><span>YEREVAN / 2026</span></section>
+    <section className="systemLine"><span>HAY ENGINE / {previewMode?"PREVIEW":"ACTIVE WORKSPACE"}</span><span>CONTEXT → DECISION → CREATE → APPROVE → PUBLISH → LEARN</span><span>YEREVAN / 2026</span></section>
 
     {publishItem&&<PublishDialog item={publishItem} connections={connections} locale={locale} onClose={()=>setPublishItem(null)} onMessage={setMessage} onQueued={status=>setAssetState(state=>({...state,[publishItem.id]:status==="queued"?"queued":"scheduled"}))}/>} 
   </main>;
