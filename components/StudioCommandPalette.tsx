@@ -16,27 +16,27 @@ export default function StudioCommandPalette(){
   function openOnboarding(){window.dispatchEvent(new Event("hay:onboarding-open"));close();}
 
   const commands=useMemo<Command[]>(()=>[
-    {label:"Generate 7-day marketing plan",hint:"RUN",action:()=>click(".heroActions .hayPrimary")},
-    {label:"Analyze business",hint:"AI BRAIN",action:()=>click(".heroActions .haySecondary")},
+    {label:"Build the next 7 days",hint:"PLAN",action:()=>click(".heroActions .hayPrimary")},
+    {label:"Refresh business context",hint:"CONTEXT",action:()=>click(".heroActions .haySecondary")},
     {label:"Toggle Autopilot",hint:"AUTO / REVIEW",action:()=>click(".autopilot")},
-    {label:"Show onboarding",hint:"START",action:openOnboarding},
-    {label:"Business Intelligence",hint:"BUSINESS",action:()=>scroll(".businessCard")},
-    {label:"Social Channels",hint:"CONNECT",action:()=>scroll(".channelsCard")},
-    {label:"Competitor Radar",hint:"RADAR",action:()=>scroll(".competitorsCard")},
-    {label:"Campaign Brain",hint:"LAUNCH / OFFER",action:()=>scroll(".studioCampaignBrain")},
-    {label:"Campaign Analytics",hint:"MEASURE / TEST",action:()=>scroll(".studioCampaignAnalytics")},
-    {label:"Conversion Bridge",hint:"CLICKS → LEADS",action:()=>scroll(".studioConversionBridge")},
-    {label:"Content Pulse",hint:"CALENDAR",action:()=>scroll(".contentPulse")},
-    {label:"Smart Publishing Calendar",hint:"SCHEDULE",action:()=>scroll(".studioScheduleQueue")},
-    {label:"Content Series",hint:"4-WEEK",action:()=>scroll(".studioSeries")},
-    {label:"Content Memory",hint:"ANTI-REPEAT",action:()=>scroll(".studioMemory")},
-    {label:"Publishing Policy",hint:"CONTROL",action:()=>scroll(".studioPolicy")},
-    {label:"Approval Inbox",hint:"DECIDE",action:()=>scroll(".studioApprovalPanel")},
-    {label:"Performance Memory",hint:"LEARN",action:()=>scroll(".studioPerformancePanel")},
-    {label:"Creator Engine",hint:"CREATE",action:()=>go("/creator")},
-    {label:"HAY Voice Lab",hint:"VOICE",action:()=>go("/voice")},
-    {label:"Armenian Quality",hint:"100/100",action:()=>go("/quality")},
-    {label:"Account & Setup",hint:"ACCOUNT",action:()=>go("/login")},
+    {label:"Open setup guide",hint:"SETUP",action:openOnboarding},
+    {label:"Business context",hint:"BRAND",action:()=>scroll(".businessCard")},
+    {label:"Connected channels",hint:"CHANNELS",action:()=>scroll(".channelsCard")},
+    {label:"Competitors",hint:"MARKET",action:()=>scroll(".competitorsCard")},
+    {label:"Campaign planning",hint:"CAMPAIGN",action:()=>scroll(".studioCampaignBrain")},
+    {label:"Campaign performance",hint:"MEASURE",action:()=>scroll(".studioCampaignAnalytics")},
+    {label:"Conversion tracking",hint:"LEADS",action:()=>scroll(".studioConversionBridge")},
+    {label:"Content desk",hint:"CONTENT",action:()=>scroll(".contentPulse")},
+    {label:"Publishing calendar",hint:"SCHEDULE",action:()=>scroll(".studioScheduleQueue")},
+    {label:"Content series",hint:"SERIES",action:()=>scroll(".studioSeries")},
+    {label:"Content history",hint:"MEMORY",action:()=>scroll(".studioMemory")},
+    {label:"Publishing rules",hint:"CONTROL",action:()=>scroll(".studioPolicy")},
+    {label:"Approval inbox",hint:"APPROVE",action:()=>scroll(".studioApprovalPanel")},
+    {label:"Performance",hint:"LEARN",action:()=>scroll(".studioPerformancePanel")},
+    {label:"Creator",hint:"CREATE",action:()=>go("/creator")},
+    {label:"Voice",hint:"VOICE",action:()=>go("/voice")},
+    {label:"Armenian quality",hint:"REPORT",action:()=>go("/quality")},
+    {label:"Account & setup",hint:"ACCOUNT",action:()=>go("/login")},
   ],[]);
 
   const filtered=commands.filter(command=>`${command.label} ${command.hint}`.toLowerCase().includes(query.toLowerCase()));
@@ -61,10 +61,10 @@ export default function StudioCommandPalette(){
   if(!open)return null;
   return <div className="studioCommandBackdrop" onMouseDown={event=>{if(event.target===event.currentTarget)close();}}>
     <section className="studioCommandPalette" role="dialog" aria-modal="true" aria-label="HAY command palette">
-      <header><span><i/>HAY COMMAND</span><kbd>ESC</kbd></header>
-      <div className="studioCommandSearch"><span>⌕</span><input autoFocus value={query} onChange={event=>setQuery(event.target.value)} onKeyDown={onInputKeyDown} placeholder="Run or find anything in HAY Studio…"/></div>
-      <div className="studioCommandList">{filtered.map((command,index)=><button key={command.label} className={selected===index?"active":""} onMouseEnter={()=>setSelected(index)} onClick={command.action}><span>{String(index+1).padStart(2,"0")}</span><strong>{command.label}</strong><small>{command.hint}</small><b>↗</b></button>)}{filtered.length===0&&<p>No command found.</p>}</div>
-      <footer><span>↑↓ NAVIGATE</span><span>ENTER RUN</span><span>⌘K TOGGLE</span></footer>
+      <header><span><i/>QUICK ACTIONS</span><kbd>ESC</kbd></header>
+      <div className="studioCommandSearch"><span>⌕</span><input autoFocus value={query} onChange={event=>setQuery(event.target.value)} onKeyDown={onInputKeyDown} placeholder="Find an action or section…"/></div>
+      <div className="studioCommandList">{filtered.map((command,index)=><button key={command.label} className={selected===index?"active":""} onMouseEnter={()=>setSelected(index)} onClick={command.action}><span>{String(index+1).padStart(2,"0")}</span><strong>{command.label}</strong><small>{command.hint}</small><b>↗</b></button>)}{filtered.length===0&&<p>No action found.</p>}</div>
+      <footer><span>↑↓ NAVIGATE</span><span>ENTER OPEN</span><span>⌘K TOGGLE</span></footer>
     </section>
   </div>;
 }
