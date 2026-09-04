@@ -44,22 +44,50 @@ const migration15=source("supabase/015_ai_employee_inbox.sql");
 assert.match(migration15,/appointment_request/i,"HAY Inbox must distinguish appointment requests from confirmed external bookings");
 assert.match(migration15,/unique \(action_id\)/i,"One confirmed action must create at most one inbox work item");
 
+const migration16=source("supabase/016_ai_employee_subscriptions.sql");
+assert.match(migration16,/ai_employee_entitlements/i,"Employee subscriptions must have a dedicated entitlement table");
+assert.match(migration16,/ai_employee_call_usage/i,"Employee calls must have a dedicated usage ledger");
+assert.match(migration16,/where owner_id=p_owner_id for update;/i,"Call admission must serialize on the exact owner entitlement row");
+assert.match(migration16,/state='active'[\s\S]*?reserved_seconds/i,"Active calls must count their reserved seconds before another call is admitted");
+assert.match(migration16,/v_active>=v_entitlement\.concurrent_calls/i,"Atomic admission must enforce call concurrency");
+assert.match(migration16,/v_remaining<60/i,"Atomic admission must reject exhausted minute pools before provider work");
+assert.match(migration16,/revoke all on function public\.hay_employee_admit_call[\s\S]*?from public,anon,authenticated;[\s\S]*?grant execute on function public\.hay_employee_admit_call[\s\S]*?to service_role;/i,"Employee call admission RPC must be service-role only");
+assert.match(migration16,/revoke all on function public\.hay_employee_finish_call[\s\S]*?from public,anon,authenticated;[\s\S]*?grant execute on function public\.hay_employee_finish_call[\s\S]*?to service_role;/i,"Employee call finalization RPC must be service-role only");
+
 const realtime=source("app/api/employee/realtime-turn/route.ts");
 assert.match(realtime,/HAY_VOICE_WORKER_SECRET/,"Realtime employee brain must require the dedicated worker secret");
 assert.match(realtime,/timingSafeEqual/,"Realtime worker secret comparison must be timing-safe");
 assert.match(realtime,/employee\.status!=="active"/,"Realtime calls must reject inactive employees by default");
 assert.match(realtime,/\.eq\("owner_id",employee\.ownerId\)/,"Realtime business context must stay scoped to the employee owner");
 assert.match(realtime,/external_session_id_required/,"Transactional call state must require a provider conversation id");
+assert.match(realtime,/employee_call_admission_required/,"Subscription-enforced realtime turns must reject calls that did not reserve minutes first");
+const admissionGuard=realtime.indexOf("employee_call_admission_required");
+const brainCall=realtime.indexOf("await runEmployeeTurn(");
+assert.ok(admissionGuard>=0&&brainCall>admissionGuard,"Call admission must be enforced before the first paid HAY brain turn");
 assert.match(realtime,/\.eq\("session_id",sessionId\)\.eq\("status","proposed"\)/,"A caller confirmation may resolve only a pending action from the same call session");
 assert.match(realtime,/parseCallerConfirmation\(message\)/,"Pending actions must use deterministic confirmation parsing before another LLM turn");
 assert.match(realtime,/confirmation==="yes"[\s\S]*?captureEmployeeAction\([\s\S]*?callerConfirmed:true/,"An affirmative turn must confirm the existing transaction rather than regenerate it");
 assert.match(realtime,/confirmation==="no"[\s\S]*?rejectEmployeeAction/,"A negative turn must reject the exact pending transaction");
 assert.match(realtime,/actionKey\(sessionId/,"New call action proposals must derive their idempotency key from the exact call session");
 
+const admitRoute=source("app/api/employee/call/admit/route.ts");
+assert.match(admitRoute,/await admitEmployeeCall\(/,"Trusted voice traffic must reserve employee minutes/concurrency before brain work");
+assert.match(admitRoute,/callUsageId:admission\.usageId/,"Accepted call usage id must be bound to the durable session");
+assert.match(admitRoute,/admissionDenied:true/,"Denied subscriptions must fail the call session closed instead of entering the brain path");
+
+const closeRoute=source("app/api/employee/session/close/route.ts");
+assert.match(closeRoute,/await finishEmployeeCall\(/,"Call close must finalize the atomic minute reservation");
+assert.match(closeRoute,/classifyEmployeeCallOutcome/,"Call close must derive measurable outcome from executed actions rather than model self-report");
+assert.doesNotMatch(closeRoute,/rawTranscript|rawAudio|transcript:/i,"Call outcome finalization must not require raw conversation retention");
+
 const voiceWorker=source("voice-worker/src/index.mjs");
-assert.match(voiceWorker,/\/api\/employee\/realtime-turn/,"Voice worker must route conversation intelligence through HAY");
+assert.match(voiceWorker,/\/api\/employee\/call\/admit/,"Voice worker must obtain call admission before realtime brain work");
+assert.match(voiceWorker,/await ensureAdmission\(session\)[\s\S]*?await askHay\(/,"Every transcript must await admission before calling HAY brain");
+assert.match(voiceWorker,/reservedSeconds\*1000/,"Voice worker must enforce the server-reserved call duration locally");
+assert.match(voiceWorker,/session\?\.close\?\.\(\)/,"Reserved call limit must be able to close the Speech Engine session");
+assert.match(voiceWorker,/\/api\/employee\/session\/close/,"Voice worker must finalize call outcome and minutes on close/disconnect");
 assert.match(voiceWorker,/externalSessionId/,"Voice worker must bind HAY transaction state to the Speech Engine conversation id");
-assert.match(voiceWorker,/askHay\(transcript,session\.conversationId,signal\)/,"Every realtime turn must send the exact Speech Engine conversation id and cancellation signal");
+assert.match(voiceWorker,/signal,/,"Voice worker must propagate Speech Engine interruption cancellation");
 assert.match(voiceWorker,/session\.sendResponse\(turn\.reply\)/,"Only the HAY-approved employee reply should be sent to TTS");
 assert.doesNotMatch(voiceWorker,/SUPABASE|service_role|SUPABASE_SERVICE_ROLE_KEY/i,"Voice worker must never receive direct database service credentials");
 assert.doesNotMatch(voiceWorker,/console\.(log|warn|error)\([^\n]*(message|transcript)/i,"Voice worker logs must not casually dump caller transcript text");
@@ -73,6 +101,11 @@ console.log(JSON.stringify({
   idempotentActions:true,
   appointmentRequestTruthfulness:true,
   privateByDefaultSessions:true,
+  atomicSubscriptionCallAdmission:true,
+  callConcurrencyProtected:true,
+  callMinutesReservedBeforeBrain:true,
+  callMinutesFinalized:true,
+  outcomeMeasuredWithoutRawTranscript:true,
   voiceWorkerNoDatabaseCredentials:true,
   interruptionCancellation:true
 },null,2));
