@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { classifyEmployeeCallOutcome,employeeOutcomeSummaryHy } from "@/lib/employee/outcome";
+import { finishEmployeeCall } from "@/lib/employee/subscription";
 import type { EmployeeActionType } from "@/lib/employee/types";
 import { createAdminClient,isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 
@@ -24,20 +25,31 @@ export async function POST(request:Request){
     const requestedState=body.state==="failed"?"failed":"completed";
     if(!employeeId||!externalSessionId)return NextResponse.json({error:"employee_and_external_session_required"},{status:400});
     const admin=createAdminClient();
-    const lookup=await admin.from("ai_employee_sessions").select("id,state").eq("employee_id",employeeId).eq("provider","elevenlabs-speech-engine").eq("external_session_id",externalSessionId).maybeSingle();
+    const lookup=await admin.from("ai_employee_sessions").select("id,owner_id,state,metadata,started_at").eq("employee_id",employeeId).eq("provider","elevenlabs-speech-engine").eq("external_session_id",externalSessionId).maybeSingle();
     if(lookup.error)return NextResponse.json({error:"employee_session_read_failed"},{status:500});
     if(!lookup.data)return NextResponse.json({closed:false,reason:"session_not_found"},{status:200});
-    if(String(lookup.data.state)==="handoff")return NextResponse.json({closed:true,state:"handoff",preserved:true},{status:200});
 
     const actions=await admin.from("ai_employee_actions").select("action_type,status").eq("session_id",lookup.data.id).eq("employee_id",employeeId).eq("status","executed");
     if(actions.error)return NextResponse.json({error:"employee_session_actions_read_failed"},{status:500});
     const actionTypes=(actions.data||[]).map(row=>String(row.action_type)).filter(type=>["book_appointment","create_lead","create_callback","take_order","handoff_human"].includes(type)) as EmployeeActionType[];
-    const outcome=classifyEmployeeCallOutcome({actionTypes,failed:requestedState==="failed"});
+    const wasHandoff=String(lookup.data.state)==="handoff"||actionTypes.includes("handoff_human");
+    const outcome=wasHandoff?"human_handoff":classifyEmployeeCallOutcome({actionTypes,failed:requestedState==="failed"});
     const summary=employeeOutcomeSummaryHy(outcome);
-    const finalState=outcome==="human_handoff"?"handoff":requestedState;
-    const updated=await admin.from("ai_employee_sessions").update({state:finalState,outcome,summary,ended_at:new Date().toISOString(),metadata:{actionCount:actionTypes.length,actionTypes}}).eq("id",lookup.data.id).eq("employee_id",employeeId).select("id,state,outcome,summary,metadata,ended_at").single();
+    const finalState=wasHandoff?"handoff":requestedState;
+    const existingMetadata=lookup.data.metadata&&typeof lookup.data.metadata==="object"?lookup.data.metadata as Record<string,unknown>:{};
+    const usageId=existingMetadata.callUsageId?String(existingMetadata.callUsageId):null;
+    const startedAt=new Date(String(lookup.data.started_at||""));
+    const elapsed=Math.max(0,Math.floor((Date.now()-(Number.isFinite(startedAt.getTime())?startedAt.getTime():Date.now()))/1000));
+    const suppliedDuration=Number(body.durationSeconds);
+    const durationSeconds=Number.isFinite(suppliedDuration)&&suppliedDuration>=0?Math.floor(suppliedDuration):elapsed;
+    const usageFinish=await finishEmployeeCall({ownerId:String(lookup.data.owner_id),usageId,durationSeconds,failed:requestedState==="failed",metadata:{outcome,actionCount:actionTypes.length,actionTypes}});
+    if(usageId&&usageFinish&&"finished" in usageFinish&&usageFinish.finished===false){
+      return NextResponse.json({error:"employee_call_usage_finalize_failed",detail:usageFinish},{status:503});
+    }
+    const metadata={...existingMetadata,actionCount:actionTypes.length,actionTypes,durationSeconds,callUsageFinalized:Boolean(usageId)};
+    const updated=await admin.from("ai_employee_sessions").update({state:finalState,outcome,summary,ended_at:new Date().toISOString(),metadata}).eq("id",lookup.data.id).eq("employee_id",employeeId).select("id,state,outcome,summary,metadata,ended_at").single();
     if(updated.error)return NextResponse.json({error:"employee_session_close_failed"},{status:500});
-    return NextResponse.json({closed:true,session:updated.data},{headers:{"Cache-Control":"no-store"}});
+    return NextResponse.json({closed:true,session:updated.data,usage:usageFinish},{headers:{"Cache-Control":"no-store"}});
   }catch(error){
     console.error("HAY Employee session close failed",error);
     return NextResponse.json({error:"employee_session_close_failed"},{status:500});
