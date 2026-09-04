@@ -14,7 +14,7 @@ function safeNextPath(){
   const value=params.get("next")||"/studio";
   const safe=value.startsWith("/")&&!value.startsWith("//")?value:"/studio";
   const plan=params.get("plan");
-  if(plan&&allowedPlans.has(plan)&&safe.startsWith("/studio")){
+  if(plan&&plan!=="free"&&allowedPlans.has(plan)&&safe.startsWith("/studio")){
     const target=new URL(safe,window.location.origin);
     if(!target.searchParams.has("plan"))target.searchParams.set("plan",plan);
     return `${target.pathname}${target.search}${target.hash}`;
@@ -50,7 +50,7 @@ export default function LoginForm() {
   async function signIn(event: FormEvent) {
     event.preventDefault();
     if (!persistenceReady) {
-      setMessage("Accounts are not active yet because HAY persistence is not connected.");
+      setMessage("Accounts are not active in this environment yet.");
       return;
     }
     setBusy(true); setMessage("");
@@ -66,5 +66,7 @@ export default function LoginForm() {
     } finally { setBusy(false); }
   }
 
-  return <main className="loginPage"><section className="loginPanel"><a href="/"><HayLogo /></a><div className="loginIndex">ACCOUNT / {setup?.mode?.toUpperCase() || "CHECKING"}</div><h1>Մեկ բիզնես։<br/><span>Մեկ աշխատանքային կոնտեքստ։</span></h1><p>{persistenceReady ? "Sign in to save the business, connect channels, keep Creator projects and continue from the same context every time." : "You can explore the product now. Accounts, saved businesses and social authorization become available when HAY persistence is connected."}</p><form onSubmit={signIn}><label>Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.am" disabled={!persistenceReady} /></label><button className="hayPrimary" disabled={busy || !persistenceReady}>{busy ? "···" : persistenceReady ? "Continue with secure link" : "Accounts not active yet"}</button></form>{!persistenceReady && <a href="/" className="haySecondary" style={{display:"inline-flex",marginTop:12,textDecoration:"none"}}>Explore HAY →</a>}{message && <div className="loginMessage">{message}</div>}<small>HAY never asks for your Instagram, TikTok or YouTube password. Social accounts connect through provider authorization.</small></section><aside className="loginAside"><div className="loginGlyph">Հ</div><div><span>CONTEXT</span><span>PLAN</span><span>CREATE</span><span>APPROVE</span><span>PUBLISH</span></div></aside></main>;
+  const accountState=!setup?"CHECKING":persistenceReady?"SECURE SIGN-IN":"PREVIEW";
+
+  return <main className="loginPage"><section className="loginPanel"><a href="/"><HayLogo /></a><div className="loginIndex">ACCOUNT / {accountState}</div><h1>Մեկ բիզնես։<br/><span>Մեկ աշխատանքային կոնտեքստ։</span></h1><p>{persistenceReady ? "Sign in to save the business, connect channels, keep Creator projects and continue from the same context every time." : "You can explore the product now. Saved businesses, account history and social authorization become available when accounts are active."}</p><form onSubmit={signIn}><label>Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.am" disabled={!persistenceReady} /></label><button className="hayPrimary" disabled={busy || !persistenceReady}>{busy ? "···" : persistenceReady ? "Continue with secure link" : "Accounts not active yet"}</button></form>{!persistenceReady && <a href="/" className="haySecondary" style={{display:"inline-flex",marginTop:12,textDecoration:"none"}}>Explore HAY →</a>}{message && <div className="loginMessage">{message}</div>}<small>HAY never asks for your Instagram, TikTok or YouTube password. Social accounts connect through provider authorization.</small></section><aside className="loginAside"><div className="loginGlyph">Հ</div><div><span>CONTEXT</span><span>PLAN</span><span>CREATE</span><span>APPROVE</span><span>PUBLISH</span></div></aside></main>;
 }
