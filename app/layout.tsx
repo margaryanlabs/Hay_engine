@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "./landing-v5.css";
-import "./landing-v6.css";
 import "./creator.css";
 import "./marketing.css";
 import "./competitor-intel.css";
@@ -33,10 +31,11 @@ import "./product-ui.css";
 import "./product-ui-legacy.css";
 import "./redesign-v7.css";
 import "./redesign-v7-labs.css";
+import "./landing-v7.css";
 
 export const metadata: Metadata = {
-  title: "HAY — Armenian-first Marketing OS",
-  description: "HAY understands the business, plans the next move, creates Armenian-first content, publishes with approval and learns from outcomes.",
+  title: "HAY — Marketing OS built for Armenia",
+  description: "HAY keeps brand context, plans the next move, creates Armenian-first content, manages approval and publishing, and learns from outcomes.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
