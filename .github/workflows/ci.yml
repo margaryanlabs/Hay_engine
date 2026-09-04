@@ -36,6 +36,8 @@ jobs:
       - run: npm run security:direct-providers
       - run: npm run security:developer-api
       - run: npm run security:billing
+      - run: npm run security:employee
+      - run: npm run voice-worker:check
       - run: npm run ui:contract
       - run: npm run typecheck
       - run: npm run quality
