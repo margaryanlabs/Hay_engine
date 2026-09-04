@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "./landing-v5.css";
-import "./landing-v6.css";
 import "./creator.css";
 import "./marketing.css";
 import "./competitor-intel.css";
@@ -31,16 +29,37 @@ import "./quality.css";
 import "./login.css";
 import "./product-ui.css";
 import "./product-ui-legacy.css";
+import "./redesign-v7.css";
+import "./redesign-v7-labs.css";
+import "./landing-v7.css";
+import "./studio-v7-refine.css";
+import "./account-v7.css";
+
+const description="HAY keeps business context, plans the next move, creates Armenian-first content, manages approval and publishing, and learns from outcomes.";
 
 export const metadata: Metadata = {
-  title: "HAY Engine — AI Marketing Autopilot for Armenia",
-  description: "Connect your business once. HAY plans, creates and operates Armenian-first marketing with content, voice, publishing, memory and outcome learning.",
+  title: "HAY — Marketing software built in Armenia",
+  description,
+  applicationName: "HAY",
+  category: "business",
+  openGraph: {
+    title: "HAY — Marketing software built in Armenia",
+    description,
+    siteName: "HAY",
+    type: "website",
+    locale: "hy_AM",
+  },
+  twitter: {
+    card: "summary",
+    title: "HAY — Marketing software built in Armenia",
+    description,
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="hy">
-      <body>{children}</body>
+      <body className="hay-ui">{children}</body>
     </html>
   );
 }

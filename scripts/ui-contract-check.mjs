@@ -1,83 +1,82 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const layout = readFileSync("app/layout.tsx", "utf8");
-const home = readFileSync("app/page.tsx", "utf8");
-const landing = readFileSync("components/LandingPageV6.tsx", "utf8");
-const landingCss = readFileSync("app/landing-v6.css", "utf8");
-const theme = readFileSync("app/product-ui.css", "utf8");
-const legacyTheme = readFileSync("app/product-ui-legacy.css", "utf8");
-const marketing = readFileSync("components/MarketingOS.tsx", "utf8");
-const publish = readFileSync("components/PublishDialog.tsx", "utf8");
-const socialIcon = readFileSync("components/SocialBrandIcon.tsx", "utf8");
+const layout=readFileSync("app/layout.tsx","utf8");
+const home=readFileSync("app/page.tsx","utf8");
+const landing=readFileSync("components/LandingPageV7.tsx","utf8");
+const landingCss=readFileSync("app/landing-v7.css","utf8");
+const redesign=readFileSync("app/redesign-v7.css","utf8");
+const studio=readFileSync("components/MarketingOSV7.tsx","utf8");
+const login=readFileSync("components/LoginForm.tsx","utf8");
+const commercial=readFileSync("components/StudioCommercialRail.tsx","utf8");
+const onboarding=readFileSync("components/StudioOnboarding.tsx","utf8");
+const publish=readFileSync("components/PublishDialog.tsx","utf8");
+const socialIcon=readFileSync("components/SocialBrandIcon.tsx","utf8");
 
-assert.doesNotMatch(
-  layout,
-  /import\s+["']\.\/marketing-v2\.css["']/,
-  "The retired neon Marketing OS skin must never be loaded into the product shell",
-);
+assert.doesNotMatch(layout,/import\s+["']\.\/marketing-v2\.css["']/,"Retired neon Marketing OS skin must stay out of the product shell");
+for(const required of ["./redesign-v7.css","./redesign-v7-labs.css","./landing-v7.css","./studio-v7-refine.css"]){
+  assert.ok(layout.includes(`import "${required}"`),`V7 layer ${required} must remain loaded`);
+}
+const legacyBridgeIndex=layout.indexOf('import "./product-ui-legacy.css"');
+const redesignIndex=layout.indexOf('import "./redesign-v7.css"');
+const landingIndex=layout.indexOf('import "./landing-v7.css"');
+assert.ok(legacyBridgeIndex>=0&&redesignIndex>legacyBridgeIndex&&landingIndex>redesignIndex,"V7 styles must load after legacy compatibility styles");
+assert.match(home,/LandingPageV7/,"Public home page must render Landing V7");
+assert.doesNotMatch(home,/LandingPageV[1-6]/,"Public home page must not regress to a retired landing generation");
 
-const productThemeIndex = layout.indexOf('import "./product-ui.css"');
-const legacyBridgeIndex = layout.indexOf('import "./product-ui-legacy.css"');
-const loginIndex = layout.indexOf('import "./login.css"');
-assert.ok(
-  loginIndex >= 0 && productThemeIndex > loginIndex && legacyBridgeIndex > productThemeIndex,
-  "Unified HAY product themes must load after legacy page styles",
-);
-assert.match(layout,/import "\.\/landing-v6\.css"/,"Landing V6 styles must remain loaded");
-assert.match(home,/LandingPageV6/,"The public home page must render Landing V6");
+assert.match(redesign,/--hay-bg:\s*#f4f4f0/,"V7 must expose the warm light background token");
+assert.match(redesign,/--hay-accent:\s*#5b55e7/,"V7 must expose the controlled indigo accent");
+assert.match(redesign,/--hay-positive:\s*#247b59/,"Green must remain reserved for semantic positive states");
+assert.doesNotMatch(landingCss,/#9fff57|#d9ff63|#39ff14/i,"Landing V7 must not contain retired acid/neon accents");
+assert.match(landingCss,/\.hayLandingV7/,"Landing V7 must own a dedicated surface");
+assert.match(landingCss,/\.hv7Cockpit/,"Landing hero must show a product/workspace preview rather than an abstract-only hero");
 
-assert.match(theme, /--hay-bg:#08090b/, "Unified HAY theme must expose the graphite background token");
-assert.match(theme, /--hay-accent:#da8d80/, "Unified HAY theme must expose the coral product accent");
-assert.match(theme, /--hay-blue:#aebfe1/, "Unified HAY theme must expose the intelligence/data blue token");
-assert.match(theme, /--hay-success:#91b58d/, "Unified HAY theme must reserve green for semantic success states");
-assert.match(theme, /\.marketingPage\{[\s\S]*?--m-warm:var\(--hay-accent\)/, "Marketing OS must inherit the same HAY product accent as Landing");
-assert.match(theme, /\.loginPage\{background:var\(--hay-bg\)/, "Login must remain inside the HAY product visual system");
-assert.match(theme, /\.creatorMessage\{/, "Creator must receive unified product chrome overrides");
-
-assert.match(
-  legacyTheme,
-  /--green:var\(--hay-accent\)!important/,
-  "Legacy Studio modules must not be able to restore the neon primary accent",
-);
-assert.match(
-  legacyTheme,
-  /\.connectionLed\.ready,[\s\S]*?background:var\(--hay-success\)!important/,
-  "Connected channel state must remain semantic green rather than product-accent green",
-);
-
-assert.match(landing,/import SocialBrandIcon from "\.\/SocialBrandIcon"/,"Landing V6 must share the same platform marks as Studio");
+assert.ok(landing.includes('import SocialBrandIcon from "./SocialBrandIcon"'),"Landing V7 must use shared social brand icons");
 for(const platform of ["instagram","tiktok","youtube","facebook"]){
-  assert.match(landing,new RegExp(`platform:\\"${platform}\\"`),`Landing V6 must visibly include ${platform}`);
+  assert.ok(landing.includes(`platform: "${platform}"`),`Landing V7 must include ${platform}`);
 }
-assert.match(landing,/className="hv6ProductWindow"/,"Landing hero must show the Studio-like product window rather than an abstract-only hero");
-assert.match(landing,/href="\/studio" className="hv6Open"/,"Landing shell must hand off directly into Studio");
-assert.match(landing,/href="\/voice"/,"Landing Armenian layer must connect directly to Voice Lab");
-assert.match(landingCss,/--hay-success/,"Landing V6 must use semantic product success color for connected states");
-assert.doesNotMatch(landingCss,/#9fff57|#d9ff63/i,"Landing V6 must not contain the retired neon product accent");
+assert.ok(landing.includes("WORKSPACE PREVIEW"),"Homepage example must be explicitly presented as a preview rather than fake live data");
+assert.doesNotMatch(landing,/AI MARKETING OPERATING SYSTEM|AI BRAIN|\/ CONNECTED/,"Homepage must not regress to generic AI-dashboard copy or fake connection claims");
+assert.ok(landing.includes('href="/voice"'),"Armenian product layer must link to Voice");
+assert.ok(landing.includes('href="/language"'),"Armenian product layer must link to Language");
+assert.ok(landing.includes('href="/quality"'),"Armenian product layer must link to Quality");
 
-assert.match(marketing, /import SocialBrandIcon from "\.\/SocialBrandIcon"/, "Marketing OS must use shared social brand icons");
-assert.doesNotMatch(marketing, /code:\s*"(?:IG|TT|YT|FB)"/, "Social channel buttons must not regress to letter abbreviations");
-assert.match(marketing, /<SocialBrandIcon platform=\{platform\}/, "Channel connector rows must render official platform marks");
-assert.match(marketing, /<SocialBrandIcon platform=\{item\.platform\}/, "Content tiles must render platform marks");
-assert.match(marketing, /href="\/voice"/, "Studio navigation must link to Voice rather than rendering dead text");
-assert.match(marketing, /href="\/developers"/, "Studio navigation must link to the developer/language surface rather than rendering dead text");
+assert.ok(studio.includes("const emptyBusiness: BusinessProfile"),"Real first-run Studio must have an empty business profile");
+assert.ok(studio.includes("const sampleBusiness: BusinessProfile"),"Sample data must be isolated from real first-run data");
+assert.match(studio,/data\.configured===false[\s\S]*?setWorkspaceMode\("preview"\)[\s\S]*?setBusiness\(sampleBusiness\)/,"Sample business must only be activated in preview mode");
+assert.ok(studio.includes('disabled={busy||workspaceMode==="loading"||!canRun}'),"Primary Studio actions must stay blocked until minimum business context exists");
+assert.ok(studio.includes('body:JSON.stringify({business,businessId:effectiveBusinessId,competitors})'),"Business analysis must retain the selected workspace id");
+assert.ok(studio.includes("selectBusinessWorkspace(id,false)"),"Saved business context must synchronize the active workspace");
+assert.doesNotMatch(studio,/orbitPanel|AI BRAIN|AI MARKETING OPERATING SYSTEM/,"Studio V7 must not restore retired sci-fi/AI-dashboard treatments");
+assert.ok(studio.includes("<SocialBrandIcon platform={platform}"),"Channel connector rows must render shared platform marks");
+assert.ok(studio.includes("<SocialBrandIcon platform={item.platform}"),"Content tiles must render shared platform marks");
 
-assert.match(publish, /<SocialBrandIcon platform=\{item\.platform\}/, "Publish review must identify the selected platform visually");
-assert.match(publish, /<SocialBrandIcon platform="tiktok"/, "TikTok Direct Post controls must carry the TikTok mark");
+assert.ok(onboarding.includes("PREVIEW MODE"),"Onboarding must describe non-persistent exploration as preview mode");
+assert.doesNotMatch(onboarding,/Supabase|BUSINESS \$\{businessId|DEMO MODE/,"Onboarding must not expose infrastructure names, internal ids, or old demo language");
+assert.ok(onboarding.includes('title:"Business context"'),"First-run flow must begin with business context");
+assert.ok(onboarding.includes('title:"Build the first 7 days"'),"First-run flow must lead to the first useful marketing cycle");
 
-for (const platform of ["instagram", "tiktok", "youtube", "facebook", "linkedin"]) {
-  assert.match(socialIcon, new RegExp(`${platform}:\\s*"`), `SocialBrandIcon must define ${platform}`);
+assert.ok(login.includes("const allowedPlans=new Set"),"Login must validate plan handoff values");
+assert.ok(login.includes('target.searchParams.set("plan",plan)'),"Selected pricing plan must survive secure sign-in");
+assert.ok(commercial.includes("function clearRequestedPlan()"),"Studio billing flow must clear one-shot plan requests");
+assert.match(commercial,/clearRequestedPlan\(\);\s*window\.location\.assign\(data\.checkoutUrl\)/,"Checkout handoff must clear plan state before leaving Studio to avoid browser-back loops");
+
+assert.ok(publish.includes("<SocialBrandIcon platform={item.platform}"),"Publish review must identify the selected platform visually");
+assert.ok(publish.includes('<SocialBrandIcon platform="tiktok"'),"TikTok controls must carry the TikTok mark");
+for(const platform of ["instagram","tiktok","youtube","facebook","linkedin"]){
+  assert.ok(socialIcon.includes(`${platform}: "`),`SocialBrandIcon must define ${platform}`);
 }
-assert.match(socialIcon, /socialBrandTikTokLayer cyan/, "TikTok mark must preserve its cyan brand offset");
-assert.match(socialIcon, /socialBrandTikTokLayer pink/, "TikTok mark must preserve its pink brand offset");
+assert.ok(socialIcon.includes("socialBrandTikTokLayer cyan"),"TikTok mark must preserve its cyan offset");
+assert.ok(socialIcon.includes("socialBrandTikTokLayer pink"),"TikTok mark must preserve its pink offset");
 
 console.log(JSON.stringify({
-  uiContract: "passed",
-  landingVersion: "v6",
-  neonMarketingSkinLoaded: false,
-  unifiedSurfaces: ["landing", "login", "studio", "creator", "publish"],
-  socialBrandIcons: ["instagram", "tiktok", "youtube", "facebook", "linkedin"],
-  semanticGreenOnly: true,
-  landingStudioContinuity: true,
-}, null, 2));
+  uiContract:"passed",
+  landingVersion:"v7",
+  firstRunSampleIsolation:true,
+  selectedPlanHandoff:true,
+  checkoutBackLoopProtected:true,
+  retiredNeonSkinLoaded:false,
+  unifiedSurfaces:["landing","login","studio","creator","voice","language","publish"],
+  socialBrandIcons:["instagram","tiktok","youtube","facebook","linkedin"],
+  semanticGreenOnly:true,
+},null,2));

@@ -1,0 +1,964 @@
+/* HAY V7 — unified product design system
+   A light-first, editorial operating system for Armenian AI marketing.
+   This layer intentionally ships last and replaces the visual language
+   without changing product behavior, API contracts or business logic. */
+
+:root {
+  --hay-bg: #f4f4f0;
+  --hay-bg-soft: #ecece6;
+  --hay-surface: #ffffff;
+  --hay-surface-2: #f8f8f5;
+  --hay-ink: #11131a;
+  --hay-ink-2: #303440;
+  --hay-muted: #6f7480;
+  --hay-faint: #a5a9b1;
+  --hay-line: rgba(17, 19, 26, 0.10);
+  --hay-line-strong: rgba(17, 19, 26, 0.18);
+  --hay-accent: #5b55e7;
+  --hay-accent-2: #403bc4;
+  --hay-accent-soft: #eeedff;
+  --hay-warm: #e36f52;
+  --hay-positive: #247b59;
+  --hay-warning: #a8661a;
+  --hay-danger: #bc4b4b;
+  --hay-shadow-sm: 0 1px 2px rgba(17, 19, 26, 0.04), 0 8px 24px rgba(17, 19, 26, 0.05);
+  --hay-shadow: 0 20px 70px rgba(17, 19, 26, 0.09), 0 2px 8px rgba(17, 19, 26, 0.05);
+  --hay-radius-sm: 12px;
+  --hay-radius: 20px;
+  --hay-radius-lg: 30px;
+  --hay-content: 1440px;
+  --hay-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
+
+html { scroll-behavior: smooth; background: var(--hay-bg); }
+body.hay-ui {
+  margin: 0;
+  color: var(--hay-ink);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(91, 85, 231, 0.07), transparent 25rem),
+    radial-gradient(circle at 92% 12%, rgba(227, 111, 82, 0.055), transparent 30rem),
+    var(--hay-bg);
+  font-family: var(--hay-font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+body.hay-ui *, body.hay-ui *::before, body.hay-ui *::after { box-sizing: border-box; }
+body.hay-ui ::selection { background: rgba(91, 85, 231, 0.18); }
+body.hay-ui a { color: inherit; }
+body.hay-ui button,
+body.hay-ui input,
+body.hay-ui textarea,
+body.hay-ui select { font: inherit; }
+body.hay-ui button,
+body.hay-ui a { -webkit-tap-highlight-color: transparent; }
+body.hay-ui button { cursor: pointer; }
+body.hay-ui button:disabled { cursor: not-allowed; opacity: .55; }
+body.hay-ui input,
+body.hay-ui textarea,
+body.hay-ui select {
+  color: var(--hay-ink);
+  background: var(--hay-surface);
+  border: 1px solid var(--hay-line);
+  border-radius: 12px;
+  outline: none;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+body.hay-ui input:focus,
+body.hay-ui textarea:focus,
+body.hay-ui select:focus {
+  border-color: rgba(91, 85, 231, .55);
+  box-shadow: 0 0 0 4px rgba(91, 85, 231, .09);
+  background: #fff;
+}
+body.hay-ui textarea { resize: vertical; }
+body.hay-ui :focus-visible { outline: 3px solid rgba(91, 85, 231, .22); outline-offset: 2px; }
+
+/* Shared navigation ------------------------------------------------------- */
+body.hay-ui :is(.hv6Nav,.marketingNav,.voiceLabNav,.languageLabNav,.developerNav,.nav) {
+  width: min(calc(100% - 32px), var(--hay-content));
+  min-height: 68px;
+  margin: 14px auto 0;
+  padding: 10px 14px 10px 18px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  position: sticky;
+  top: 12px;
+  z-index: 80;
+  color: var(--hay-ink);
+  background: rgba(255,255,255,.84);
+  border: 1px solid rgba(17,19,26,.08);
+  border-radius: 18px;
+  box-shadow: 0 10px 40px rgba(17,19,26,.06);
+  backdrop-filter: blur(18px) saturate(145%);
+}
+body.hay-ui :is(.hv6Nav,.marketingNav,.voiceLabNav,.languageLabNav,.developerNav,.nav) nav {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+}
+body.hay-ui :is(.hv6Nav,.marketingNav,.voiceLabNav,.languageLabNav,.developerNav,.nav) nav a,
+body.hay-ui .accountLink {
+  padding: 9px 11px;
+  border-radius: 10px;
+  color: var(--hay-muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .01em;
+  text-decoration: none;
+  transition: color .18s ease, background .18s ease;
+}
+body.hay-ui :is(.hv6Nav,.marketingNav,.voiceLabNav,.languageLabNav,.developerNav,.nav) nav a:hover,
+body.hay-ui :is(.hv6Nav,.marketingNav,.voiceLabNav,.languageLabNav,.developerNav,.nav) nav a.active,
+body.hay-ui .accountLink:hover { color: var(--hay-ink); background: var(--hay-bg-soft); }
+body.hay-ui :is(.voiceLabNav,.languageLabNav,.developerNav) > span {
+  display: none;
+}
+body.hay-ui :is(.hv6Locale,.localePill,.localeSwitch) {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--hay-bg-soft);
+  border: 1px solid var(--hay-line);
+  border-radius: 11px;
+}
+body.hay-ui :is(.hv6Locale,.localePill,.localeSwitch) button {
+  min-width: 36px;
+  height: 30px;
+  padding: 0 8px;
+  color: var(--hay-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 750;
+}
+body.hay-ui :is(.hv6Locale,.localePill,.localeSwitch) button.active {
+  color: var(--hay-ink);
+  background: #fff;
+  box-shadow: 0 1px 5px rgba(17,19,26,.08);
+}
+body.hay-ui .hv6Open,
+body.hay-ui :is(.hayPrimary,.primary,.creatorGenerate),
+body.hay-ui .languageControls > button,
+body.hay-ui .voiceComposer > button,
+body.hay-ui .developerCreate > button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 16px;
+  color: #fff;
+  background: var(--hay-ink);
+  border: 1px solid var(--hay-ink);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 720;
+  letter-spacing: 0;
+  text-decoration: none;
+  box-shadow: 0 6px 16px rgba(17,19,26,.12);
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+}
+body.hay-ui .hv6Open:hover,
+body.hay-ui :is(.hayPrimary,.primary,.creatorGenerate):hover,
+body.hay-ui .languageControls > button:hover,
+body.hay-ui .voiceComposer > button:hover,
+body.hay-ui .developerCreate > button:hover {
+  transform: translateY(-1px);
+  background: #242733;
+  box-shadow: 0 10px 24px rgba(17,19,26,.16);
+}
+body.hay-ui :is(.haySecondary,.hv6Ghost) {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 15px;
+  color: var(--hay-ink);
+  background: rgba(255,255,255,.7);
+  border: 1px solid var(--hay-line-strong);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 680;
+  text-decoration: none;
+}
+
+/* Landing ---------------------------------------------------------------- */
+body.hay-ui .hayLandingV6 {
+  min-height: 100vh;
+  overflow: clip;
+  color: var(--hay-ink);
+  background: transparent;
+}
+body.hay-ui .hv6NavActions { display: flex; align-items: center; gap: 10px; margin-left: 6px; }
+body.hay-ui .hv6Brand { display: flex; align-items: center; text-decoration: none; }
+body.hay-ui .hv6Hero {
+  width: min(calc(100% - 40px), var(--hay-content));
+  margin: 0 auto;
+  padding: 88px 0 74px;
+  display: grid;
+  grid-template-columns: minmax(0, .92fr) minmax(520px, 1.08fr);
+  gap: clamp(42px, 7vw, 104px);
+  align-items: center;
+}
+body.hay-ui .hv6HeroCopy { max-width: 700px; }
+body.hay-ui :is(.hv6Eyebrow,.signalLabel,.eyebrow) {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 22px;
+  color: var(--hay-accent-2);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+body.hay-ui :is(.hv6Eyebrow,.signalLabel) i {
+  width: 7px;
+  height: 7px;
+  display: inline-block;
+  border-radius: 50%;
+  background: var(--hay-accent);
+  box-shadow: 0 0 0 5px rgba(91,85,231,.09);
+}
+body.hay-ui .hv6Hero h1 {
+  margin: 0;
+  color: var(--hay-ink);
+  font-size: clamp(46px, 6vw, 82px);
+  line-height: .99;
+  letter-spacing: -.055em;
+  font-weight: 740;
+}
+body.hay-ui .hv6Hero h1 span,
+body.hay-ui .hv6Hero h1 strong { display: block; color: inherit; font: inherit; }
+body.hay-ui .hv6Hero h1 strong { color: var(--hay-accent); }
+body.hay-ui .hv6HeroCopy > p {
+  max-width: 620px;
+  margin: 26px 0 0;
+  color: var(--hay-muted);
+  font-size: clamp(16px, 1.5vw, 19px);
+  line-height: 1.65;
+}
+body.hay-ui .hv6HeroActions { display: flex; gap: 10px; margin-top: 30px; flex-wrap: wrap; }
+body.hay-ui .hv6Primary {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 19px;
+  color: #fff;
+  background: var(--hay-accent);
+  border: 1px solid var(--hay-accent);
+  border-radius: 13px;
+  font-size: 13px;
+  font-weight: 720;
+  text-decoration: none;
+  box-shadow: 0 12px 30px rgba(91,85,231,.22);
+}
+body.hay-ui .hv6Primary:hover { background: var(--hay-accent-2); transform: translateY(-1px); }
+body.hay-ui .hv6HeroCopy > small { display: block; margin-top: 16px; color: var(--hay-faint); font-size: 11px; }
+body.hay-ui .hv6ProductWindow {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--hay-ink);
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(17,19,26,.09);
+  border-radius: 28px;
+  box-shadow: var(--hay-shadow);
+  transform: rotate(.35deg);
+}
+body.hay-ui .hv6WindowBar,
+body.hay-ui .hv6ChannelBar {
+  min-height: 48px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--hay-muted);
+  background: rgba(248,248,245,.92);
+  border-bottom: 1px solid var(--hay-line);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+body.hay-ui .hv6WindowBar > div { display: flex; gap: 5px; }
+body.hay-ui .hv6WindowBar > div i { width: 8px; height: 8px; border-radius: 50%; background: #d3d3ce; }
+body.hay-ui .hv6WindowBar > b { margin-left: auto; color: var(--hay-ink-2); font-size: 10px; }
+body.hay-ui .hv6ChannelBar { justify-content: space-between; background: #fff; }
+body.hay-ui .hv6ChannelBar > div { display: flex; gap: 7px; }
+body.hay-ui .hv6ChannelBar > div > div {
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  background: var(--hay-surface-2);
+  border: 1px solid var(--hay-line);
+  border-radius: 10px;
+}
+body.hay-ui .hv6ChannelBar > div > div i { width: 6px; height: 6px; position: absolute; right: -1px; bottom: -1px; border: 2px solid #fff; border-radius: 50%; background: var(--hay-positive); }
+body.hay-ui .hv6WindowBody { display: grid; grid-template-columns: 1.2fr .8fr; min-height: 420px; }
+body.hay-ui .hv6DayStream { padding: 22px; border-right: 1px solid var(--hay-line); }
+body.hay-ui .hv6DayHead { margin-bottom: 16px; display: flex; justify-content: space-between; color: var(--hay-muted); font-size: 10px; font-weight: 740; letter-spacing: .08em; }
+body.hay-ui .hv6DayHead b { display: inline-flex; align-items: center; gap: 7px; color: var(--hay-positive); }
+body.hay-ui .hv6DayHead b i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+body.hay-ui .hv6DayStream article {
+  margin: 0 0 10px;
+  padding: 15px;
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  color: var(--hay-ink);
+  background: var(--hay-surface-2);
+  border: 1px solid var(--hay-line);
+  border-radius: 14px;
+}
+body.hay-ui .hv6DayStream article.active { background: var(--hay-accent-soft); border-color: rgba(91,85,231,.22); }
+body.hay-ui .hv6DayStream time { color: var(--hay-faint); font-size: 11px; }
+body.hay-ui .hv6DayStream article strong { display: block; font-size: 13px; line-height: 1.35; }
+body.hay-ui .hv6DayStream article p { margin: 4px 0 0; color: var(--hay-muted); font-size: 11px; }
+body.hay-ui .hv6DayStream article :is(em,button) { padding: 5px 8px; color: var(--hay-accent-2); background: #fff; border: 1px solid rgba(91,85,231,.18); border-radius: 8px; font-size: 9px; font-style: normal; font-weight: 750; }
+body.hay-ui .hv6AssetPreview { padding: 22px; background: #fbfbf8; }
+body.hay-ui .hv6AssetTop { display: flex; justify-content: space-between; color: var(--hay-muted); font-size: 9px; font-weight: 750; letter-spacing: .08em; }
+body.hay-ui .hv6Poster {
+  aspect-ratio: 9/11;
+  margin: 20px 0 16px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(155deg,#232735,#4d477f 55%,#d47862);
+  border-radius: 18px;
+}
+body.hay-ui .hv6PosterH { color: rgba(255,255,255,.95); font-size: 78px; font-weight: 700; }
+body.hay-ui .hv6PosterLines { display: none; }
+body.hay-ui .hv6AssetPreview > strong { display: block; font-size: 14px; line-height: 1.35; }
+body.hay-ui .hv6AssetPreview > p { margin: 5px 0 0; color: var(--hay-muted); font-size: 10px; }
+body.hay-ui .hv6PlatformRail {
+  width: min(calc(100% - 40px), var(--hay-content));
+  margin: 0 auto 22px;
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
+  align-items: center;
+  background: rgba(255,255,255,.62);
+  border: 1px solid var(--hay-line);
+  border-radius: 18px;
+}
+body.hay-ui .hv6PlatformRail p { max-width: 620px; margin: 0; color: var(--hay-muted); font-size: 13px; }
+body.hay-ui .hv6PlatformRail > div { display: flex; gap: 7px; flex-wrap: wrap; }
+body.hay-ui .hv6PlatformRail > div span { display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px; background: #fff; border: 1px solid var(--hay-line); border-radius: 10px; }
+body.hay-ui .hv6PlatformRail b { font-size: 10px; font-weight: 670; }
+body.hay-ui :is(.hv6How,.hv6Armenian,.hv6Loop,.hv6Pricing,.hv6Final) {
+  width: min(calc(100% - 40px), var(--hay-content));
+  margin: 22px auto 0;
+  padding: clamp(54px,7vw,92px);
+  border-radius: var(--hay-radius-lg);
+}
+body.hay-ui :is(.hv6How,.hv6Pricing) { background: #fff; border: 1px solid var(--hay-line); box-shadow: var(--hay-shadow-sm); }
+body.hay-ui .hv6SectionLead { max-width: 850px; }
+body.hay-ui .hv6SectionLead > span,
+body.hay-ui :is(.hv6ArmenianCopy,.hv6LoopCopy,.hv6Final > div) > span {
+  color: var(--hay-accent-2);
+  font-size: 10px;
+  font-weight: 780;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+body.hay-ui .hv6SectionLead h2,
+body.hay-ui :is(.hv6ArmenianCopy,.hv6LoopCopy,.hv6Final > div) h2 {
+  margin: 14px 0 0;
+  color: var(--hay-ink);
+  font-size: clamp(34px,4.5vw,62px);
+  line-height: 1.05;
+  letter-spacing: -.045em;
+  font-weight: 710;
+}
+body.hay-ui .hv6Steps { margin-top: 46px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+body.hay-ui .hv6Steps article {
+  min-height: 300px;
+  padding: 26px;
+  position: relative;
+  overflow: hidden;
+  background: var(--hay-surface-2);
+  border: 1px solid var(--hay-line);
+  border-radius: 20px;
+}
+body.hay-ui .hv6Steps article.wide { grid-column: 1/-1; min-height: 230px; }
+body.hay-ui .hv6Steps article > div:first-child { display: flex; gap: 12px; color: var(--hay-muted); font-size: 10px; font-weight: 760; letter-spacing: .08em; }
+body.hay-ui .hv6Steps h3 { max-width: 520px; margin: 42px 0 0; font-size: 28px; line-height: 1.12; letter-spacing: -.025em; }
+body.hay-ui .hv6Steps p { max-width: 520px; color: var(--hay-muted); font-size: 14px; }
+body.hay-ui .hv6StepVisual { opacity: .5; filter: saturate(.6); }
+body.hay-ui .hv6StepChannels { display: flex; gap: 8px; margin-top: 28px; }
+body.hay-ui .hv6Armenian {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(40px,8vw,120px);
+  align-items: center;
+  background: #20232d;
+  color: #fff;
+}
+body.hay-ui .hv6ArmenianCopy h2 { color: #fff; }
+body.hay-ui .hv6ArmenianCopy > p { max-width: 650px; color: rgba(255,255,255,.64); font-size: 16px; line-height: 1.7; }
+body.hay-ui .hv6Guards { display: flex; flex-wrap: wrap; gap: 7px; margin: 26px 0; }
+body.hay-ui .hv6Guards i { padding: 7px 9px; color: rgba(255,255,255,.72); background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.10); border-radius: 9px; font-size: 10px; font-style: normal; }
+body.hay-ui .hv6ArmenianCopy > a { color: #fff; font-size: 11px; font-weight: 750; text-decoration: none; }
+body.hay-ui .hv6SpeechDemo { padding: 18px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.10); border-radius: 22px; }
+body.hay-ui .hv6SpeechDemo > div { padding: 20px; background: rgba(255,255,255,.06); border-radius: 14px; }
+body.hay-ui .hv6SpeechDemo > b { display: block; margin: 7px 0; color: rgba(255,255,255,.35); text-align: center; }
+body.hay-ui .hv6SpeechDemo span,
+body.hay-ui .hv6SpeechDemo small { color: rgba(255,255,255,.48); font-size: 9px; letter-spacing: .08em; }
+body.hay-ui .hv6SpeechDemo p { margin: 12px 0; color: #fff; font-size: 22px; line-height: 1.35; }
+body.hay-ui .hv6SpeechDemo footer { margin-top: 14px; display: flex; align-items: center; gap: 8px; }
+body.hay-ui .hv6Loop { background: #e8e8ff; }
+body.hay-ui .hv6LoopCopy { max-width: 850px; }
+body.hay-ui .hv6LoopCopy p { max-width: 700px; color: var(--hay-muted); font-size: 16px; }
+body.hay-ui .hv6LoopTrack { margin-top: 42px; display: grid; grid-template-columns: repeat(6,1fr); gap: 8px; }
+body.hay-ui .hv6LoopTrack > div { min-width: 0; padding: 16px; position: relative; background: rgba(255,255,255,.68); border: 1px solid rgba(91,85,231,.10); border-radius: 14px; }
+body.hay-ui .hv6LoopTrack b { display: block; color: var(--hay-faint); font-size: 9px; }
+body.hay-ui .hv6LoopTrack strong { display: block; margin-top: 18px; font-size: 11px; letter-spacing: .04em; }
+body.hay-ui .hv6LoopTrack i { display: none; }
+body.hay-ui .hv6PlanRail { margin-top: 42px; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+body.hay-ui .hv6PlanRail article { min-height: 340px; padding: 24px; display: flex; flex-direction: column; background: var(--hay-surface-2); border: 1px solid var(--hay-line); border-radius: 18px; }
+body.hay-ui .hv6PlanRail article.featured { background: var(--hay-ink); color: #fff; border-color: var(--hay-ink); box-shadow: 0 20px 44px rgba(17,19,26,.14); }
+body.hay-ui .hv6PlanRail article > div { display: flex; justify-content: space-between; gap: 10px; color: var(--hay-muted); font-size: 9px; font-weight: 760; }
+body.hay-ui .hv6PlanRail article.featured > div { color: rgba(255,255,255,.55); }
+body.hay-ui .hv6PlanRail article em { padding: 4px 7px; color: var(--hay-accent-2); background: var(--hay-accent-soft); border-radius: 7px; font-style: normal; }
+body.hay-ui .hv6PlanRail h3 { margin: 34px 0 8px; font-size: 25px; letter-spacing: -.025em; }
+body.hay-ui .hv6PlanRail p { color: var(--hay-muted); font-size: 13px; }
+body.hay-ui .hv6PlanRail article.featured p { color: rgba(255,255,255,.58); }
+body.hay-ui .hv6PlanRail article > strong { margin-top: auto; font-size: 24px; letter-spacing: -.02em; }
+body.hay-ui .hv6PlanRail article > strong small { color: var(--hay-muted); font-size: 10px; font-weight: 500; }
+body.hay-ui .hv6PlanRail article > a { margin-top: 16px; min-height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; color: var(--hay-ink); background: #fff; border: 1px solid var(--hay-line); border-radius: 11px; font-size: 11px; font-weight: 700; text-decoration: none; }
+body.hay-ui .hv6Agency { margin-top: 12px; padding: 26px; display: grid; grid-template-columns: 1fr auto auto; gap: 30px; align-items: center; background: var(--hay-surface-2); border: 1px solid var(--hay-line); border-radius: 18px; }
+body.hay-ui .hv6Agency h3 { margin: 6px 0; font-size: 24px; }
+body.hay-ui .hv6Agency p { margin: 0; color: var(--hay-muted); }
+body.hay-ui .hv6Agency > a { padding: 10px 13px; background: #fff; border: 1px solid var(--hay-line); border-radius: 11px; text-decoration: none; font-size: 11px; font-weight: 700; }
+body.hay-ui .hv6Final { display: flex; justify-content: space-between; gap: 40px; align-items: end; background: #fff; border: 1px solid var(--hay-line); }
+body.hay-ui .hv6Final > div { max-width: 850px; }
+body.hay-ui .hv6Final p { max-width: 680px; color: var(--hay-muted); }
+body.hay-ui .hv6Final > a { flex: 0 0 auto; min-height: 54px; display: inline-flex; align-items: center; gap: 18px; padding: 0 20px; color: #fff; background: var(--hay-accent); border-radius: 14px; font-size: 12px; font-weight: 730; text-decoration: none; }
+body.hay-ui .hv6Footer { width: min(calc(100% - 40px), var(--hay-content)); margin: 0 auto; padding: 34px 4px 42px; display: flex; justify-content: space-between; gap: 20px; color: var(--hay-faint); font-size: 9px; letter-spacing: .08em; }
+
+/* Marketing OS / main product ------------------------------------------- */
+body.hay-ui .marketingPage {
+  width: min(calc(100% - 32px), var(--hay-content));
+  margin: 0 auto;
+  padding: 0 0 70px;
+  color: var(--hay-ink);
+  background: transparent;
+}
+body.hay-ui .marketingPage .marketingNav { width: 100%; margin-left: 0; margin-right: 0; }
+body.hay-ui .productNav { display: flex; gap: 4px; margin-left: auto; }
+body.hay-ui .navTools { display: flex; gap: 7px; align-items: center; }
+body.hay-ui .commandButton {
+  width: 42px; height: 36px; display: grid; place-items: center;
+  color: var(--hay-muted); background: var(--hay-bg-soft); border: 1px solid var(--hay-line); border-radius: 10px; font-size: 10px;
+}
+body.hay-ui .marketingHero {
+  min-height: auto;
+  margin: 18px 0 0;
+  padding: clamp(38px,5vw,70px);
+  display: block;
+  position: relative;
+  overflow: hidden;
+  color: var(--hay-ink);
+  background: linear-gradient(135deg,#ffffff 0%,#f9f8ff 62%,#f2efff 100%);
+  border: 1px solid var(--hay-line);
+  border-radius: 28px;
+  box-shadow: var(--hay-shadow-sm);
+}
+body.hay-ui .marketingHero::after {
+  content: "Հ";
+  position: absolute;
+  right: clamp(24px,6vw,90px);
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(91,85,231,.07);
+  font-size: clamp(150px,20vw,300px);
+  font-weight: 760;
+  line-height: 1;
+  pointer-events: none;
+}
+body.hay-ui .heroCopy { max-width: 940px; position: relative; z-index: 1; }
+body.hay-ui .heroCopy h1 {
+  max-width: 950px;
+  margin: 0;
+  color: var(--hay-ink);
+  font-size: clamp(38px,5vw,70px);
+  line-height: 1.02;
+  letter-spacing: -.05em;
+  font-weight: 720;
+}
+body.hay-ui .heroCopy h1 span { display: block; color: var(--hay-accent); }
+body.hay-ui .heroCopy > p { max-width: 760px; margin: 20px 0 0; color: var(--hay-muted); font-size: 16px; line-height: 1.65; }
+body.hay-ui .heroActions { margin-top: 26px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+body.hay-ui .heroActions :is(.hayPrimary,.haySecondary) { min-height: 46px; padding: 0 16px; }
+body.hay-ui .autopilot { min-height: 46px; display: inline-flex; align-items: center; gap: 9px; padding: 0 12px; color: var(--hay-muted); background: #fff; border: 1px solid var(--hay-line); border-radius: 12px; }
+body.hay-ui .autopilot input { position: absolute; opacity: 0; pointer-events: none; }
+body.hay-ui .autopilot > span { width: 32px; height: 18px; position: relative; background: #d8d9dd; border-radius: 999px; }
+body.hay-ui .autopilot > span::after { content:""; width: 14px; height: 14px; position:absolute; left:2px; top:2px; background:#fff; border-radius:50%; box-shadow:0 1px 3px rgba(17,19,26,.2); transition:.18s ease; }
+body.hay-ui .autopilot.on > span { background: var(--hay-accent); }
+body.hay-ui .autopilot.on > span::after { transform: translateX(14px); }
+body.hay-ui .autopilot b { color: var(--hay-ink); font-size: 11px; }
+body.hay-ui .autopilot small { color: var(--hay-faint); font-size: 9px; }
+body.hay-ui .marketingMessage { margin: 14px 0 0 !important; padding: 10px 12px; color: var(--hay-ink-2) !important; background: rgba(255,255,255,.72); border: 1px solid var(--hay-line); border-radius: 11px; font-size: 12px !important; }
+body.hay-ui .orbitPanel { display: none !important; }
+body.hay-ui .studioTodayBrief {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: minmax(0,2.2fr) repeat(3,minmax(150px,.8fr));
+  gap: 10px;
+  position: relative;
+  z-index: 2;
+}
+body.hay-ui .studioTodayBrief > * { min-height: 116px; padding: 16px; color: var(--hay-ink); background: rgba(255,255,255,.8); border: 1px solid var(--hay-line); border-radius: 15px; box-shadow: none; }
+body.hay-ui .todayMove { display: flex; flex-direction: column; align-items: flex-start; }
+body.hay-ui .todayMove > span,
+body.hay-ui .todayMetric > span { color: var(--hay-muted); font-size: 9px; font-weight: 760; letter-spacing: .09em; }
+body.hay-ui .todayMove strong { max-width: 660px; margin-top: 8px; font-size: 15px; line-height: 1.4; }
+body.hay-ui .todayMove button { margin-top: auto; padding: 0; color: var(--hay-accent-2); background: transparent; border: 0; font-size: 10px; font-weight: 750; }
+body.hay-ui .todayMetric { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+body.hay-ui .todayMetric strong { margin-top: 9px; font-size: 23px; letter-spacing: -.03em; }
+body.hay-ui .todayMetric small { margin-top: auto; color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .marketingGrid { margin-top: 14px; display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap: 12px; }
+body.hay-ui .intelCard {
+  min-width: 0;
+  min-height: 360px;
+  padding: 24px;
+  color: var(--hay-ink);
+  background: #fff;
+  border: 1px solid var(--hay-line);
+  border-radius: 22px;
+  box-shadow: var(--hay-shadow-sm);
+}
+body.hay-ui .businessCard { grid-column: span 7; }
+body.hay-ui .channelsCard { grid-column: span 5; }
+body.hay-ui :is(.intelligenceCard,.competitorsCard) { grid-column: span 6; min-height: 300px; }
+body.hay-ui .panelTop { min-height: 32px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; color: var(--hay-muted); border: 0; font-size: 9px; font-weight: 760; letter-spacing: .09em; }
+body.hay-ui .panelTop em { padding: 5px 7px; color: var(--hay-positive); background: rgba(36,123,89,.08); border-radius: 7px; font-style: normal; }
+body.hay-ui .businessNameRow { display: flex; align-items: center; gap: 10px; }
+body.hay-ui .businessNameRow input { width: 100%; padding: 12px 13px; font-size: 22px; font-weight: 680; letter-spacing: -.02em; }
+body.hay-ui .pulseDot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: var(--hay-positive); box-shadow: 0 0 0 5px rgba(36,123,89,.08); }
+body.hay-ui .fieldPair { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+body.hay-ui :is(.fieldPair,.fullField) label,
+body.hay-ui .fullField { color: var(--hay-muted); font-size: 10px; font-weight: 650; }
+body.hay-ui :is(.fieldPair,.fullField) input,
+body.hay-ui .fullField textarea { width: 100%; margin-top: 6px; padding: 11px 12px; font-size: 13px; }
+body.hay-ui .fullField { display: block; margin-top: 10px; }
+body.hay-ui .fullField textarea { min-height: 86px; }
+body.hay-ui .dnaStrip { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 7px; }
+body.hay-ui .dnaStrip span { padding: 7px 9px; color: var(--hay-muted); background: var(--hay-surface-2); border: 1px solid var(--hay-line); border-radius: 9px; font-size: 9px; }
+body.hay-ui .dnaStrip b { color: var(--hay-ink); }
+body.hay-ui .channelList { display: grid; gap: 8px; }
+body.hay-ui .channelList > button { width: 100%; min-height: 60px; padding: 10px 12px; display: grid; grid-template-columns: 38px 1fr auto; gap: 11px; align-items: center; text-align: left; color: var(--hay-ink); background: var(--hay-surface-2); border: 1px solid var(--hay-line); border-radius: 13px; }
+body.hay-ui .channelList > button:hover { background: var(--hay-accent-soft); border-color: rgba(91,85,231,.20); }
+body.hay-ui .channelList > button > i { width: 36px; height: 36px; display: grid; place-items: center; background: #fff; border: 1px solid var(--hay-line); border-radius: 10px; }
+body.hay-ui .channelList strong { display: block; font-size: 12px; }
+body.hay-ui .channelList small { display: block; margin-top: 2px; color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .connectionLed { width: 8px; height: 8px; border-radius: 50%; background: #c9cbd0; }
+body.hay-ui .connectionLed.ready,
+body.hay-ui .connectionLed.connected { background: var(--hay-positive); }
+body.hay-ui .microcopy { margin: 13px 0 0; color: var(--hay-faint); font-size: 9px; }
+body.hay-ui .strategyQuote { padding: 18px; color: var(--hay-ink); background: var(--hay-surface-2); border: 1px solid var(--hay-line); border-radius: 14px; font-size: 18px; line-height: 1.45; letter-spacing: -.015em; }
+body.hay-ui .pillarCloud { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+body.hay-ui .pillarCloud span { padding: 7px 9px; color: var(--hay-ink-2); background: #fff; border: 1px solid var(--hay-line); border-radius: 9px; font-size: 10px; }
+body.hay-ui .pillarCloud i { margin-right: 6px; color: var(--hay-faint); font-style: normal; }
+body.hay-ui .competitorsCard > textarea { width: 100%; min-height: 90px; padding: 12px; font-size: 13px; }
+body.hay-ui .radarRows { margin-top: 12px; display: grid; gap: 7px; }
+body.hay-ui .radarRows > div { min-height: 48px; padding: 9px 11px; display: grid; grid-template-columns: 30px 1fr 1fr; gap: 8px; align-items: center; background: var(--hay-surface-2); border-radius: 10px; }
+body.hay-ui .radarRows > div > span { color: var(--hay-faint); font-size: 9px; }
+body.hay-ui .radarRows strong { font-size: 11px; }
+body.hay-ui .radarRows small { color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .contentPulse { margin-top: 12px; padding: 26px; color: var(--hay-ink); background: #fff; border: 1px solid var(--hay-line); border-radius: 22px; box-shadow: var(--hay-shadow-sm); }
+body.hay-ui .pulseHeader { display: flex; justify-content: space-between; gap: 20px; align-items: end; }
+body.hay-ui .pulseHeader > div:first-child > span { color: var(--hay-muted); font-size: 9px; font-weight: 760; letter-spacing: .1em; }
+body.hay-ui .pulseHeader h2 { margin: 5px 0 0; font-size: 28px; letter-spacing: -.03em; }
+body.hay-ui .pulseStats { display: flex; gap: 7px; flex-wrap: wrap; }
+body.hay-ui .pulseStats span { padding: 7px 9px; color: var(--hay-muted); background: var(--hay-surface-2); border: 1px solid var(--hay-line); border-radius: 9px; font-size: 9px; }
+body.hay-ui .pulseStats b { color: var(--hay-ink); }
+body.hay-ui .calendarRail { margin-top: 20px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; overflow: visible; }
+body.hay-ui .contentTile { min-height: 240px; padding: 16px; display: flex; flex-direction: column; color: var(--hay-ink); background: var(--hay-surface-2); border: 1px solid var(--hay-line); border-radius: 15px; }
+body.hay-ui .tileMeta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .tileMeta i { display: inline-flex; align-items: center; gap: 4px; font-style: normal; }
+body.hay-ui .tileMeta em { margin-left: auto; font-style: normal; }
+body.hay-ui .contentTile h3 { margin: 24px 0 7px; font-size: 18px; line-height: 1.25; letter-spacing: -.02em; }
+body.hay-ui .contentTile p { margin: 0; color: var(--hay-muted); font-size: 11px; }
+body.hay-ui .contentTile footer { margin-top: auto; padding-top: 18px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+body.hay-ui .contentTile footer span { color: var(--hay-faint); font-size: 9px; }
+body.hay-ui .contentTile footer button { min-height: 34px; padding: 0 10px; color: var(--hay-accent-2); background: #fff; border: 1px solid rgba(91,85,231,.18); border-radius: 9px; font-size: 9px; font-weight: 700; }
+body.hay-ui .emptyPulse { min-height: 300px; display: grid; place-items: center; align-content: center; text-align: center; background: var(--hay-surface-2); border: 1px dashed var(--hay-line-strong); border-radius: 16px; }
+body.hay-ui .emptyGlyph { width: 54px; height: 54px; display: grid; place-items: center; color: var(--hay-accent); background: var(--hay-accent-soft); border-radius: 15px; font-size: 28px; font-weight: 700; }
+body.hay-ui .emptyPulse h3 { margin: 14px 0 4px; font-size: 20px; }
+body.hay-ui .emptyPulse p { max-width: 480px; margin: 0 0 16px; color: var(--hay-muted); font-size: 12px; }
+body.hay-ui .systemLine { margin-top: 12px; padding: 12px 4px; display: flex; justify-content: space-between; gap: 16px; color: var(--hay-faint); border: 0; font-size: 8px; letter-spacing: .08em; }
+
+/* Studio rails and secondary operational modules ------------------------- */
+body.hay-ui .studioStatusRail,
+body.hay-ui .studioCommercialRail,
+body.hay-ui .studioWorkspaceSwitcher {
+  width: min(calc(100% - 32px), var(--hay-content));
+  margin: 10px auto 0;
+  color: var(--hay-ink);
+  background: rgba(255,255,255,.76);
+  border: 1px solid var(--hay-line);
+  border-radius: 16px;
+  box-shadow: var(--hay-shadow-sm);
+}
+body.hay-ui .studioStatusRail { margin-top: 14px; padding: 12px; display: grid; grid-template-columns: 220px 1fr 210px; gap: 8px; }
+body.hay-ui .studioStatusIntro { padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+body.hay-ui .studioStatusIntro span { color: var(--hay-ink); font-size: 9px; font-weight: 760; }
+body.hay-ui .studioStatusIntro span i { width: 6px; height: 6px; display: inline-block; margin-right: 6px; border-radius: 50%; background: var(--hay-positive); }
+body.hay-ui .studioStatusIntro b { color: var(--hay-muted); font-size: 8px; font-weight: 600; }
+body.hay-ui .studioStatusCells { display: grid; grid-template-columns: repeat(6,1fr); gap: 5px; }
+body.hay-ui .studioStatusCells a,
+body.hay-ui .studioStatusQuality { min-width: 0; padding: 8px; display: flex; flex-direction: column; justify-content: center; text-decoration: none; background: var(--hay-surface-2); border: 1px solid var(--hay-line); border-radius: 10px; }
+body.hay-ui .studioStatusCells span,
+body.hay-ui .studioStatusQuality span { color: var(--hay-faint); font-size: 7px; letter-spacing: .06em; }
+body.hay-ui .studioStatusCells strong,
+body.hay-ui .studioStatusQuality strong { margin-top: 3px; font-size: 9px; }
+body.hay-ui .studioStatusCells a > i { width: 5px; height: 5px; position: absolute; opacity: 0; }
+body.hay-ui .studioStatusCells a.ready strong { color: var(--hay-positive); }
+body.hay-ui .studioStatusQuality small { margin-top: 2px; color: var(--hay-faint); font-size: 7px; }
+body.hay-ui .studioAppV7 { min-height: 100vh; }
+body.hay-ui .studioInsightGrid,
+body.hay-ui .studioExecutionGrid {
+  width: min(calc(100% - 32px), var(--hay-content));
+  margin: 12px auto 0;
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 12px;
+  align-items: start;
+}
+body.hay-ui :is(.studioInsightGrid,.studioExecutionGrid) > * {
+  min-width: 0;
+  margin: 0 !important;
+  color: var(--hay-ink);
+  background: #fff;
+  border-color: var(--hay-line) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--hay-shadow-sm);
+}
+body.hay-ui .studioOnboardingWrap { width: min(calc(100% - 32px), var(--hay-content)); margin: 12px auto 70px; }
+body.hay-ui .studioOnboardingWrap > * { margin: 0 !important; border-radius: 20px !important; }
+
+/* Creator --------------------------------------------------------------- */
+body.hay-ui .shell.creatorShell {
+  width: min(calc(100% - 32px), var(--hay-content));
+  max-width: var(--hay-content);
+  margin: 0 auto;
+  padding: 0 0 70px;
+  color: var(--hay-ink);
+  background: transparent;
+}
+body.hay-ui .creatorShell > .nav { width: 100%; margin-left: 0; margin-right: 0; justify-content: space-between; }
+body.hay-ui .creatorHero { max-width: 900px; padding: 76px 0 46px; }
+body.hay-ui .creatorHero h1 { margin: 0; color: var(--hay-ink); font-size: clamp(44px,6vw,78px); line-height: 1; letter-spacing: -.05em; font-weight: 720; }
+body.hay-ui .creatorHero p { max-width: 680px; margin: 20px 0 0; color: var(--hay-muted); font-size: 17px; line-height: 1.65; }
+body.hay-ui .creatorWorkspace { display: grid; grid-template-columns: 1.35fr .65fr; gap: 12px; align-items: stretch; }
+body.hay-ui .creatorShell .card { color: var(--hay-ink); background: #fff; border: 1px solid var(--hay-line); border-radius: 22px; box-shadow: var(--hay-shadow-sm); }
+body.hay-ui .creatorComposer { padding: 24px; }
+body.hay-ui .creatorComposer > label { display: block; margin-bottom: 8px; color: var(--hay-muted); font-size: 10px; font-weight: 700; }
+body.hay-ui .creatorComposer > textarea { width: 100%; min-height: 170px; padding: 16px; font-size: 15px; line-height: 1.6; }
+body.hay-ui .creatorSettings { margin-top: 12px; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 8px; }
+body.hay-ui .creatorSettings label { min-width: 0; color: var(--hay-muted); font-size: 9px; font-weight: 650; }
+body.hay-ui .creatorSettings select { width: 100%; min-height: 40px; margin-top: 5px; padding: 0 8px; font-size: 11px; }
+body.hay-ui .creatorGenerate { margin-top: 14px; }
+body.hay-ui .creatorPipeline { padding: 20px; }
+body.hay-ui .cardHeader,
+body.hay-ui .sectionTitle { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--hay-muted); font-size: 9px; font-weight: 730; letter-spacing: .08em; }
+body.hay-ui .pipelineRow { padding: 14px 0; display: grid; grid-template-columns: 28px 1fr; gap: 8px; border-bottom: 1px solid var(--hay-line); }
+body.hay-ui .pipelineRow > span { color: var(--hay-faint); font-size: 9px; }
+body.hay-ui .pipelineRow strong { display: block; color: var(--hay-ink); font-size: 11px; }
+body.hay-ui .pipelineRow small { color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .creatorResult { margin-top: 12px; display: grid; grid-template-columns: .95fr 1.05fr; gap: 12px; align-items: start; }
+body.hay-ui .creatorResult > .card { padding: 20px; }
+body.hay-ui .creatorMessage { margin-top: 10px; padding: 10px 12px; color: var(--hay-ink-2); background: var(--hay-accent-soft); border-radius: 10px; font-size: 11px; }
+
+/* Voice / Language / Developer — same product, not separate microsites ---- */
+body.hay-ui :is(.voiceLabPage,.languageLabPage,.developerPage) {
+  width: min(calc(100% - 32px), var(--hay-content));
+  margin: 0 auto;
+  padding: 0 0 70px;
+  color: var(--hay-ink);
+  background: transparent;
+}
+body.hay-ui :is(.voiceLabPage,.languageLabPage,.developerPage) > :is(.voiceLabNav,.languageLabNav,.developerNav) { width: 100%; margin-left: 0; margin-right: 0; }
+body.hay-ui :is(.voiceLabHero,.languageHero,.developerHero) {
+  margin: 18px 0 0;
+  padding: clamp(42px,6vw,78px);
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+  gap: 60px;
+  align-items: end;
+  background: #fff;
+  border: 1px solid var(--hay-line);
+  border-radius: 28px;
+  box-shadow: var(--hay-shadow-sm);
+}
+body.hay-ui :is(.voiceLabHero,.languageHero,.developerHero) > span,
+body.hay-ui :is(.languageHero,.developerHero) > div > span { color: var(--hay-accent-2); font-size: 10px; font-weight: 760; letter-spacing: .11em; }
+body.hay-ui :is(.voiceLabHero,.languageHero,.developerHero) h1 { margin: 10px 0 0; color: var(--hay-ink); font-size: clamp(42px,6vw,76px); line-height: 1; letter-spacing: -.05em; font-weight: 710; }
+body.hay-ui :is(.voiceLabHero,.languageHero,.developerHero) h1 em { color: var(--hay-accent); font-style: normal; }
+body.hay-ui :is(.voiceLabHero,.languageHero,.developerHero) > p { max-width: 560px; margin: 0; color: var(--hay-muted); font-size: 15px; line-height: 1.7; }
+body.hay-ui .voiceLabGrid { margin-top: 12px; display: grid; grid-template-columns: 1.2fr .8fr; gap: 12px; }
+body.hay-ui :is(.voiceComposer,.voiceCatalog,.voiceOutput,.languageComposer,.languageOutput,.developerKeys,.developerUsage,.developerDocs,.developerBlocker) {
+  color: var(--hay-ink);
+  background: #fff;
+  border: 1px solid var(--hay-line);
+  border-radius: 20px;
+  box-shadow: var(--hay-shadow-sm);
+}
+body.hay-ui .voiceComposer { padding: 22px; }
+body.hay-ui .voicePanelTop { display: flex; justify-content: space-between; gap: 10px; color: var(--hay-muted); font-size: 9px; font-weight: 740; letter-spacing: .08em; }
+body.hay-ui .voiceComposer textarea { width: 100%; min-height: 220px; margin-top: 14px; padding: 14px; font-size: 15px; line-height: 1.65; }
+body.hay-ui .voiceControls { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+body.hay-ui .voiceControls label { color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .voiceControls select { width: 100%; min-height: 42px; margin-top: 5px; padding: 0 10px; font-size: 11px; }
+body.hay-ui .voiceComposer > button { width: 100%; margin-top: 12px; }
+body.hay-ui .voiceCatalog { padding: 18px; }
+body.hay-ui .voiceCatalog > button { width: 100%; min-height: 62px; margin-top: 7px; padding: 9px 10px; display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; text-align: left; color: var(--hay-ink); background: var(--hay-surface-2); border: 1px solid var(--hay-line); border-radius: 12px; }
+body.hay-ui .voiceCatalog > button.active { background: var(--hay-accent-soft); border-color: rgba(91,85,231,.25); }
+body.hay-ui .voiceCatalog > button > i { width: 34px; height: 34px; display: grid; place-items: center; color: var(--hay-accent-2); background: #fff; border-radius: 9px; font-style: normal; }
+body.hay-ui .voiceCatalog strong { display: block; font-size: 11px; }
+body.hay-ui .voiceCatalog small { color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .voiceCatalog > button > span { color: var(--hay-faint); font-size: 8px; }
+body.hay-ui .voiceOutput { margin-top: 12px; padding: 22px; }
+body.hay-ui .voiceOutputBody { margin-top: 14px; display: grid; grid-template-columns: 68px 1fr; gap: 18px; align-items: start; }
+body.hay-ui .voiceOutputMark { width: 64px; height: 64px; display: grid; place-items: center; color: var(--hay-accent); background: var(--hay-accent-soft); border-radius: 16px; font-size: 28px; font-weight: 700; }
+body.hay-ui .voiceOutputBody p { margin: 6px 0 12px; color: var(--hay-ink-2); font-size: 15px; }
+body.hay-ui .voiceOutputBody audio { width: min(100%,520px); }
+body.hay-ui :is(.voiceLabFooter,.languageLabFooter,.developerFooter) { margin-top: 12px; padding: 14px 4px; display: flex; gap: 18px; justify-content: space-between; color: var(--hay-faint); border: 0; font-size: 8px; letter-spacing: .06em; }
+body.hay-ui :is(.voiceLabFooter,.languageLabFooter,.developerFooter) a { color: var(--hay-accent-2); text-decoration: none; }
+
+body.hay-ui .languageWorkbench { margin-top: 12px; display: grid; grid-template-columns: 170px minmax(0,1.1fr) minmax(0,.9fr); gap: 12px; align-items: stretch; }
+body.hay-ui .languageModes { padding: 7px; display: flex; flex-direction: column; gap: 5px; background: rgba(255,255,255,.68); border: 1px solid var(--hay-line); border-radius: 16px; }
+body.hay-ui .languageModes button { min-height: 54px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; color: var(--hay-muted); background: transparent; border: 0; border-radius: 10px; text-align: left; }
+body.hay-ui .languageModes button.active { color: var(--hay-ink); background: #fff; box-shadow: 0 3px 10px rgba(17,19,26,.06); }
+body.hay-ui .languageModes span { color: var(--hay-faint); font-size: 8px; }
+body.hay-ui .languageModes b { font-size: 9px; }
+body.hay-ui :is(.languageComposer,.languageOutput) { padding: 22px; }
+body.hay-ui :is(.languageComposer,.languageOutput) > header { display: flex; justify-content: space-between; color: var(--hay-muted); font-size: 9px; font-weight: 740; letter-spacing: .08em; }
+body.hay-ui .languageComposer > p { color: var(--hay-muted); font-size: 11px; line-height: 1.6; }
+body.hay-ui .languageComposer > textarea { width: 100%; min-height: 245px; padding: 14px; font-size: 14px; line-height: 1.65; }
+body.hay-ui .languageControls { margin-top: 10px; display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+body.hay-ui .languageControls label { min-width: 170px; color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .languageControls :is(select,input) { width: 100%; min-height: 42px; margin-top: 5px; padding: 0 10px; }
+body.hay-ui .languageControls > button { margin-left: auto; }
+body.hay-ui .languageOutputText { margin-top: 14px; padding: 15px; min-height: 300px; overflow: auto; background: #20232d; border-radius: 14px; }
+body.hay-ui .languageOutputText small { color: rgba(255,255,255,.45); font-size: 8px; }
+body.hay-ui .languageOutputText pre { margin: 12px 0 0; white-space: pre-wrap; color: rgba(255,255,255,.90); font-family: var(--hay-font); font-size: 12px; line-height: 1.7; }
+body.hay-ui .languageOutput details { margin-top: 10px; color: var(--hay-muted); font-size: 10px; }
+body.hay-ui .languageDrop { min-height: 245px; display: grid; place-items: center; align-content: center; text-align: center; background: var(--hay-surface-2); border: 1px dashed var(--hay-line-strong); border-radius: 14px; }
+body.hay-ui .languageDrop input { position: absolute; opacity: 0; }
+body.hay-ui .languageDrop span { font-weight: 700; }
+body.hay-ui .languageDrop small { max-width: 420px; margin-top: 6px; color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .languageArchitecture { margin-top: 12px; padding: 32px; background: #fff; border: 1px solid var(--hay-line); border-radius: 20px; }
+body.hay-ui .languageArchitecture h2 { margin: 5px 0 0; font-size: 30px; letter-spacing: -.03em; }
+body.hay-ui .languageArchitecture > div > span { color: var(--hay-accent-2); font-size: 9px; font-weight: 740; }
+body.hay-ui .languageArchitecture ol { margin: 28px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; list-style: none; }
+body.hay-ui .languageArchitecture li { padding: 16px; background: var(--hay-surface-2); border-radius: 13px; }
+body.hay-ui .languageArchitecture li b { color: var(--hay-faint); font-size: 9px; }
+body.hay-ui .languageArchitecture li span { display: block; margin-top: 16px; font-size: 9px; font-weight: 750; }
+body.hay-ui .languageArchitecture li p { color: var(--hay-muted); font-size: 10px; }
+
+body.hay-ui .developerGrid { margin-top: 12px; display: grid; grid-template-columns: 1.35fr .65fr; gap: 12px; align-items: start; }
+body.hay-ui :is(.developerKeys,.developerUsage) { padding: 22px; }
+body.hay-ui :is(.developerKeys,.developerUsage) > header { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--hay-muted); font-size: 9px; letter-spacing: .07em; }
+body.hay-ui .developerCreate { margin-top: 16px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
+body.hay-ui .developerCreate label span { display: block; margin-bottom: 5px; color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .developerCreate input { width: 100%; min-height: 42px; padding: 0 11px; }
+body.hay-ui .developerKeyList { margin-top: 14px; display: grid; gap: 7px; }
+body.hay-ui .developerKeyList article { padding: 12px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: center; background: var(--hay-surface-2); border: 1px solid var(--hay-line); border-radius: 12px; }
+body.hay-ui .developerKeyList article span { font-size: 11px; font-weight: 650; }
+body.hay-ui .developerKeyList code { color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .developerKeyList small { display: block; color: var(--hay-faint); font-size: 8px; }
+body.hay-ui .developerKeyList button { padding: 6px 8px; color: var(--hay-danger); background: #fff; border: 1px solid rgba(188,75,75,.18); border-radius: 8px; font-size: 8px; }
+body.hay-ui .developerMetric { margin-top: 7px; padding: 13px; background: var(--hay-surface-2); border-radius: 11px; }
+body.hay-ui .developerMetric span { color: var(--hay-muted); font-size: 8px; }
+body.hay-ui .developerMetric strong { display: block; margin-top: 4px; font-size: 22px; letter-spacing: -.03em; }
+body.hay-ui .developerEndpoints { margin-top: 10px; }
+body.hay-ui .developerEndpoints > div { padding: 8px 2px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--hay-line); font-size: 9px; }
+body.hay-ui .developerSecret { margin-top: 12px; padding: 14px; background: #20232d; border-radius: 13px; color: #fff; }
+body.hay-ui .developerSecret > span { display: block; color: rgba(255,255,255,.5); font-size: 8px; }
+body.hay-ui .developerSecret code { display: block; margin: 10px 0; overflow-wrap: anywhere; font-size: 11px; }
+body.hay-ui .developerSecret button { margin-right: 6px; padding: 7px 9px; color: #fff; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 8px; font-size: 8px; }
+body.hay-ui .developerDocs { margin-top: 12px; padding: 26px; display: grid; grid-template-columns: .8fr 1.2fr; gap: 28px; }
+body.hay-ui .developerDocs h2 { margin: 8px 0; font-size: 28px; letter-spacing: -.03em; }
+body.hay-ui .developerDocs p { color: var(--hay-muted); font-size: 11px; }
+body.hay-ui .developerDocs > pre { margin: 0; padding: 16px; overflow: auto; color: rgba(255,255,255,.9); background: #20232d; border-radius: 13px; font-size: 10px; line-height: 1.7; }
+body.hay-ui .developerScopes { grid-column: 1/-1; display: flex; align-items: center; gap: 7px; color: var(--hay-muted); font-size: 9px; }
+body.hay-ui .developerScopes code { padding: 5px 8px; background: var(--hay-accent-soft); border-radius: 7px; color: var(--hay-accent-2); }
+body.hay-ui .developerBlocker { margin-top: 12px; padding: 30px; }
+body.hay-ui .developerBlocker span { color: var(--hay-warning); font-size: 9px; font-weight: 750; }
+body.hay-ui .developerBlocker h2 { max-width: 800px; margin: 8px 0; font-size: 30px; letter-spacing: -.03em; }
+body.hay-ui .developerBlocker p { max-width: 760px; color: var(--hay-muted); }
+body.hay-ui .developerToast,
+body.hay-ui :is(.voiceLabMessage,.languageMessage) { margin-top: 10px; padding: 10px 12px; color: var(--hay-ink-2); background: var(--hay-accent-soft); border: 1px solid rgba(91,85,231,.10); border-radius: 10px; font-size: 10px; }
+
+/* Login ------------------------------------------------------------------ */
+body.hay-ui .loginPage {
+  min-height: 100vh;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(340px,.72fr);
+  gap: 14px;
+  color: var(--hay-ink);
+  background: transparent;
+}
+body.hay-ui .loginPanel,
+body.hay-ui .loginAside { min-width: 0; border-radius: 28px; }
+body.hay-ui .loginPanel { padding: clamp(32px,6vw,86px); display: flex; flex-direction: column; justify-content: center; background: #fff; border: 1px solid var(--hay-line); box-shadow: var(--hay-shadow-sm); }
+body.hay-ui .loginPanel > a:first-child { align-self: flex-start; }
+body.hay-ui .loginIndex { margin-top: 76px; color: var(--hay-accent-2); font-size: 9px; font-weight: 750; letter-spacing: .10em; }
+body.hay-ui .loginPanel h1 { max-width: 760px; margin: 12px 0 0; color: var(--hay-ink); font-size: clamp(40px,5vw,70px); line-height: 1.02; letter-spacing: -.05em; }
+body.hay-ui .loginPanel h1 span { color: var(--hay-accent); }
+body.hay-ui .loginPanel > p { max-width: 650px; margin: 20px 0 0; color: var(--hay-muted); font-size: 14px; line-height: 1.7; }
+body.hay-ui .loginPanel form { max-width: 560px; margin-top: 30px; }
+body.hay-ui .loginPanel form label { color: var(--hay-muted); font-size: 10px; }
+body.hay-ui .loginPanel form input { width: 100%; min-height: 48px; margin: 6px 0 9px; padding: 0 13px; }
+body.hay-ui .loginPanel form button { width: 100%; min-height: 48px; }
+body.hay-ui .loginPanel > small { max-width: 560px; margin-top: 26px; color: var(--hay-faint); font-size: 9px; line-height: 1.5; }
+body.hay-ui .loginMessage { max-width: 560px; margin-top: 10px; padding: 10px 12px; color: var(--hay-ink-2); background: var(--hay-accent-soft); border-radius: 10px; font-size: 10px; }
+body.hay-ui .loginAside { padding: clamp(28px,5vw,60px); display: flex; flex-direction: column; justify-content: space-between; color: #fff; background: linear-gradient(145deg,#262936,#4b4685 68%,#a45e50); overflow: hidden; }
+body.hay-ui .loginGlyph { color: rgba(255,255,255,.93); font-size: clamp(110px,20vw,260px); line-height: .85; font-weight: 720; }
+body.hay-ui .loginAside > div:last-child { display: grid; gap: 7px; }
+body.hay-ui .loginAside > div:last-child span { color: rgba(255,255,255,.60); font-size: 9px; font-weight: 700; letter-spacing: .11em; }
+
+/* Responsive ------------------------------------------------------------- */
+@media (max-width: 1180px) {
+  body.hay-ui .hv6Hero { grid-template-columns: 1fr; }
+  body.hay-ui .hv6HeroCopy { max-width: 900px; }
+  body.hay-ui .hv6ProductWindow { transform: none; }
+  body.hay-ui .hv6PlanRail { grid-template-columns: repeat(2,1fr); }
+  body.hay-ui .studioStatusRail { grid-template-columns: 1fr; }
+  body.hay-ui .studioStatusCells { grid-template-columns: repeat(3,1fr); }
+  body.hay-ui .studioStatusQuality { display: none; }
+  body.hay-ui .studioTodayBrief { grid-template-columns: 1.5fr repeat(3,1fr); }
+  body.hay-ui .businessCard,
+  body.hay-ui .channelsCard { grid-column: span 6; }
+  body.hay-ui .creatorSettings { grid-template-columns: repeat(3,1fr); }
+  body.hay-ui .languageWorkbench { grid-template-columns: 1fr 1fr; }
+  body.hay-ui .languageModes { grid-column: 1/-1; flex-direction: row; overflow-x: auto; }
+  body.hay-ui .languageModes button { min-width: 130px; }
+}
+
+@media (max-width: 900px) {
+  body.hay-ui :is(.hv6Nav,.marketingNav,.voiceLabNav,.languageLabNav,.developerNav,.nav) { width: calc(100% - 20px); top: 8px; margin-top: 8px; min-height: 60px; padding: 8px 10px; }
+  body.hay-ui :is(.hv6Nav,.marketingNav,.voiceLabNav,.languageLabNav,.developerNav,.nav) nav { display: none; }
+  body.hay-ui .hv6NavActions,
+  body.hay-ui .navTools { margin-left: auto; }
+  body.hay-ui .accountLink,
+  body.hay-ui .commandButton { display: none; }
+  body.hay-ui .hv6Hero { width: calc(100% - 24px); padding: 58px 0 46px; }
+  body.hay-ui .hv6WindowBody { grid-template-columns: 1fr; }
+  body.hay-ui .hv6DayStream { border-right: 0; border-bottom: 1px solid var(--hay-line); }
+  body.hay-ui .hv6AssetPreview { display: grid; grid-template-columns: 150px 1fr; gap: 14px; align-items: center; }
+  body.hay-ui .hv6AssetTop { grid-column: 1/-1; }
+  body.hay-ui .hv6Poster { margin: 0; }
+  body.hay-ui .hv6PlatformRail { width: calc(100% - 24px); align-items: flex-start; flex-direction: column; }
+  body.hay-ui :is(.hv6How,.hv6Armenian,.hv6Loop,.hv6Pricing,.hv6Final) { width: calc(100% - 24px); padding: 38px 24px; border-radius: 24px; }
+  body.hay-ui .hv6Steps { grid-template-columns: 1fr; }
+  body.hay-ui .hv6Steps article.wide { grid-column: auto; }
+  body.hay-ui .hv6Armenian { grid-template-columns: 1fr; }
+  body.hay-ui .hv6LoopTrack { grid-template-columns: repeat(3,1fr); }
+  body.hay-ui .hv6Agency { grid-template-columns: 1fr; gap: 14px; }
+  body.hay-ui .hv6Final { align-items: flex-start; flex-direction: column; }
+  body.hay-ui .hv6Footer { width: calc(100% - 24px); flex-wrap: wrap; }
+
+  body.hay-ui .marketingPage { width: calc(100% - 20px); }
+  body.hay-ui .marketingHero { padding: 34px 24px; }
+  body.hay-ui .marketingHero::after { right: 10px; opacity: .5; }
+  body.hay-ui .studioTodayBrief { grid-template-columns: repeat(3,1fr); }
+  body.hay-ui .todayMove { grid-column: 1/-1; }
+  body.hay-ui .marketingGrid { grid-template-columns: 1fr; }
+  body.hay-ui :is(.businessCard,.channelsCard,.intelligenceCard,.competitorsCard) { grid-column: auto; min-height: auto; }
+  body.hay-ui .calendarRail { grid-template-columns: repeat(2,1fr); }
+  body.hay-ui .studioInsightGrid,
+  body.hay-ui .studioExecutionGrid { width: calc(100% - 20px); grid-template-columns: 1fr; }
+  body.hay-ui .studioStatusRail,
+  body.hay-ui .studioCommercialRail,
+  body.hay-ui .studioWorkspaceSwitcher { width: calc(100% - 20px); }
+
+  body.hay-ui .shell.creatorShell,
+  body.hay-ui :is(.voiceLabPage,.languageLabPage,.developerPage) { width: calc(100% - 20px); }
+  body.hay-ui .creatorWorkspace,
+  body.hay-ui .creatorResult,
+  body.hay-ui .voiceLabGrid,
+  body.hay-ui .developerGrid { grid-template-columns: 1fr; }
+  body.hay-ui :is(.voiceLabHero,.languageHero,.developerHero) { grid-template-columns: 1fr; gap: 24px; padding: 38px 24px; }
+  body.hay-ui .languageWorkbench { grid-template-columns: 1fr; }
+  body.hay-ui .languageModes { grid-column: auto; }
+  body.hay-ui .languageArchitecture ol { grid-template-columns: repeat(2,1fr); }
+  body.hay-ui .developerDocs { grid-template-columns: 1fr; }
+  body.hay-ui .developerDocs > pre,
+  body.hay-ui .developerScopes { grid-column: auto; }
+  body.hay-ui .loginPage { grid-template-columns: 1fr; padding: 10px; }
+  body.hay-ui .loginAside { min-height: 260px; }
+}
+
+@media (max-width: 620px) {
+  body.hay-ui { font-size: 14px; }
+  body.hay-ui .hv6Locale { display: none; }
+  body.hay-ui .hv6Open { min-height: 38px; padding: 0 12px; }
+  body.hay-ui .hv6Hero h1 { font-size: clamp(40px,14vw,62px); }
+  body.hay-ui .hv6ProductWindow { border-radius: 20px; }
+  body.hay-ui .hv6WindowBar > b { display: none; }
+  body.hay-ui .hv6DayStream article { grid-template-columns: 40px 1fr; }
+  body.hay-ui .hv6DayStream article :is(em,button) { grid-column: 2; justify-self: start; }
+  body.hay-ui .hv6AssetPreview { display: block; }
+  body.hay-ui .hv6Poster { max-width: 230px; margin: 14px auto; }
+  body.hay-ui .hv6PlatformRail > div { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+  body.hay-ui .hv6Steps article { min-height: 260px; padding: 20px; }
+  body.hay-ui .hv6LoopTrack { grid-template-columns: 1fr 1fr; }
+  body.hay-ui .hv6PlanRail { grid-template-columns: 1fr; }
+  body.hay-ui .hv6Footer > span:last-child { display: none; }
+
+  body.hay-ui .productNav { display: none; }
+  body.hay-ui .localePill { margin-left: auto; }
+  body.hay-ui .marketingHero { padding: 28px 20px; border-radius: 20px; }
+  body.hay-ui .heroCopy h1 { font-size: 40px; }
+  body.hay-ui .heroCopy > p { font-size: 14px; }
+  body.hay-ui .heroActions { align-items: stretch; }
+  body.hay-ui .heroActions > :is(button,label) { width: 100%; justify-content: center; }
+  body.hay-ui .studioTodayBrief { grid-template-columns: 1fr; }
+  body.hay-ui .todayMove { grid-column: auto; }
+  body.hay-ui .fieldPair { grid-template-columns: 1fr; }
+  body.hay-ui .calendarRail { grid-template-columns: 1fr; }
+  body.hay-ui .pulseHeader { align-items: flex-start; flex-direction: column; }
+  body.hay-ui .studioStatusCells { grid-template-columns: repeat(2,1fr); }
+  body.hay-ui .systemLine { display: none; }
+
+  body.hay-ui .creatorHero { padding: 52px 4px 28px; }
+  body.hay-ui .creatorHero h1 { font-size: 43px; }
+  body.hay-ui .creatorSettings { grid-template-columns: 1fr 1fr; }
+  body.hay-ui .creatorComposer,
+  body.hay-ui .creatorPipeline { padding: 18px; }
+  body.hay-ui .voiceLabHero h1,
+  body.hay-ui .languageHero h1,
+  body.hay-ui .developerHero h1 { font-size: 43px; }
+  body.hay-ui .voiceControls { grid-template-columns: 1fr; }
+  body.hay-ui .voiceOutputBody { grid-template-columns: 1fr; }
+  body.hay-ui .languageModes { padding: 5px; }
+  body.hay-ui .languageArchitecture { padding: 22px 18px; }
+  body.hay-ui .languageArchitecture ol { grid-template-columns: 1fr; }
+  body.hay-ui .developerCreate { grid-template-columns: 1fr; }
+  body.hay-ui .developerKeyList article { grid-template-columns: 1fr; }
+  body.hay-ui :is(.voiceLabFooter,.languageLabFooter,.developerFooter) { flex-direction: column; gap: 5px; }
+  body.hay-ui .loginPanel { padding: 30px 22px; }
+  body.hay-ui .loginIndex { margin-top: 58px; }
+  body.hay-ui .loginPanel h1 { font-size: 42px; }
+  body.hay-ui .loginAside { min-height: 220px; padding: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  body.hay-ui *, body.hay-ui *::before, body.hay-ui *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}

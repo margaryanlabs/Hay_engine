@@ -1,0 +1,98 @@
+/* HAY Studio V7 — final hierarchy refinements */
+
+body.hay-ui .marketingPageV7 .marketingHeroV7{
+  background:#fff;
+  border:1px solid var(--hay-line);
+  box-shadow:var(--hay-shadow-sm);
+}
+body.hay-ui .marketingPageV7 .marketingHeroV7::after{
+  content:none;
+}
+body.hay-ui .marketingPageV7 .heroCopy{
+  max-width:980px;
+}
+body.hay-ui .marketingPageV7 .heroCopy h1 span{
+  color:var(--hay-ink);
+}
+body.hay-ui .marketingPageV7 .signalLabel{
+  color:var(--hay-muted);
+}
+body.hay-ui .marketingPageV7 .signalLabel i{
+  background:var(--hay-positive);
+  box-shadow:0 0 0 5px rgba(36,123,89,.08);
+}
+body.hay-ui .studioContextStrip{
+  margin-top:34px;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  border:1px solid var(--hay-line);
+  border-radius:16px;
+  overflow:hidden;
+  background:var(--hay-surface-2);
+}
+body.hay-ui .studioContextStrip article{
+  min-height:96px;
+  padding:17px 18px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+body.hay-ui .studioContextStrip article+article{
+  border-left:1px solid var(--hay-line);
+}
+body.hay-ui .studioContextStrip span{
+  color:var(--hay-faint);
+  font-size:8px;
+  font-weight:780;
+  letter-spacing:.11em;
+}
+body.hay-ui .studioContextStrip strong{
+  margin-top:20px;
+  color:var(--hay-ink-2);
+  font-size:12px;
+  font-weight:680;
+  line-height:1.35;
+}
+body.hay-ui .marketingPageV7 .intelCard{
+  box-shadow:none;
+}
+body.hay-ui .marketingPageV7 .panelTop em{
+  color:var(--hay-muted);
+  background:var(--hay-bg-soft);
+}
+body.hay-ui .marketingPageV7 .pulseDot{
+  background:var(--hay-positive);
+  box-shadow:none;
+}
+body.hay-ui .marketingPageV7 .strategyQuote{
+  font-size:19px;
+  line-height:1.45;
+  letter-spacing:-.02em;
+}
+body.hay-ui .marketingPageV7 .contentPulse{
+  box-shadow:none;
+}
+body.hay-ui .marketingPageV7 .emptyGlyph{
+  width:46px;
+  height:46px;
+  display:grid;
+  place-items:center;
+  color:var(--hay-accent-2);
+  background:var(--hay-accent-soft);
+  border:1px solid rgba(91,85,231,.10);
+  border-radius:13px;
+  font-size:21px;
+  font-weight:720;
+}
+body.hay-ui .marketingPageV7 .systemLine{
+  color:var(--hay-faint);
+  background:transparent;
+  border-color:var(--hay-line);
+}
+
+@media(max-width:840px){
+  body.hay-ui .studioContextStrip{grid-template-columns:1fr;}
+  body.hay-ui .studioContextStrip article+article{border-left:0;border-top:1px solid var(--hay-line);}
+  body.hay-ui .studioContextStrip article{min-height:78px;}
+  body.hay-ui .studioContextStrip strong{margin-top:12px;}
+}

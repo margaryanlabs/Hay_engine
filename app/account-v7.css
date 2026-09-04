@@ -1,0 +1,57 @@
+/* HAY V7 / Account -------------------------------------------------------- */
+body.hay-ui .accountPage{width:min(calc(100% - 32px),var(--hay-content));margin:0 auto;padding:0 0 60px;color:var(--hay-ink);}
+body.hay-ui .accountNav{min-height:68px;margin:14px 0 0;padding:10px 14px 10px 18px;display:flex;align-items:center;gap:22px;position:sticky;top:12px;z-index:90;background:rgba(255,255,255,.86);border:1px solid var(--hay-line);border-radius:18px;box-shadow:0 10px 36px rgba(17,19,26,.06);backdrop-filter:blur(18px) saturate(145%);}
+body.hay-ui .accountBrand{display:flex;align-items:center;text-decoration:none;}
+body.hay-ui .accountNav nav{margin-left:auto;display:flex;gap:4px;align-items:center;}
+body.hay-ui .accountNav nav a{padding:9px 11px;color:var(--hay-muted);border-radius:10px;font-size:12px;font-weight:650;text-decoration:none;}
+body.hay-ui .accountNav nav a:hover{color:var(--hay-ink);background:var(--hay-bg-soft);}
+body.hay-ui .accountBack{min-height:38px;padding:0 12px;display:inline-flex;align-items:center;color:#fff;background:var(--hay-ink);border-radius:10px;font-size:10px;font-weight:720;text-decoration:none;}
+body.hay-ui .accountHero{margin-top:18px;padding:clamp(42px,6vw,76px);display:grid;grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr);gap:50px;align-items:end;background:#fff;border:1px solid var(--hay-line);border-radius:28px;box-shadow:var(--hay-shadow-sm);}
+body.hay-ui .accountHero>div>span,body.hay-ui .accountNotice>span,body.hay-ui .accountUsage header span,body.hay-ui .accountBusinesses header span,body.hay-ui .accountSecurity>div>span{color:var(--hay-accent-2);font-size:9px;font-weight:780;letter-spacing:.11em;}
+body.hay-ui .accountHero h1{max-width:850px;margin:12px 0 0;font-size:clamp(42px,5.5vw,74px);line-height:1;letter-spacing:-.055em;font-weight:720;}
+body.hay-ui .accountHero h1 em{color:var(--hay-accent);font:inherit;font-style:normal;}
+body.hay-ui .accountHero>div>p{max-width:700px;margin:22px 0 0;color:var(--hay-muted);font-size:15px;line-height:1.7;}
+body.hay-ui .accountHero>aside{padding:22px;background:var(--hay-surface-2);border:1px solid var(--hay-line);border-radius:18px;}
+body.hay-ui .accountHero>aside span{display:block;color:var(--hay-faint);font-size:8px;font-weight:760;letter-spacing:.08em;}
+body.hay-ui .accountHero>aside strong{display:block;margin-top:13px;overflow-wrap:anywhere;font-size:18px;letter-spacing:-.02em;}
+body.hay-ui .accountHero>aside small{display:block;margin-top:7px;color:var(--hay-muted);font-size:9px;}
+body.hay-ui .accountNotice{margin-top:12px;padding:24px;display:grid;grid-template-columns:120px 1fr auto;gap:24px;align-items:center;background:var(--hay-accent-soft);border:1px solid rgba(91,85,231,.14);border-radius:18px;}
+body.hay-ui .accountNotice h2{margin:0;font-size:20px;letter-spacing:-.02em;}
+body.hay-ui .accountNotice p{margin:5px 0 0;color:var(--hay-muted);font-size:10px;}
+body.hay-ui .accountNotice a{padding:10px 12px;color:var(--hay-ink);background:#fff;border:1px solid var(--hay-line);border-radius:10px;font-size:9px;font-weight:720;text-decoration:none;}
+body.hay-ui .accountGrid{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+body.hay-ui :is(.accountPlanCard,.accountIdentityCard,.accountUsage,.accountBusinesses,.accountSecurity){background:#fff;border:1px solid var(--hay-line);border-radius:20px;box-shadow:var(--hay-shadow-sm);}
+body.hay-ui :is(.accountPlanCard,.accountIdentityCard){min-height:270px;padding:24px;display:flex;flex-direction:column;}
+body.hay-ui :is(.accountPlanCard,.accountIdentityCard)>header{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--hay-faint);font-size:8px;font-weight:760;letter-spacing:.08em;}
+body.hay-ui :is(.accountPlanCard,.accountIdentityCard)>header b{padding:5px 7px;color:var(--hay-positive);background:rgba(36,123,89,.08);border-radius:7px;font-size:7px;}
+body.hay-ui :is(.accountPlanCard,.accountIdentityCard)>strong{margin-top:38px;font-size:28px;letter-spacing:-.035em;overflow-wrap:anywhere;}
+body.hay-ui :is(.accountPlanCard,.accountIdentityCard)>p{max-width:520px;margin:10px 0 0;color:var(--hay-muted);font-size:11px;line-height:1.6;}
+body.hay-ui .accountPlanCard>a,body.hay-ui .accountIdentityCard>button{margin-top:auto;align-self:flex-start;min-height:38px;padding:0 12px;display:inline-flex;align-items:center;color:var(--hay-ink);background:var(--hay-surface-2);border:1px solid var(--hay-line);border-radius:10px;font-size:9px;font-weight:730;text-decoration:none;}
+body.hay-ui .accountUsage,body.hay-ui .accountBusinesses{margin-top:12px;padding:26px;}
+body.hay-ui .accountUsage>header,body.hay-ui .accountBusinesses>header{display:flex;align-items:end;justify-content:space-between;gap:18px;}
+body.hay-ui .accountUsage h2,body.hay-ui .accountBusinesses h2{margin:7px 0 0;font-size:28px;letter-spacing:-.035em;}
+body.hay-ui .accountUsage>header small{color:var(--hay-muted);font-size:9px;}
+body.hay-ui .accountUsage>div{margin-top:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+body.hay-ui .accountUsage article{padding:15px;background:var(--hay-surface-2);border:1px solid var(--hay-line);border-radius:12px;}
+body.hay-ui .accountUsage article>div{display:flex;justify-content:space-between;gap:10px;color:var(--hay-muted);font-size:8px;}
+body.hay-ui .accountUsage article>div b{color:var(--hay-ink);}
+body.hay-ui .accountUsage article>i{height:4px;margin-top:11px;display:block;overflow:hidden;background:#deded9;border-radius:999px;}
+body.hay-ui .accountUsage article>i>b{height:100%;display:block;background:var(--hay-accent);border-radius:inherit;}
+body.hay-ui .accountBusinesses>header>strong{font-size:30px;letter-spacing:-.04em;}
+body.hay-ui .accountBusinesses>div{margin-top:18px;display:grid;gap:7px;}
+body.hay-ui .accountBusinesses>div>a{padding:14px;display:flex;align-items:center;justify-content:space-between;gap:15px;color:var(--hay-ink);background:var(--hay-surface-2);border:1px solid var(--hay-line);border-radius:12px;text-decoration:none;}
+body.hay-ui .accountBusinesses>div>a:hover{background:var(--hay-accent-soft);border-color:rgba(91,85,231,.18);}
+body.hay-ui .accountBusinesses>div>a strong{display:block;font-size:11px;}
+body.hay-ui .accountBusinesses>div>a small{display:block;margin-top:3px;color:var(--hay-muted);font-size:8px;}
+body.hay-ui .accountBusinesses>div>a>span{color:var(--hay-accent-2);font-size:8px;font-weight:720;}
+body.hay-ui .accountEmpty{padding:18px;background:var(--hay-surface-2);border-radius:12px;}
+body.hay-ui .accountEmpty p{margin:0;color:var(--hay-muted);font-size:10px;}
+body.hay-ui .accountEmpty a{display:inline-block;margin-top:10px;color:var(--hay-accent-2);font-size:9px;font-weight:720;text-decoration:none;}
+body.hay-ui .accountSecurity{margin-top:12px;padding:28px;display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:end;}
+body.hay-ui .accountSecurity h2{margin:7px 0 0;font-size:27px;letter-spacing:-.03em;}
+body.hay-ui .accountSecurity>p{margin:0;color:var(--hay-muted);font-size:11px;line-height:1.7;}
+body.hay-ui .accountMessage{margin:12px 0 0;padding:11px 13px;color:var(--hay-danger);background:rgba(188,75,75,.06);border:1px solid rgba(188,75,75,.13);border-radius:10px;font-size:10px;}
+body.hay-ui .accountFooter{padding:28px 3px 0;display:flex;justify-content:space-between;gap:20px;color:var(--hay-faint);font-size:8px;letter-spacing:.07em;}
+body.hay-ui .accountFooter a{color:var(--hay-accent-2);text-decoration:none;}
+@media(max-width:850px){body.hay-ui .accountHero{grid-template-columns:1fr;}body.hay-ui .accountGrid{grid-template-columns:1fr;}body.hay-ui .accountUsage>div{grid-template-columns:1fr;}body.hay-ui .accountSecurity{grid-template-columns:1fr;}body.hay-ui .accountNotice{grid-template-columns:1fr;}}
+@media(max-width:700px){body.hay-ui .accountPage{width:calc(100% - 20px);}body.hay-ui .accountNav{top:8px;margin-top:8px;padding:8px 10px;}body.hay-ui .accountNav nav{display:none;}body.hay-ui .accountHero{padding:34px 22px;border-radius:20px;}body.hay-ui .accountHero h1{font-size:44px;}body.hay-ui :is(.accountUsage,.accountBusinesses){padding:20px;}body.hay-ui .accountFooter{flex-direction:column;}}

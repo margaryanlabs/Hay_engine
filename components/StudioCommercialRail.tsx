@@ -17,6 +17,14 @@ type Context={
 const label={content_assets:"CONTENT",ai_video_credits:"VIDEO",voice_minutes:"VOICE"} as const;
 const paidPlans=new Set<PaidPlan>(["creator","growth","business","agency"]);
 
+function clearRequestedPlan(){
+  if(typeof window==="undefined")return;
+  const url=new URL(window.location.href);
+  if(!url.searchParams.has("plan"))return;
+  url.searchParams.delete("plan");
+  window.history.replaceState({},"",`${url.pathname}${url.search}${url.hash}`);
+}
+
 export default function StudioCommercialRail(){
   const [context,setContext]=useState<Context|null>(null);
   const [message,setMessage]=useState("");
@@ -27,6 +35,11 @@ export default function StudioCommercialRail(){
   useEffect(()=>{
     if(!context||attemptedPlan.current)return;
     const requested=new URLSearchParams(window.location.search).get("plan") as PaidPlan|null;
+    if(requested&&paidPlans.has(requested)&&requested===context.planId){
+      attemptedPlan.current=true;
+      clearRequestedPlan();
+      return;
+    }
     if(requested&&paidPlans.has(requested)&&requested!==context.planId){
       attemptedPlan.current=true;
       void upgrade(requested);
@@ -38,7 +51,7 @@ export default function StudioCommercialRail(){
       const response=await fetch("/api/account/entitlement",{cache:"no-store"});
       const data=await response.json();
       if(response.ok||data.configured===false)setContext(data);
-    }catch{/* Studio still works if commercial diagnostics are temporarily unavailable. */}
+    }catch{/* Studio still works if plan diagnostics are temporarily unavailable. */}
   }
 
   async function upgrade(plan:PaidPlan){
@@ -47,6 +60,7 @@ export default function StudioCommercialRail(){
       const response=await fetch("/api/billing/checkout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan})});
       const data=await response.json();
       if(!response.ok){setMessage(data.message||data.error||"Checkout is not configured yet.");return;}
+      clearRequestedPlan();
       window.location.assign(data.checkoutUrl);
     }catch{setMessage("Checkout is temporarily unavailable.");}
     finally{setBusy(null);}
@@ -60,13 +74,12 @@ export default function StudioCommercialRail(){
   ];
 
   return <section className="studioCommercial" aria-label="HAY plan and usage">
-    <header><div><span>HAY / COMMERCIAL</span><strong>{context.planId.toUpperCase()}</strong></div><div className={`commercialState ${context.status}`}>{context.status.toUpperCase()}</div></header>
+    <header><div><span>PLAN & USAGE</span><strong>{context.planId.toUpperCase()}</strong></div><div className={`commercialState ${context.status}`}>{context.status.toUpperCase()}</div></header>
     <div className="commercialMeters">{meters.map(item=>{
       const ratio=item.limit?Math.min(100,(item.used/item.limit)*100):0;
       return <div className="commercialMeter" key={item.key}><div><span>{label[item.key]}</span><b>{Math.round(item.used*10)/10} / {item.limit} {item.unit}</b></div><i><b style={{width:`${ratio}%`}}/></i></div>;
     })}</div>
     <footer>
-      <div><span>{context.enforcementEnabled?"PLAN LIMITS ON":"PLAN LIMITS READY"}</span>{!context.migrationReady&&<b>APPLY 007 MIGRATION</b>}</div>
       {context.planId==="free"&&<button disabled={busy!==null} onClick={()=>upgrade("creator")}>{busy?"…":"UPGRADE →"}</button>}
       {context.planId==="creator"&&<button disabled={busy!==null} onClick={()=>upgrade("growth")}>{busy?"…":"MOVE TO GROWTH →"}</button>}
       {context.planId==="growth"&&<button disabled={busy!==null} onClick={()=>upgrade("business")}>{busy?"…":"MOVE TO BUSINESS →"}</button>}

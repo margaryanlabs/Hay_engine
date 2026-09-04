@@ -15,37 +15,8 @@ export type PersistedPlanResult = {
 
 type PersistPlanOptions={campaign?:CampaignBlueprint};
 
-async function ensureOwnedBusiness(plan: MarketingPlan, requestedBusinessId?: string) {
-  const supabase = await createClient();
-  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
-  const userId = claimsData?.claims?.sub;
-  if (claimsError || !userId) return null;
-
-  if (requestedBusinessId) {
-    const { data } = await supabase.from("businesses").select("id").eq("id", requestedBusinessId).eq("owner_id", userId).maybeSingle();
-    if (data?.id) return { supabase, userId, businessId: String(data.id) };
-  }
-
-  const { data: existing } = await supabase.from("businesses").select("id").eq("owner_id", userId).eq("name", plan.business.name).limit(1).maybeSingle();
-  if (existing?.id) {
-    await supabase.from("businesses").update({
-      category: plan.business.category,
-      description: plan.business.description || "",
-      website: plan.business.website || null,
-      location: plan.business.location || null,
-      primary_language: plan.business.primaryLanguage,
-      goals: plan.business.goals || [],
-      audience: plan.business.audience || null,
-      offer: plan.business.offer || null,
-      tone: plan.business.tone || null,
-      updated_at: new Date().toISOString(),
-    }).eq("id", existing.id);
-    return { supabase, userId, businessId: String(existing.id) };
-  }
-
-  const { data: created, error } = await supabase.from("businesses").insert({
-    owner_id: userId,
-    name: plan.business.name,
+function profileRow(plan:MarketingPlan){
+  return {
     category: plan.business.category,
     description: plan.business.description || "",
     website: plan.business.website || null,
@@ -55,6 +26,38 @@ async function ensureOwnedBusiness(plan: MarketingPlan, requestedBusinessId?: st
     audience: plan.business.audience || null,
     offer: plan.business.offer || null,
     tone: plan.business.tone || null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function ensureOwnedBusiness(plan: MarketingPlan, requestedBusinessId?: string) {
+  const supabase = await createClient();
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
+  if (claimsError || !userId) return null;
+
+  const profile=profileRow(plan);
+
+  if (requestedBusinessId) {
+    const { data } = await supabase.from("businesses").select("id").eq("id", requestedBusinessId).eq("owner_id", userId).maybeSingle();
+    if (data?.id) {
+      const {error:updateError}=await supabase.from("businesses").update(profile).eq("id",data.id).eq("owner_id",userId);
+      if(updateError)throw updateError;
+      return { supabase, userId, businessId: String(data.id) };
+    }
+  }
+
+  const { data: existing } = await supabase.from("businesses").select("id").eq("owner_id", userId).eq("name", plan.business.name).limit(1).maybeSingle();
+  if (existing?.id) {
+    const {error:updateError}=await supabase.from("businesses").update(profile).eq("id", existing.id).eq("owner_id",userId);
+    if(updateError)throw updateError;
+    return { supabase, userId, businessId: String(existing.id) };
+  }
+
+  const { data: created, error } = await supabase.from("businesses").insert({
+    owner_id: userId,
+    name: plan.business.name,
+    ...profile,
   }).select("id").single();
   if (error || !created?.id) throw error || new Error("business_create_failed");
   return { supabase, userId, businessId: String(created.id) };
