@@ -6,8 +6,8 @@ import { correctionFlywheelReady } from "@/lib/hay/correction-store";
 import { pronunciationRegistryReady } from "@/lib/hay/pronunciation-store";
 import { getConnectorReadiness } from "@/lib/marketing/connectors";
 import { isPublishWorkerConfigured } from "@/lib/publish/client";
-import { isOpenAITranscriptionConfigured } from "@/lib/providers/openai-transcription";
 import { isPexelsConfigured } from "@/lib/providers/pexels";
+import { isAnyTranscriptionProviderConfigured, transcriptionProviderReadiness } from "@/lib/providers/transcription";
 import { isVeoConfigured } from "@/lib/providers/veo";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -94,13 +94,14 @@ export async function GET() {
 
   const supabase = isSupabaseConfigured();
   const admin = isSupabaseAdminConfigured();
+  const transcriptionProviders = transcriptionProviderReadiness();
   const providers = {
     strategy: Boolean(process.env.OPENAI_API_KEY),
     image: Boolean(process.env.OPENAI_API_KEY),
     stock: isPexelsConfigured(),
     voice: Boolean(process.env.ELEVENLABS_API_KEY && (process.env.ELEVENLABS_VOICE_ID || process.env.ELEVENLABS_VOICE_ID_MALE || process.env.ELEVENLABS_VOICE_ID_FEMALE)) || Boolean(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION),
     video: isVeoConfigured(),
-    transcription: isOpenAITranscriptionConfigured(),
+    transcription: isAnyTranscriptionProviderConfigured(),
     translation: Boolean(process.env.OPENAI_API_KEY),
   };
   const languageApi = {
@@ -108,6 +109,7 @@ export async function GET() {
     pronounce: true,
     captions: true,
     transcribe: providers.transcription,
+    transcriptionProviders,
     transcriptCorrection: Boolean(process.env.OPENAI_API_KEY),
     translate: providers.translation,
     unauthenticatedProviderAccess: process.env.HAY_ALLOW_UNAUTHENTICATED_LANGUAGE_API === "true",
@@ -219,7 +221,7 @@ export async function GET() {
         ...(commercialMigration && !atomicUsageMigration && planEnforcementEnabled() ? ["plan_enforcement_requires_atomic_usage_migrations"] : []),
         ...(commercialMigration && !planEnforcementEnabled() ? ["plan_enforcement_disabled"] : []),
         ...(!checkout.creator || !checkout.growth || !checkout.business ? ["paid_checkout_links_required"] : []),
-        ...(!providers.transcription ? ["openai_key_required_for_transcription"] : []),
+        ...(!providers.transcription ? ["transcription_provider_required"] : []),
       ],
     },
     {
