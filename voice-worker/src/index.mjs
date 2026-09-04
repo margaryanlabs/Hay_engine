@@ -18,13 +18,14 @@ function lastCallerMessage(transcript){
   return "";
 }
 
-async function askHay(transcript,signal){
+async function askHay(transcript,externalSessionId,signal){
   const message=lastCallerMessage(transcript);
   if(!message)throw new Error("caller_message_missing");
+  if(!externalSessionId)throw new Error("conversation_id_missing");
   const response=await fetch(`${hayAppUrl}/api/employee/realtime-turn`,{
     method:"POST",
     headers:{"Content-Type":"application/json","Authorization":`Bearer ${workerSecret}`},
-    body:JSON.stringify({employeeId,message,history:transcript}),
+    body:JSON.stringify({employeeId,externalSessionId,message,history:transcript}),
     signal,
   });
   const payload=await response.json().catch(()=>({}));
@@ -40,7 +41,7 @@ const server=new SpeechEngine.Server({
   onInit(conversationId){console.log(JSON.stringify({event:"employee_call_started",conversationId,employeeId}));},
   async onTranscript(transcript,signal,session){
     try{
-      const turn=await askHay(transcript,signal);
+      const turn=await askHay(transcript,session.conversationId,signal);
       if(signal.aborted)return;
       session.sendResponse(turn.reply);
       console.log(JSON.stringify({event:"employee_turn",conversationId:session.conversationId,employeeId,intent:turn.intent,confidence:turn.confidence,action:turn.action?.type||null,handoff:turn.shouldHandoff}));
