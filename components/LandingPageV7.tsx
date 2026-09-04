@@ -20,18 +20,18 @@ const copy = {
     navLanguage: "Հայերեն",
     navPricing: "Գներ",
     open: "Բացել HAY",
-    eyebrow: "MARKETING OS / BUILT IN ARMENIA",
+    eyebrow: "MARKETING SOFTWARE / BUILT IN ARMENIA",
     heroA: "Մարքեթինգը՝",
     heroB: "մեկ աշխատանքային համակարգում։",
     heroBody: "HAY-ը պահում է բրենդի կոնտեքստը, հետևում է շուկային, կառուցում է պլանը, ստեղծում է կոնտենտ և տանում է աշխատանքը մինչև հաստատում ու հրապարակում։",
     primary: "Սկսել անվճար",
     secondary: "Տեսնել համակարգը",
-    note: "Առանց քարտի · human approval-ը միշտ մնում է քեզ մոտ",
-    today: "ԱՅՍՕՐ / ARARAT HOUSE",
-    status: "OPERATING",
+    note: "Առանց քարտի · վերջնական հաստատումը միշտ քո մոտ է",
+    today: "ՕՐԻՆԱԿ / ARARAT HOUSE",
+    status: "WORKSPACE",
     nextMove: "Հաջորդ քայլը",
-    nextMoveText: "Ուրբաթ երեկոյի համար տեղափոխել emphasis-ը product proof-ի վրա և ուժեղացնել reservation CTA-ն։",
-    review: "Պատրաստ է review-ի",
+    nextMoveText: "Ուրբաթ երեկոյի համար շեշտը տեղափոխել product proof-ի վրա և ուժեղացնել reservation CTA-ն։",
+    review: "Պատրաստ է հաստատման",
     reviewText: "Reel · 12 sec · HY-AM",
     publish: "Հրապարակում",
     publishText: "Այսօր · 19:20",
@@ -42,12 +42,12 @@ const copy = {
     workflowLabel: "WORKFLOW",
     workflowTitle: "Որոշումից մինչև հրապարակում՝ առանց հինգ տարբեր գործիքի։",
     workflow: [
-      ["01", "Understand", "Բրենդ, շուկա, մրցակիցներ"],
-      ["02", "Decide", "Հաջորդ լավագույն քայլը"],
-      ["03", "Create", "Copy, visual, voice, video"],
-      ["04", "Approve", "Մարդու վերահսկողություն"],
-      ["05", "Publish", "Schedule և direct publishing"],
-      ["06", "Learn", "Performance memory"],
+      ["01", "Հասկանալ", "Բրենդ, շուկա, մրցակիցներ"],
+      ["02", "Որոշել", "Հաջորդ լավագույն քայլը"],
+      ["03", "Ստեղծել", "Copy, visual, voice, video"],
+      ["04", "Հաստատել", "Մարդու վերջնական վերահսկողություն"],
+      ["05", "Հրապարակել", "Schedule և direct publishing"],
+      ["06", "Սովորել", "Արդյունքը դառնում է հաջորդ որոշման կոնտեքստ"],
     ],
     armenianLabel: "ARMENIAN LAYER",
     armenianTitle: "Հայերենը առանձին feature չէ։ Այն HAY-ի հիմքն է։",
@@ -59,12 +59,12 @@ const copy = {
     productLabel: "ONE PRODUCT",
     productTitle: "Այն, ինչ սովորաբար բաժանված է թիմերի ու dashboard-ների միջև։",
     modules: [
-      ["Strategy", "Business intelligence, competitors, campaigns"],
-      ["Content", "Posts, Reels, series, memory"],
-      ["Voice", "Natural Armenian speech and pronunciation"],
-      ["Publishing", "Approvals, schedules, connected channels"],
-      ["Learning", "Performance, experiments, next decisions"],
-      ["API", "Language and product infrastructure for teams"],
+      ["Ռազմավարություն", "Բիզնեսի կոնտեքստ, մրցակիցներ, արշավներ"],
+      ["Կոնտենտ", "Posts, Reels, series և պատմություն"],
+      ["Ձայն", "Բնական հայերեն խոսք և արտասանություն"],
+      ["Հրապարակում", "Հաստատումներ, schedule և միացված ալիքներ"],
+      ["Արդյունքներ", "Performance, experiments և հաջորդ որոշումներ"],
+      ["API", "Լեզվական և product գործիքներ թիմերի համար"],
     ],
     pricingLabel: "PRICING",
     pricingTitle: "Սկսիր փոքրից։ Մեծացրու՝ երբ HAY-ը արդեն աշխատում է։",
@@ -72,8 +72,9 @@ const copy = {
     choose: "Ընտրել",
     agency: "Agency / Enterprise",
     agencyBody: "15+ բրենդ, թիմային approval, custom limits, white-label և API։",
+    agencyCta: "Կապվել / Սկսել",
     from: "սկսած",
-    finalLabel: "HAY / OPERATING SYSTEM",
+    finalLabel: "HAY",
     finalTitle: "Միացրու բիզնեսը մեկ անգամ։ Հետո աշխատիր նույն կոնտեքստի վրա ամեն օր։",
     finalBody: "Առաջին session-ից HAY-ը սկսում է հավաքել բիզնեսի հիշողությունը և կառուցել հաջորդ քայլերը։",
   },
@@ -82,18 +83,18 @@ const copy = {
     navLanguage: "Armenian",
     navPricing: "Pricing",
     open: "Open HAY",
-    eyebrow: "MARKETING OS / BUILT IN ARMENIA",
+    eyebrow: "MARKETING SOFTWARE / BUILT IN ARMENIA",
     heroA: "Marketing,",
-    heroB: "inside one operating system.",
+    heroB: "inside one working system.",
     heroBody: "HAY keeps the brand context, watches the market, builds the plan, creates the content and carries the work through review and publishing.",
     primary: "Start free",
     secondary: "See the system",
-    note: "No card · human approval always stays with you",
-    today: "TODAY / ARARAT HOUSE",
-    status: "OPERATING",
+    note: "No card · final approval always stays with you",
+    today: "EXAMPLE / ARARAT HOUSE",
+    status: "WORKSPACE",
     nextMove: "Next move",
     nextMoveText: "Shift Friday evening toward product proof and strengthen the reservation CTA.",
-    review: "Ready for review",
+    review: "Ready for approval",
     reviewText: "Reel · 12 sec · HY-AM",
     publish: "Publishing",
     publishText: "Today · 19:20",
@@ -107,9 +108,9 @@ const copy = {
       ["01", "Understand", "Brand, market and competitors"],
       ["02", "Decide", "The next best move"],
       ["03", "Create", "Copy, visual, voice and video"],
-      ["04", "Approve", "Human control"],
+      ["04", "Approve", "Human final control"],
       ["05", "Publish", "Schedule and direct publishing"],
-      ["06", "Learn", "Performance memory"],
+      ["06", "Learn", "The outcome becomes context for the next decision"],
     ],
     armenianLabel: "ARMENIAN LAYER",
     armenianTitle: "Armenian is not an extra feature. It is part of the system.",
@@ -121,12 +122,12 @@ const copy = {
     productLabel: "ONE PRODUCT",
     productTitle: "What is usually split across teams and dashboards.",
     modules: [
-      ["Strategy", "Business intelligence, competitors, campaigns"],
-      ["Content", "Posts, Reels, series and memory"],
+      ["Strategy", "Business context, competitors and campaigns"],
+      ["Content", "Posts, Reels, series and history"],
       ["Voice", "Natural Armenian speech and pronunciation"],
       ["Publishing", "Approvals, schedules and connected channels"],
-      ["Learning", "Performance, experiments and next decisions"],
-      ["API", "Language and product infrastructure for teams"],
+      ["Results", "Performance, experiments and next decisions"],
+      ["API", "Language and product tools for teams"],
     ],
     pricingLabel: "PRICING",
     pricingTitle: "Start small. Scale when HAY is already working.",
@@ -134,8 +135,9 @@ const copy = {
     choose: "Choose",
     agency: "Agency / Enterprise",
     agencyBody: "15+ brands, team approval, custom limits, white-label and API.",
+    agencyCta: "Contact / Start",
     from: "from",
-    finalLabel: "HAY / OPERATING SYSTEM",
+    finalLabel: "HAY",
     finalTitle: "Connect the business once. Keep working from the same context every day.",
     finalBody: "From the first session, HAY starts building business memory and the next useful actions.",
   },
@@ -144,18 +146,18 @@ const copy = {
     navLanguage: "Армянский",
     navPricing: "Цены",
     open: "Открыть HAY",
-    eyebrow: "MARKETING OS / BUILT IN ARMENIA",
+    eyebrow: "MARKETING SOFTWARE / BUILT IN ARMENIA",
     heroA: "Маркетинг —",
     heroB: "в одной рабочей системе.",
     heroBody: "HAY хранит контекст бренда, следит за рынком, строит план, создаёт контент и ведёт работу до проверки и публикации.",
     primary: "Начать бесплатно",
     secondary: "Посмотреть систему",
-    note: "Без карты · human approval всегда остаётся у вас",
-    today: "СЕГОДНЯ / ARARAT HOUSE",
-    status: "OPERATING",
+    note: "Без карты · финальное подтверждение всегда остаётся у вас",
+    today: "ПРИМЕР / ARARAT HOUSE",
+    status: "WORKSPACE",
     nextMove: "Следующий шаг",
     nextMoveText: "На вечер пятницы сместить акцент на product proof и усилить CTA на бронирование.",
-    review: "Готово к review",
+    review: "Готово к подтверждению",
     reviewText: "Reel · 12 sec · HY-AM",
     publish: "Публикация",
     publishText: "Сегодня · 19:20",
@@ -166,16 +168,16 @@ const copy = {
     workflowLabel: "WORKFLOW",
     workflowTitle: "От решения до публикации без пяти разных инструментов.",
     workflow: [
-      ["01", "Understand", "Бренд, рынок и конкуренты"],
-      ["02", "Decide", "Следующее лучшее действие"],
-      ["03", "Create", "Copy, visual, voice и video"],
-      ["04", "Approve", "Контроль человека"],
-      ["05", "Publish", "Schedule и direct publishing"],
-      ["06", "Learn", "Performance memory"],
+      ["01", "Понять", "Бренд, рынок и конкуренты"],
+      ["02", "Решить", "Следующее лучшее действие"],
+      ["03", "Создать", "Copy, visual, voice и video"],
+      ["04", "Подтвердить", "Финальный контроль человека"],
+      ["05", "Опубликовать", "Schedule и direct publishing"],
+      ["06", "Учесть результат", "Результат становится контекстом следующего решения"],
     ],
     armenianLabel: "ARMENIAN LAYER",
     armenianTitle: "Армянский — не дополнительная функция. Это слой системы.",
-    armenianBody: "Брендовые слова, числа, валюты, code-switching, spoken copy и произношение обрабатываются как языковая инфраструктура, а не перевод в самом конце.",
+    armenianBody: "Брендовые слова, числа, валюты, code-switching, spoken copy и произношение обрабатываются как языковой слой, а не перевод в самом конце.",
     written: "DISPLAY COPY",
     spoken: "SPOKEN COPY",
     writtenText: "Նոր համը արդեն այստեղ է։",
@@ -183,12 +185,12 @@ const copy = {
     productLabel: "ONE PRODUCT",
     productTitle: "То, что обычно разбросано по командам и dashboard-ам.",
     modules: [
-      ["Strategy", "Business intelligence, competitors, campaigns"],
-      ["Content", "Posts, Reels, series и memory"],
-      ["Voice", "Natural Armenian speech и pronunciation"],
-      ["Publishing", "Approvals, schedules и connected channels"],
-      ["Learning", "Performance, experiments и следующие решения"],
-      ["API", "Language и product infrastructure для команд"],
+      ["Стратегия", "Контекст бизнеса, конкуренты и кампании"],
+      ["Контент", "Posts, Reels, series и история"],
+      ["Голос", "Естественная армянская речь и произношение"],
+      ["Публикация", "Подтверждения, schedule и подключённые каналы"],
+      ["Результаты", "Performance, experiments и следующие решения"],
+      ["API", "Языковые и product-инструменты для команд"],
     ],
     pricingLabel: "PRICING",
     pricingTitle: "Начните с малого. Масштабируйте, когда HAY уже работает.",
@@ -196,8 +198,9 @@ const copy = {
     choose: "Выбрать",
     agency: "Agency / Enterprise",
     agencyBody: "15+ брендов, командный approval, custom limits, white-label и API.",
+    agencyCta: "Связаться / Начать",
     from: "от",
-    finalLabel: "HAY / OPERATING SYSTEM",
+    finalLabel: "HAY",
     finalTitle: "Подключите бизнес один раз. Дальше работайте из одного контекста каждый день.",
     finalBody: "С первой сессии HAY начинает собирать память бизнеса и строить следующие полезные действия.",
   },
@@ -232,14 +235,14 @@ export default function LandingPageV7(){
         <small>{t.note}</small>
       </div>
 
-      <div className="hv7Cockpit" aria-label="HAY operating day preview">
-        <header><div><span>{t.today}</span><b><i/>{t.status}</b></div><strong>HAY / 09:42</strong></header>
-        <section className="hv7Decision"><span>{t.nextMove}</span><h2>{t.nextMoveText}</h2><div><b>WHY NOW</b><p>Demand window · competitor gap · previous Reel performance</p></div></section>
+      <div className="hv7Cockpit" aria-label="HAY workspace example">
+        <header><div><span>{t.today}</span><b><i/>{t.status}</b></div><strong>WORKSPACE PREVIEW</strong></header>
+        <section className="hv7Decision"><span>{t.nextMove}</span><h2>{t.nextMoveText}</h2><div><b>CONTEXT</b><p>Friday demand · competitor gap · previous Reel performance</p></div></section>
         <div className="hv7CockpitGrid">
           <article><span>{t.review}</span><strong>{t.reviewText}</strong><small>Caption + voice + visual ready</small></article>
           <article><span>{t.publish}</span><strong>{t.publishText}</strong><small>Approval required</small></article>
         </div>
-        <footer><span>{t.channels}</span><div>{channels.map(item=><i key={item.platform} title={item.label}><SocialBrandIcon platform={item.platform} size={17} decorative/></i>)}</div><b>4 / CONNECTED</b></footer>
+        <footer><span>{t.channels}</span><div>{channels.map(item=><i key={item.platform} title={item.label}><SocialBrandIcon platform={item.platform} size={17} decorative/></i>)}</div><b>4 CHANNELS</b></footer>
       </div>
     </section>
 
@@ -255,7 +258,7 @@ export default function LandingPageV7(){
     </section>
 
     <section className="hv7Armenian" id="armenian">
-      <div className="hv7ArmenianCopy"><span>{t.armenianLabel}</span><h2>{t.armenianTitle}</h2><p>{t.armenianBody}</p><div className="hv7ArmenianLinks"><a href="/language">Language Lab ↗</a><a href="/voice">Voice Lab ↗</a><a href="/quality">Quality ↗</a></div></div>
+      <div className="hv7ArmenianCopy"><span>{t.armenianLabel}</span><h2>{t.armenianTitle}</h2><p>{t.armenianBody}</p><div className="hv7ArmenianLinks"><a href="/language">Language ↗</a><a href="/voice">Voice ↗</a><a href="/quality">Quality ↗</a></div></div>
       <div className="hv7LanguageCard"><div><span>{t.written}</span><p>{t.writtenText}</p></div><div><span>{t.spoken}</span><p>{t.spokenText}</p></div><footer><b>HY-AM</b><span>brand-safe</span><span>pronunciation-aware</span><span>human-reviewable</span></footer></div>
     </section>
 
@@ -267,11 +270,11 @@ export default function LandingPageV7(){
     <section className="hv7Pricing" id="pricing">
       <header><span>{t.pricingLabel}</span><h2>{t.pricingTitle}</h2></header>
       <div className="hv7PlanGrid">{HAY_PLANS.map(plan=><article key={plan.id} className={plan.id==="growth"?"featured":""}><div><span>{plan.name}</span>{plan.badge&&<b>{plan.badge}</b>}</div><p>{plan.description[locale]}</p><strong>{plan.priceAmd?`${formatAmd(plan.priceAmd)} ֏`:"0 ֏"}<small>{t.month}</small></strong><ul>{plan.features[locale].slice(0,5).map(feature=><li key={feature}>{feature}</li>)}</ul><a href={`/login?next=%2Fstudio&plan=${plan.id}`}>{t.choose}<span>↗</span></a></article>)}</div>
-      <div className="hv7Agency"><div><span>{t.agency}</span><p>{t.agencyBody}</p></div><strong>{t.from} {formatAmd(AGENCY_STARTING_AMD)} ֏</strong><a href="/login?next=%2Fstudio&plan=agency">Contact / Start ↗</a></div>
+      <div className="hv7Agency"><div><span>{t.agency}</span><p>{t.agencyBody}</p></div><strong>{t.from} {formatAmd(AGENCY_STARTING_AMD)} ֏</strong><a href="/login?next=%2Fstudio&plan=agency">{t.agencyCta} ↗</a></div>
     </section>
 
     <section className="hv7Final"><div><span>{t.finalLabel}</span><h2>{t.finalTitle}</h2><p>{t.finalBody}</p></div><a href="/login?next=%2Fstudio">{t.open}<span>↗</span></a></section>
 
-    <footer className="hv7Footer"><span>HAY ENGINE · YEREVAN / 2026</span><div><a href="/developers">API</a><a href="/benchmark">Benchmark</a><a href="/corrections">Teach HAY</a></div><span>ARMENIAN-FIRST MARKETING INFRASTRUCTURE</span></footer>
+    <footer className="hv7Footer"><span>HAY ENGINE · YEREVAN / 2026</span><div><a href="/developers">API</a><a href="/benchmark">Benchmark</a><a href="/corrections">Corrections</a></div><span>MARKETING SOFTWARE · ARMENIAN LANGUAGE LAYER</span></footer>
   </main>;
 }

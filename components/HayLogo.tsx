@@ -6,7 +6,7 @@ export default function HayLogo({ compact = false }: { compact?: boolean }) {
         <path d="M18 18v28M46 18v28M18 31h28M27 18v28" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round"/>
         <circle cx="46" cy="18" r="3.2" fill="currentColor"/>
       </svg>
-      <div className="hayWordmark"><strong>HAY</strong><span>ENGINE</span>{!compact && <small>Հայկական AI ենթակառուցվածք</small>}</div>
+      <div className="hayWordmark"><strong>HAY</strong><span>ENGINE</span>{!compact && <small>BUILT IN ARMENIA</small>}</div>
     </div>
   );
 }
