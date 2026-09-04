@@ -30,7 +30,7 @@ jobs:
             ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
       - run: npm ci
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high || (sleep 15 && npm audit --omit=dev --audit-level=high)
+        run: npm audit --package-lock-only --omit=dev --audit-level=high || (sleep 15 && npm audit --package-lock-only --omit=dev --audit-level=high)
       - run: npm run env:check
       - run: npm run security:policy
       - run: npm run security:regeneration
@@ -58,7 +58,7 @@ jobs:
           cache-dependency-path: render-worker/package-lock.json
       - run: npm ci
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high || (sleep 15 && npm audit --omit=dev --audit-level=high)
+        run: npm audit --package-lock-only --omit=dev --audit-level=high || (sleep 15 && npm audit --package-lock-only --omit=dev --audit-level=high)
       - run: npm run check
 
   publish-worker:
@@ -75,5 +75,5 @@ jobs:
           cache-dependency-path: publish-worker/package-lock.json
       - run: npm ci
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high || (sleep 15 && npm audit --omit=dev --audit-level=high)
+        run: npm audit --package-lock-only --omit=dev --audit-level=high || (sleep 15 && npm audit --package-lock-only --omit=dev --audit-level=high)
       - run: npm run check
